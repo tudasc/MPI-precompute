@@ -34,6 +34,7 @@ MOD=${MOD-0}
 
 # config
 OUTPATH=/work/scratch/tj75qeje/mpi-comp-match/output/$SLURM_NPROCS
+mkdir -p $OUTPATH
 
 
 TIMEOUT_CMD="/usr/bin/timeout -k 60 60"
