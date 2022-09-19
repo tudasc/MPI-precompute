@@ -23,18 +23,18 @@
 #same as -o
 #SBATCH --output output/job_%a.out
 ## The real output will be saved into yml files
-####SBATCH --output /dev/null
+#SBATCH --output /dev/null
 
+
+
+MODE=${MODE-normal}
+# 0,1,2,3 for normal,rendevouz1,rendevouz2,eager
+MOD=${MOD-0}
 
 
 # config
 OUTPATH=/work/scratch/tj75qeje/mpi-comp-match/output/$SLURM_NPROCS
-MODE=normal
-# 0,1,2,3 for normal,rendevouz1,rendevouz2,eager
-MOD=0
 
-
-## CYCLES=64
 
 TIMEOUT_CMD="/usr/bin/timeout -k 60 60"
 #here the jobscript starts
