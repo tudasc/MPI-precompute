@@ -7,8 +7,8 @@ import numpy as np
 import argparse
 import pickle
 
-# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/2"
-DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2"
+DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/2"
+# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_noWarmup"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside_no_warmup"
@@ -96,7 +96,6 @@ def get_data_bufsize(data, buf_size, calctime):
     y = []
 
     # key is calctime, value the dict mapping bufsize and overhead
-
     for mearsurement in data[calctime]:
         if buf_size in mearsurement:
             y.append(float(mearsurement[buf_size]))
@@ -418,6 +417,10 @@ def add_line_plot(key, ax, buf_size, data, fill):
     return max_y
 
 
+# data = dict
+# mode
+# calctime
+
 def read_data():
     print("Read Data ...")
     data_NOwarmup = {NORMAL: {}, EAGER: {}, RENDEVOUZ1: {}, RENDEVOUZ2: {}}
@@ -445,8 +448,12 @@ def read_data():
                         print(entry.name)
                         exit(-1)
 
-                    # get calctime
-                    calctime = int(entry.name.split("_")[-1].split(".")[0])
+                    # get calctime and cycles:
+                    splitted= entry.name.split("_")
+                    calctime = int(splitted[2])
+                    assert("calctime" in splitted[1])
+                    assert("cycles" in splitted[3])
+                    cycles = int(splitted[4].split(".")[0])
                     # print(calctime)
 
                     # read data
