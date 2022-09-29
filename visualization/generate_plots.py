@@ -6,15 +6,17 @@ import math
 import numpy as np
 import argparse
 import pickle
+import pandas as pd
 
 DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/2"
+#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/192"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_noWarmup"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside_no_warmup"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_192"
 
-CACHE_FILE = "cache.pkl"
+CACHE_FILE = "cache.csv"
 PLTSIZE = (12, 4)
 PLTSIZE_BAR_PLT = (12, 4)
 PLTSIZE_VIOLIN_PLT = (24, 4)
@@ -35,6 +37,8 @@ buffer_sizes_with_full_plot = [1024, 1048576]
 nrows = 1
 
 comptime_for_barplots = 10000
+cycles_to_use=64
+warmup_to_use=8
 
 # limited set for faster measurement
 # buffer_sizes = [8,1024,16384,65536,262144,1048576,4194304,16777216]
@@ -96,7 +100,7 @@ def get_data_bufsize(data, buf_size, calctime):
     y = []
 
     # key is calctime, value the dict mapping bufsize and overhead
-    for mearsurement in data[calctime]:
+    for mearsurement in data[calctime][cycles_to_use]:
         if buf_size in mearsurement:
             y.append(float(mearsurement[buf_size]))
         # print (y)
@@ -420,13 +424,17 @@ def add_line_plot(key, ax, buf_size, data, fill):
 # data = dict
 # mode
 # calctime
+# warmup
+# repetitions
+# buf len
+# list of measurements
 
 def read_data():
+
+    df=pd.DataFrame(columns=['mode','calctime','warmup','cycles','buflen','overhead'])
     print("Read Data ...")
-    data_NOwarmup = {NORMAL: {}, EAGER: {}, RENDEVOUZ1: {}, RENDEVOUZ2: {}}
 
-    data = {NORMAL: {}, EAGER: {}, RENDEVOUZ1: {}, RENDEVOUZ2: {}}
-
+    i=0
     # read input data
     with os.scandir(DATA_DIR) as dir:
         for entry in dir:
@@ -451,9 +459,11 @@ def read_data():
                     # get calctime and cycles:
                     splitted= entry.name.split("_")
                     calctime = int(splitted[2])
-                    assert("calctime" in splitted[1])
+                    #assert("calctime" in splitted[1])
                     assert("cycles" in splitted[3])
-                    cycles = int(splitted[4].split(".")[0])
+                    cycles = int(splitted[4])
+                    assert ("warmup" in splitted[5])
+                    warmup = int(splitted[6].split(".")[0])
                     # print(calctime)
 
                     # read data
@@ -468,37 +478,28 @@ def read_data():
                     # if there is data available
                     if run_data is not None:
                         run_data = run_data["async_persistentpt2pt"]["over_full"]
-                        if calctime not in data[mode]:
-                            data[mode][calctime] = []
-                        data[mode][calctime].append(run_data)
+                        for key,val in run_data.items():
+                            # key is bufsize, val is overhead measured in s
+                            df.loc[i]=[mode,calctime,cycles,warmup,key,val]
+                            i+=1
                 except ValueError:
                     print("could not read %s" % entry.name)
-
-    return data, data_NOwarmup
+    return df
 
 
 def print_stat(data, key, buf_size, base_val):
-    measurement_count = 0
-    sum = 0
-    values = []
     # only print stats for maximum comp time
-    comp_time = max(data[key], key=int)
-    for measurement in data[key][comp_time]:
-        if buf_size in measurement:
-            measurement_count += 1
-            values.append(float(measurement[buf_size]))
+    select_df= data[(data['mode']==key)&(data['calctime'] == data['calctime'].max()) & (data['buflen'] == buf_size)]
 
-    avg = 1
-
+    avg=select_df['overhead'].mean()
+    measurement_count = len(select_df.index)
     if measurement_count > 0:
-        avg = mean_percentile_range(values, upper, lower)
+
         if base_val == -1:
             print("%s: %d measurements, 0%% improvement (avg)" % (names[key], measurement_count))
         else:
             improvement = 100 * (base_val - avg) / base_val
             print("%s: %d measurements, %f%% improvement (avg)" % (names[key], measurement_count, improvement))
-
-
     else:
         print("%s: 0 measurements" % names[key])
 
@@ -510,8 +511,8 @@ def print_statistics(data):
         print("")
         print(buf_size)
         measurement_count, avg = print_stat(data, NORMAL, buf_size, -1)
-        measurement_count, _ = print_stat(data, EAGER, buf_size, avg)
-        measurement_count, _ = print_stat(data, RENDEVOUZ1, buf_size, avg)
+        #measurement_count, _ = print_stat(data, EAGER, buf_size, avg)
+        #measurement_count, _ = print_stat(data, RENDEVOUZ1, buf_size, avg)
         measurement_count, _ = print_stat(data, RENDEVOUZ2, buf_size, avg)
 
 
@@ -521,28 +522,19 @@ def main():
                         help='use the content of the cache file named %s. do NOT set this argument, if you want to re-write the cache' % CACHE_FILE)
     args = parser.parse_args()
     if args.cache:
-        with open(CACHE_FILE, 'rb') as f:
-            data = pickle.load(f)
+        data=pd.read_csv(CACHE_FILE,index_col=0)
     else:
-        data, data_NOwarmup = read_data()
-        with open(CACHE_FILE, 'wb') as f:
-            pickle.dump(data, f)
-
+        data = read_data()
+        data.to_csv(CACHE_FILE)
     print_statistics(data)
 
     print("generating plots ...")
-
-    # get_comp_time_plot(data, buffer_sizes_with_full_plot,"overhead_scaled",scaling=True, fill=False,eager=False)
-    # get_comp_time_plot(data, buffer_sizes_with_full_plot,"overhead_scaled_filled",scaling=True, fill=True,eager=False)
-    # get_comp_time_plot(data, buffer_sizes_with_full_plot,"overhead",scaling=False, fill=False,eager=False)
 
     get_bar_plot(data, buffer_sizes, comptime_for_barplots, "overhead_bars")
     get_bar_plot(data, buffer_sizes, comptime_for_barplots, "overhead_bars_scaled", scaling=True)
     get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins")
     get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins_scaled", scaling=True)
 
-    # get_plot(data_NOwarmup, True, "noWarmup_scaled")
-    # get_plot(data_NOwarmup, False, "noWarmup")
 
     print("done")
 
