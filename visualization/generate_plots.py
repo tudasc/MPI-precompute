@@ -9,12 +9,12 @@ import pickle
 import pandas as pd
 
 DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/2"
-#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/192"
+# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/192"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2"
-#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_noWarmup"
-#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside"
-#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside_no_warmup"
-#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_192"
+# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_noWarmup"
+# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside"
+# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside_no_warmup"
+# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_192"
 
 CACHE_FILE = "cache.csv"
 PLTSIZE = (12, 4)
@@ -37,8 +37,8 @@ buffer_sizes_with_full_plot = [1024, 1048576]
 nrows = 1
 
 comptime_for_barplots = 10000
-cycles_to_use=64
-warmup_to_use=8
+cycles_to_use = 64
+warmup_to_use = 8
 
 # limited set for faster measurement
 # buffer_sizes = [8,1024,16384,65536,262144,1048576,4194304,16777216]
@@ -96,29 +96,25 @@ def extract_data_calctime(data, buf_size):
     return x_sort, y_min_sort, y_max_sort, y_avg_sort
 
 
-def get_data_bufsize(data, buf_size, calctime):
-    y = []
+def get_data_bufsize(data, key, buf_size, calctime):
+    select_df = data[(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
+                data['calctime'] == calctime) & (data['buflen'] == buf_size)]
 
-    # key is calctime, value the dict mapping bufsize and overhead
-    for mearsurement in data[calctime][cycles_to_use]:
-        if buf_size in mearsurement:
-            y.append(float(mearsurement[buf_size]))
-        # print (y)
-    if not y:
+    if len(select_df.index) == 0:
         # empty
         return 0, 0, 0, 0, [0]
+    y = select_df['overhead'].to_numpy()
     y_min = np.percentile(y, lower)
     y_max = np.percentile(y, upper)
     y_avg = mean_percentile_range(y, upper, lower)
 
-    y = [yy for yy in y if yy >= y_min and yy <= y_max]
     y_median = np.median(y)
 
     return y_min, y_max, y_avg, y_median, y
 
 
-def add_bar(ax,x, data, key, buf_size, comp_time, show_in_legend=True):
-    min, max, avg, median, _ = get_data_bufsize(data[key], buf_size, comp_time)
+def add_bar(ax, x, data, key, buf_size, comp_time, show_in_legend=True):
+    min, max, avg, median, _ = get_data_bufsize(data, key, buf_size, comp_time)
     if show_in_legend:
         label = names[key]
     else:
@@ -131,10 +127,11 @@ def add_bar(ax,x, data, key, buf_size, comp_time, show_in_legend=True):
     return max
 
 
-def add_violin(ax,x, data, key, buf_size, comp_time, show_in_legend=True):
-    _, max, _, _, y = get_data_bufsize(data[key], buf_size, comp_time)
+def add_violin(ax, x, data, key, buf_size, comp_time, show_in_legend=True):
+    _, max, _, _, y = get_data_bufsize(data, key, buf_size, comp_time)
 
-    violin_parts = ax.violinplot([y], [x*2], widths=[1.5], quantiles=[lower / 100, upper / 100], showmeans=True,showmedians=True, showextrema=False)
+    violin_parts = ax.violinplot([y], [x * 2], widths=[1.5], quantiles=[lower / 100, upper / 100], showmeans=True,
+                                 showmedians=True, showextrema=False)
     for pc in violin_parts['bodies']:
         pc.set_color(colors[key])
 
@@ -142,13 +139,13 @@ def add_violin(ax,x, data, key, buf_size, comp_time, show_in_legend=True):
 
 
 def get_bar_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=False, normal=True, eager=True,
-                 rendevouz1=True, rendevouz2=True, scaling_key=NORMAL,split_point=5):
+                 rendevouz1=True, rendevouz2=True, scaling_key=NORMAL, split_point=5):
     ftsize = 16
     plt.rcParams.update({'font.size': ftsize})
     # plt.rcParams.update({'font.size': 18, 'hatch.linewidth': 0.0075})
     figsz = PLTSIZE_BAR_PLT
 
-    local_split_point=split_point
+    local_split_point = split_point
     num_bars = 1  # the space in between two different buffer length
     if normal:
         num_bars += 1
@@ -167,8 +164,7 @@ def get_bar_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=Fa
     current_bar = 0
     show_in_legend = True;
 
-
-    i=0
+    i = 0
     for ax in axs:
         x_tics_labels = []
         x_tics = []
@@ -176,30 +172,30 @@ def get_bar_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=Fa
         while i < len(buffer_sizes):
             if current_bar >= local_split_point * num_bars:
                 local_split_point = len(buffer_sizes)
-                show_in_legend=True
+                show_in_legend = True
                 break
 
-            buf_size=buffer_sizes[i]
-            i+=1
+            buf_size = buffer_sizes[i]
+            i += 1
 
             x_tics.append(num_bars / 2 + current_bar)
             if eager:
-                max_y = add_bar(ax,current_bar, data, EAGER, buf_size, comp_time, show_in_legend)
+                max_y = add_bar(ax, current_bar, data, EAGER, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if scaling_key == EAGER:
                     y_scale = max(max_y, y_scale)
             if rendevouz1:
-                max_y = add_bar(ax,current_bar, data, RENDEVOUZ1, buf_size, comp_time, show_in_legend)
+                max_y = add_bar(ax, current_bar, data, RENDEVOUZ1, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if scaling_key == RENDEVOUZ1:
                     y_scale = max(max_y, y_scale)
             if rendevouz2:
-                max_y = add_bar(ax,current_bar, data, RENDEVOUZ2, buf_size, comp_time, show_in_legend)
+                max_y = add_bar(ax, current_bar, data, RENDEVOUZ2, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if scaling_key == RENDEVOUZ2:
                     y_scale = max(max_y, y_scale)
             if normal:
-                max_y = add_bar(ax,current_bar, data, NORMAL, buf_size, comp_time, show_in_legend)
+                max_y = add_bar(ax, current_bar, data, NORMAL, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if scaling_key == NORMAL:
                     y_scale = max(max_y, y_scale)
@@ -224,7 +220,7 @@ def get_bar_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=Fa
         # ax.xaxis.set_major_locator(locator)
         # ax.locator_params(axis='x', tight=True, nbins=4)
 
-        if ax==axs[1]:
+        if ax == axs[1]:
             ax.legend(loc='upper left')
 
         if scaling:
@@ -242,7 +238,7 @@ def get_bar_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=Fa
 
 
 def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=False, normal=True, eager=True,
-                    rendevouz1=True, rendevouz2=True, scaling_key=NORMAL,split_point=5):
+                    rendevouz1=True, rendevouz2=True, scaling_key=NORMAL, split_point=5):
     ftsize = 16
     plt.rcParams.update({'font.size': ftsize})
     # plt.rcParams.update({'font.size': 18, 'hatch.linewidth': 0.0075})
@@ -258,11 +254,11 @@ def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill
     if rendevouz2:
         num_violins += 1
 
-    y_pos = range(num_violins *2* len(buffer_sizes))
-    y_scale =0
+    y_pos = range(num_violins * 2 * len(buffer_sizes))
+    y_scale = 0
 
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsz, sharex=False, sharey=False)
-    local_split_point=split_point
+    local_split_point = split_point
 
     current_bar = 0
     show_in_legend = True
@@ -280,30 +276,30 @@ def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill
 
             buf_size = buffer_sizes[i]
             i += 1
-            x_tics.append(num_violins / 2 + current_bar*2)
+            x_tics.append(num_violins / 2 + current_bar * 2)
             if eager:
-                label,max_y = add_violin(ax,current_bar, data, EAGER, buf_size, comp_time, show_in_legend)
+                label, max_y = add_violin(ax, current_bar, data, EAGER, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if show_in_legend:
                     legend_labels.append(label)
                 if scaling_key == EAGER:
                     y_scale = max(max_y, y_scale)
             if rendevouz1:
-                label,max_y = add_violin(ax,current_bar, data, RENDEVOUZ1, buf_size, comp_time, show_in_legend)
+                label, max_y = add_violin(ax, current_bar, data, RENDEVOUZ1, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if show_in_legend:
                     legend_labels.append(label)
                 if scaling_key == RENDEVOUZ1:
                     y_scale = max(max_y, y_scale)
             if rendevouz2:
-                label,max_y = add_violin(ax,current_bar, data, RENDEVOUZ2, buf_size, comp_time, show_in_legend)
+                label, max_y = add_violin(ax, current_bar, data, RENDEVOUZ2, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if show_in_legend:
                     legend_labels.append(label)
                 if scaling_key == RENDEVOUZ2:
                     y_scale = max(max_y, y_scale)
             if normal:
-                label,max_y = add_violin(ax,current_bar, data, NORMAL, buf_size, comp_time, show_in_legend)
+                label, max_y = add_violin(ax, current_bar, data, NORMAL, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if show_in_legend:
                     legend_labels.append(label)
@@ -332,7 +328,7 @@ def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill
             ax.legend(*zip(*legend_labels), loc='upper left')
 
         if scaling:
-           ax.set_ylim(0, y_scale * 1.05)
+            ax.set_ylim(0, y_scale * 1.05)
 
         # convert to seconds easy comparision with y axis
 
@@ -430,11 +426,10 @@ def add_line_plot(key, ax, buf_size, data, fill):
 # list of measurements
 
 def read_data():
-
-    df=pd.DataFrame(columns=['mode','calctime','warmup','cycles','buflen','overhead'])
+    df = pd.DataFrame(columns=['mode', 'calctime', 'warmup', 'cycles', 'buflen', 'overhead'])
     print("Read Data ...")
 
-    i=0
+    i = 0
     # read input data
     with os.scandir(DATA_DIR) as dir:
         for entry in dir:
@@ -457,10 +452,10 @@ def read_data():
                         exit(-1)
 
                     # get calctime and cycles:
-                    splitted= entry.name.split("_")
+                    splitted = entry.name.split("_")
                     calctime = int(splitted[2])
-                    #assert("calctime" in splitted[1])
-                    assert("cycles" in splitted[3])
+                    # assert("calctime" in splitted[1])
+                    assert ("cycles" in splitted[3])
                     cycles = int(splitted[4])
                     assert ("warmup" in splitted[5])
                     warmup = int(splitted[6].split(".")[0])
@@ -478,10 +473,10 @@ def read_data():
                     # if there is data available
                     if run_data is not None:
                         run_data = run_data["async_persistentpt2pt"]["over_full"]
-                        for key,val in run_data.items():
+                        for key, val in run_data.items():
                             # key is bufsize, val is overhead measured in s
-                            df.loc[i]=[mode,calctime,cycles,warmup,key,val]
-                            i+=1
+                            df.loc[i] = [mode, calctime, warmup, cycles, key, val]
+                            i += 1
                 except ValueError:
                     print("could not read %s" % entry.name)
     return df
@@ -489,9 +484,11 @@ def read_data():
 
 def print_stat(data, key, buf_size, base_val):
     # only print stats for maximum comp time
-    select_df= data[(data['mode']==key)&(data['calctime'] == data['calctime'].max()) & (data['buflen'] == buf_size)]
+    select_df = data[(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
+                data['calctime'] == data['calctime'].max()) & (data['buflen'] == buf_size)]
+    # print(select_df.head)
 
-    avg=select_df['overhead'].mean()
+    avg = select_df['overhead'].mean()
     measurement_count = len(select_df.index)
     if measurement_count > 0:
 
@@ -511,8 +508,8 @@ def print_statistics(data):
         print("")
         print(buf_size)
         measurement_count, avg = print_stat(data, NORMAL, buf_size, -1)
-        #measurement_count, _ = print_stat(data, EAGER, buf_size, avg)
-        #measurement_count, _ = print_stat(data, RENDEVOUZ1, buf_size, avg)
+        # measurement_count, _ = print_stat(data, EAGER, buf_size, avg)
+        # measurement_count, _ = print_stat(data, RENDEVOUZ1, buf_size, avg)
         measurement_count, _ = print_stat(data, RENDEVOUZ2, buf_size, avg)
 
 
@@ -522,7 +519,7 @@ def main():
                         help='use the content of the cache file named %s. do NOT set this argument, if you want to re-write the cache' % CACHE_FILE)
     args = parser.parse_args()
     if args.cache:
-        data=pd.read_csv(CACHE_FILE,index_col=0)
+        data = pd.read_csv(CACHE_FILE, index_col=0)
     else:
         data = read_data()
         data.to_csv(CACHE_FILE)
@@ -534,7 +531,6 @@ def main():
     get_bar_plot(data, buffer_sizes, comptime_for_barplots, "overhead_bars_scaled", scaling=True)
     get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins")
     get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins_scaled", scaling=True)
-
 
     print("done")
 
