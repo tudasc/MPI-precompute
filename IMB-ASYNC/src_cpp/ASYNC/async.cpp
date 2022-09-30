@@ -492,7 +492,7 @@ namespace async_suite {
             } else {
                 pair = rank - stride;
                 MPI_Send_init((char*)sbuf  , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
-                            MPI_Recv_init((char*)rbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_r);
+                MPI_Recv_init((char*)rbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_r);
                 for (int i = 0; i < ncycles + nwarmup; i++) {
                     if (i == nwarmup) t1 = MPI_Wtime();
                     MPI_Start(&request_s);
@@ -527,11 +527,15 @@ namespace async_suite {
             // max 10% different calc-times
             if (diff>0.1*max_ctime){
             	// one could also just check if(ctime < 0.9*max_ctime)
-            	valid=0;
+            	//SWITCH OF THIS FEATURE FOR RUNNING WITH VERY LARGE PROCESS COUNTS
+            	valid=1;
             	std::cout << "WARNING: SUSPICIOUSLY LARGE DIFFERENCE IN CALCULATION TIMINGS, discarding this run\n";
             }
             // ONLY TAKE RESULT, IF ALL ARE VALID
             MPI_Allreduce(MPI_IN_PLACE,&valid, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);
+
+// take the maximum time, so that the waiting time is tought of as computation instead of overhead
+            ctime = max_ctime;
 
             results[count] = result { (valid>0), time, time - ctime + tover_comm, tover_calc, ncycles };
             return true;
@@ -936,7 +940,11 @@ namespace async_suite {
             cper10usec = cper10usec_avg;
             assert(cper10usec_avg != 0);
         }
+
+
         int R = calctime_by_len[count] * cper10usec / 10;
+               
+               
         if (wld == workload_t::CALC_AND_PROGRESS && reqs) {
             for (int r = 0; r < num_requests; r++) {
                 stat[r] = 0;
