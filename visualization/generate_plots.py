@@ -8,8 +8,10 @@ import argparse
 import pickle
 import pandas as pd
 
+import seaborn as sns
+
 DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/2"
-# DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/192"
+#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/192"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_noWarmup"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside"
@@ -32,7 +34,7 @@ colors = {NORMAL: "#4477AA", EAGER: "#EE6677", RENDEVOUZ1: "#AA3377", RENDEVOUZ2
 
 buffer_sizes = [4, 8, 32, 512, 1024, 4906, 16384, 65536, 1048576, 4194304, 16777216]
 # buffer_sizes = [4, 8, 32, 512, 1024, 16384, 1048576, 4194304, 16777216]
-# buffer_sizes = [512,4194304,16777216]
+# buffer_sizes = [1048576,4194304,16777216]
 buffer_sizes_with_full_plot = [1024, 1048576]
 nrows = 1
 
@@ -132,6 +134,10 @@ def add_violin(ax, x, data, key, buf_size, comp_time, show_in_legend=True):
 
     violin_parts = ax.violinplot([y], [x * 2], widths=[1.5], quantiles=[lower / 100, upper / 100], showmeans=True,
                                  showmedians=True, showextrema=False)
+
+    swarm=simple_beeswarm(y,nbins=6)
+    swarm = swarm + x*2
+    ax.plot(swarm,y, 'o',color=colors[key])
     for pc in violin_parts['bodies']:
         pc.set_color(colors[key])
 
@@ -236,8 +242,156 @@ def get_bar_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=Fa
     output_format = "pdf"
     plt.savefig(plot_name + "." + output_format, bbox_inches='tight')
 
+#from
+#
+def simple_beeswarm(y, nbins=None):
+    """
+    Returns x coordinates for the points in ``y``, so that plotting ``x`` and
+    ``y`` results in a bee swarm plot.
+    """
+    y = np.asarray(y)
+    if nbins is None:
+        nbins = len(y) // 6
+
+    # Get upper bounds of bins
+    x = np.zeros(len(y))
+    if len(y) < nbins:
+        return x
+    ylo = np.min(y)
+    yhi = np.max(y)
+    dy = (yhi - ylo) / nbins
+    ybins = np.linspace(ylo + dy, yhi - dy, nbins - 1)
+
+    # Divide indices into bins
+    i = np.arange(len(y))
+    ibs = [0] * nbins
+    ybs = [0] * nbins
+    nmax = 0
+    for j, ybin in enumerate(ybins):
+        f = y <= ybin
+        ibs[j], ybs[j] = i[f], y[f]
+        nmax = max(nmax, len(ibs[j]))
+        f = ~f
+        i, y = i[f], y[f]
+    ibs[-1], ybs[-1] = i, y
+    nmax = max(nmax, len(ibs[-1]))
+
+    # Assign x indices
+    dx = 1 / (nmax // 2)
+    for i, y in zip(ibs, ybs):
+        if len(i) > 1:
+            j = len(i) % 2
+            i = i[np.argsort(y)]
+            a = i[j::2]
+            b = i[j+1::2]
+            x[a] = (0.5 + j / 3 + np.arange(len(b))) * dx
+            x[b] = (0.5 + j / 3 + np.arange(len(b))) * -dx
+
+    return x
 
 def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=False, normal=True, eager=True,
+                    rendevouz1=True, rendevouz2=True, scaling_key=NORMAL, split_point=5):
+    ftsize = 16
+    plt.rcParams.update({'font.size': ftsize})
+    # plt.rcParams.update({'font.size': 18, 'hatch.linewidth': 0.0075})
+    figsz = PLTSIZE_VIOLIN_PLT
+
+    num_violins = 1  # the space in between two different buffer length
+    if normal:
+        num_violins += 1
+    if eager:
+        num_violins += 1
+    if rendevouz1:
+        num_violins += 1
+    if rendevouz2:
+        num_violins += 1
+
+    y_pos = range(num_violins * 2 * len(buffer_sizes))
+    y_scale = 0
+
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsz, sharex=False, sharey=False)
+    local_split_point = split_point
+
+    current_bar = 0
+    show_in_legend = True
+    i = 0
+    for ax in axs:
+        legend_labels = []
+        x_tics_labels = []
+        x_tics = []
+        # reshape axis to have 1d-array we can iterate over
+        while i < len(buffer_sizes):
+            if current_bar >= local_split_point * num_violins:
+                local_split_point = len(buffer_sizes)
+                show_in_legend = True
+                break
+
+            buf_size = buffer_sizes[i]
+            i += 1
+            x_tics.append(num_violins / 2 + current_bar * 2)
+            if eager:
+                label, max_y = add_violin(ax, current_bar, data, EAGER, buf_size, comp_time, show_in_legend)
+                current_bar += 1
+                if show_in_legend:
+                    legend_labels.append(label)
+                if scaling_key == EAGER:
+                    y_scale = max(max_y, y_scale)
+            if rendevouz1:
+                label, max_y = add_violin(ax, current_bar, data, RENDEVOUZ1, buf_size, comp_time, show_in_legend)
+                current_bar += 1
+                if show_in_legend:
+                    legend_labels.append(label)
+                if scaling_key == RENDEVOUZ1:
+                    y_scale = max(max_y, y_scale)
+            if rendevouz2:
+                label, max_y = add_violin(ax, current_bar, data, RENDEVOUZ2, buf_size, comp_time, show_in_legend)
+                current_bar += 1
+                if show_in_legend:
+                    legend_labels.append(label)
+                if scaling_key == RENDEVOUZ2:
+                    y_scale = max(max_y, y_scale)
+            if normal:
+                label, max_y = add_violin(ax, current_bar, data, NORMAL, buf_size, comp_time, show_in_legend)
+                current_bar += 1
+                if show_in_legend:
+                    legend_labels.append(label)
+                if scaling_key == NORMAL:
+                    y_scale = max(max_y, y_scale)
+            current_bar += 1
+            show_in_legend = False
+
+            if buf_size < 1024:
+                x_tics_labels.append("%d\nB" % buf_size)
+            elif buf_size < 1048576:
+                x_tics_labels.append("%d\nKiB" % (buf_size / 1024))
+            else:
+                x_tics_labels.append("%d\nMiB" % (buf_size / 1048576))
+
+        ax.set_xlabel("Buffer Size")
+        if ax == axs[0]:
+            ax.set_ylabel("communication overhead in seconds")
+        else:
+            ax.yaxis.tick_right()
+
+        # locator = plt.MaxNLocator(nbins=7)
+        # ax.xaxis.set_major_locator(locator)
+        # ax.locator_params(axis='x', tight=True, nbins=4)
+        if ax == axs[1]:
+            ax.legend(*zip(*legend_labels), loc='upper left')
+
+        if scaling:
+            ax.set_ylim(0, y_scale * 1.05)
+
+        # convert to seconds easy comparision with y axis
+
+        ax.set_xticks(x_tics)
+        ax.set_xticklabels(x_tics_labels)
+
+    plt.tight_layout()
+    output_format = "pdf"
+    plt.savefig(plot_name + "." + output_format, bbox_inches='tight')
+
+def get_violin_plot_old(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=False, normal=True, eager=True,
                     rendevouz1=True, rendevouz2=True, scaling_key=NORMAL, split_point=5):
     ftsize = 16
     plt.rcParams.update({'font.size': ftsize})
@@ -342,6 +496,7 @@ def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill
 
 def get_comp_time_plot(data, buffer_sizes, plot_name, scaling=True, fill=False, normal=True, eager=True,
                        rendevouz1=True, rendevouz2=True):
+
     ftsize = 16
     plt.rcParams.update({'font.size': ftsize})
     # plt.rcParams.update({'font.size': 18, 'hatch.linewidth': 0.0075})
@@ -486,7 +641,7 @@ def print_stat(data, key, buf_size, base_val):
     # only print stats for maximum comp time
     select_df = data[(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
                 data['calctime'] == data['calctime'].max()) & (data['buflen'] == buf_size)]
-    # print(select_df.head)
+    #print(select_df.head)
 
     avg = select_df['overhead'].mean()
     measurement_count = len(select_df.index)
@@ -527,9 +682,9 @@ def main():
 
     print("generating plots ...")
 
-    get_bar_plot(data, buffer_sizes, comptime_for_barplots, "overhead_bars")
-    get_bar_plot(data, buffer_sizes, comptime_for_barplots, "overhead_bars_scaled", scaling=True)
-    get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins")
+    #get_bar_plot(data, buffer_sizes, comptime_for_barplots, "overhead_bars")
+    #get_bar_plot(data, buffer_sizes, comptime_for_barplots, "overhead_bars_scaled", scaling=True)
+    get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins",scaling_key=RENDEVOUZ2)
     get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins_scaled", scaling=True)
 
     print("done")
