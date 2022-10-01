@@ -246,21 +246,21 @@ namespace async_suite {
         MPI_Gather(&xx, 1, MPI_DOUBLE, fromall.data(), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         if (rank != 0)
             return 0;
+        
+        //remove all NaN
+        fromall.erase(std::remove_if(fromall.begin(),fromall.end(), [] (double x ) {return std::isnan(x);}),fromall.end());
+        
+          
         const char *avg_option = nullptr;
         if (!(avg_option = getenv("IMB_ASYNC_AVG_OPT"))) {
             avg_option = "MEDIAN";
         }
         if (std::string(avg_option) == "MEDIAN") {
-            std::sort(fromall.begin(), fromall.end());
-            if (nexec == 0)
-                return 0;
-            int off = np - nexec;
-            if (nexec == 1)
-                return fromall[off];
-            if (nexec == 2) {
-                return (fromall[off] + fromall[off+1]) / 2.0;
-            }
-            return fromall[off + nexec / 2];
+            // if we are here: we can choose other alg: there is no need to sort the whole vector for getting the median, nth elem is just fine
+            
+            size_t n = fromall.size() / 2;
+    nth_element(fromall.begin(), fromall.begin()+n, fromall.end());
+    return fromall[n];
         }
         if (std::string(avg_option) == "AVERAGE") {
             double sum = 0;
@@ -277,6 +277,7 @@ namespace async_suite {
         }
         return -1;
     }
+    
 
     void AsyncBenchmark::finalize() { 
         GET_PARAMETER(YAML::Emitter, yaml_out);
@@ -442,8 +443,6 @@ namespace async_suite {
                 MPI_Barrier(MPI_COMM_WORLD);
                 double ctime=0;
                 MPI_Allreduce(MPI_IN_PLACE, &ctime, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-                int valid =1;
-                MPI_Allreduce(MPI_IN_PLACE,&valid, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);
                 return false;
             }
             size_t b = (size_t)orig_count * (size_t)dtsize;
@@ -518,6 +517,8 @@ namespace async_suite {
             MPI_Barrier(MPI_COMM_WORLD);
             std::cout<< ctime <<"\n";
 
+
+			double overhead=time - ctime + tover_comm;
             double max_ctime;
             MPI_Allreduce(&ctime,&max_ctime, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
@@ -527,17 +528,15 @@ namespace async_suite {
             // max 10% different calc-times
             if (diff>0.1*max_ctime){
             	// one could also just check if(ctime < 0.9*max_ctime)
-            	//SWITCH OF THIS FEATURE FOR RUNNING WITH VERY LARGE PROCESS COUNTS
-            	valid=1;
-            	std::cout << "WARNING: SUSPICIOUSLY LARGE DIFFERENCE IN CALCULATION TIMINGS, discarding this run\n";
+            	std::cout << "WARNING: SUSPICIOUSLY LARGE DIFFERENCE IN CALCULATION TIMINGS, discarding this mearurement and use the timing from slower ranks instead\n";
+            	// set NAN
+            	overhead =std::numeric_limits<double>::quiet_NaN();
             }
-            // ONLY TAKE RESULT, IF ALL ARE VALID
-            MPI_Allreduce(MPI_IN_PLACE,&valid, 1, MPI_INT, MPI_BAND, MPI_COMM_WORLD);
 
 // take the maximum time, so that the waiting time is tought of as computation instead of overhead
-            ctime = max_ctime;
+            //ctime = max_ctime;
 
-            results[count] = result { (valid>0), time, time - ctime + tover_comm, tover_calc, ncycles };
+            results[count] = result { (valid>0), time, overhead, tover_calc, ncycles };
             return true;
         }
 
@@ -785,10 +784,12 @@ namespace async_suite {
         return true;
     }
 
+
+
     // NOTE: to ensure just calc, no manual progress call it with iters_till_test == R
     // NOTE2: tover_comm is not zero'ed here before operation!
     void AsyncBenchmark_calc::calc_and_progress_cycle(int R, int iters_till_test, double &tover_comm) {
-        for (int repeat = 0, cnt = iters_till_test; repeat < R; repeat++) {
+          for (int repeat = 0, cnt = iters_till_test; repeat < R; repeat++) {
             if (--cnt == 0) { 
                 double t1 = MPI_Wtime();
                 if (reqs && num_requests) {
