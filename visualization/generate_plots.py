@@ -10,8 +10,9 @@ import pandas as pd
 
 import seaborn as sns
 
-DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/2"
+#DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/2"
 #DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/192"
+DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_noWarmup"
 # DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/measurement_2_inside"
@@ -41,6 +42,7 @@ nrows = 1
 comptime_for_barplots = 10000
 cycles_to_use = 64
 warmup_to_use = 8
+process_count_to_use=2
 
 # limited set for faster measurement
 # buffer_sizes = [8,1024,16384,65536,262144,1048576,4194304,16777216]
@@ -99,7 +101,7 @@ def extract_data_calctime(data, buf_size):
 
 
 def get_data_bufsize(data, key, buf_size, calctime):
-    select_df = data[(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
+    select_df = data[(data['nprocs'] == process_count_to_use) &(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
                 data['calctime'] == calctime) & (data['buflen'] == buf_size)]
 
     if len(select_df.index) == 0:
@@ -581,65 +583,69 @@ def add_line_plot(key, ax, buf_size, data, fill):
 # list of measurements
 
 def read_data():
-    df = pd.DataFrame(columns=['mode', 'calctime', 'warmup', 'cycles', 'buflen', 'overhead'])
+    df = pd.DataFrame(columns=['nprocs','mode', 'calctime', 'warmup', 'cycles', 'buflen', 'overhead'])
     print("Read Data ...")
 
     i = 0
     # read input data
-    with os.scandir(DATA_DIR) as dir:
-        for entry in dir:
-            if entry.is_file():
-
-                try:
-                    # original or modified run
-                    mode = -1
-                    if "normal" in entry.name:
-                        mode = NORMAL
-                    elif "eager" in entry.name:
-                        mode = EAGER
-                    elif "rendevouz1" in entry.name:
-                        mode = RENDEVOUZ1
-                    elif "rendevouz2" in entry.name:
-                        mode = RENDEVOUZ2
-                    else:
-                        print("Error readig file:")
-                        print(entry.name)
-                        exit(-1)
-
-                    # get calctime and cycles:
-                    splitted = entry.name.split("_")
-                    calctime = int(splitted[2])
-                    # assert("calctime" in splitted[1])
-                    assert ("cycles" in splitted[3])
-                    cycles = int(splitted[4])
-                    assert ("warmup" in splitted[5])
-                    warmup = int(splitted[6].split(".")[0])
-                    # print(calctime)
-
-                    # read data
-                    run_data = {}
-                    with open(DATA_DIR + "/" + entry.name, "r") as stream:
+    with os.scandir(DATA_DIR) as dirBase:
+        for entryDir in dirBase:
+            if entryDir.is_dir:
+                nprocs=int(entryDir.name)
+            with os.scandir(entryDir) as dir:
+                for entry in dir:
+                    if entry.is_file():
+        
                         try:
-                            run_data = yaml.safe_load(stream)
-                        except yaml.YAMLError as exc:
-                            print(exc)
-
-                    # only care about the overhead
-                    # if there is data available
-                    if run_data is not None:
-                        run_data = run_data["async_persistentpt2pt"]["over_full"]
-                        for key, val in run_data.items():
-                            # key is bufsize, val is overhead measured in s
-                            df.loc[i] = [mode, calctime, warmup, cycles, key, val]
-                            i += 1
-                except ValueError:
-                    print("could not read %s" % entry.name)
+                            # original or modified run
+                            mode = -1
+                            if "normal" in entry.name:
+                                mode = NORMAL
+                            elif "eager" in entry.name:
+                                mode = EAGER
+                            elif "rendevouz1" in entry.name:
+                                mode = RENDEVOUZ1
+                            elif "rendevouz2" in entry.name:
+                                mode = RENDEVOUZ2
+                            else:
+                                print("Error readig file:")
+                                print(entry.name)
+                                exit(-1)
+        
+                            # get calctime and cycles:
+                            splitted = entry.name.split("_")
+                            calctime = int(splitted[2])
+                            # assert("calctime" in splitted[1])
+                            assert ("cycles" in splitted[3])
+                            cycles = int(splitted[4])
+                            assert ("warmup" in splitted[5])
+                            warmup = int(splitted[6].split(".")[0])
+                            # print(calctime)
+        
+                            # read data
+                            run_data = {}
+                            with open(DATA_DIR + "/" +entryDir.name+"/"+ entry.name, "r") as stream:
+                                try:
+                                    run_data = yaml.safe_load(stream)
+                                except yaml.YAMLError as exc:
+                                    print(exc)
+        
+                            # only care about the overhead
+                            # if there is data available
+                            if run_data is not None:
+                                run_data = run_data["async_persistentpt2pt"]["over_full"]
+                                for key, val in run_data.items():
+                                    # key is bufsize, val is overhead measured in s
+                                    df.loc[i] = [nprocs,mode, calctime, warmup, cycles, key, val]
+                                    i += 1
+                        except ValueError:
+                            print("could not read %s" % entry.name)
     return df
 
 
 def print_stat(data, key, buf_size, base_val):
     # only print stats for maximum comp time
-    select_df = data[(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
+    select_df = data[(data['nprocs'] == process_count_to_use) &(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
                 data['calctime'] == data['calctime'].max()) & (data['buflen'] == buf_size)]
     #print(select_df.head)
 
