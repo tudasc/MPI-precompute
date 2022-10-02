@@ -1,3 +1,4 @@
+calcltime_10000_cycles_2_warmup_0 -ncycles 2 -nwarmup 0 -calctime 10000 -len 1048576
 calcltime_10000_cycles_64_warmup_8 -ncycles 64 -nwarmup 8 -calctime 10000 -len 4
 calcltime_10000_cycles_64_warmup_8 -ncycles 64 -nwarmup 8 -calctime 10000 -len 8
 calcltime_10000_cycles_64_warmup_8 -ncycles 64 -nwarmup 8 -calctime 10000 -len 32
