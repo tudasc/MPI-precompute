@@ -275,7 +275,7 @@ def get_scaling_plot(data, buffer_sizes, comp_time,plot_name, scaling=True, fill
     fig = plt.figure(figsize=figsz)
     ax= plt.gca()
 
-    
+
     for buf_size,color in zip(buffer_sizes,colors_list):
         size_str=""
         if buf_size < 1024:
@@ -319,7 +319,7 @@ def get_scaling_plot(data, buffer_sizes, comp_time,plot_name, scaling=True, fill
     ticks_y = mticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x * scale_y))
     ax.yaxis.set_major_formatter(ticks_y)
     
-    xtics = [1,8,16, 32,64]
+    xtics = [2,8,16, 32,64]
     #labels = [0, 0.005, 0.01]
     ax.set_xticks(xtics)
     #ax.set_xticklabels(labels)
