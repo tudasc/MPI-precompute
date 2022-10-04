@@ -14,9 +14,9 @@ DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/"
 
 
 CACHE_FILE = "cache.csv"
-PLTSIZE = (12, 8)
+PLTSIZE = (15, 8)
 PLTSIZE_BAR_PLT = (12, 4)
-PLTSIZE_VIOLIN_PLT = (24, 8)
+PLTSIZE_VIOLIN_PLT = (15, 8)
 
 NORMAL = 1
 EAGER = 2
