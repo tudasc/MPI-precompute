@@ -440,6 +440,7 @@ def calculate_break_even_model(data):
 
         normal_start=dataset[(dataset['mode'] == NORMAL)]['overhead'].median()
         normal_op = reference_df[(reference_df['mode'] == NORMAL)]['overhead'].median()
+
         rendevouz_start=dataset[(dataset['mode'] == RENDEVOUZ2)]['overhead'].median()
         rendevouz_op = reference_df[(reference_df['mode'] == RENDEVOUZ2)]['overhead'].median()
 
@@ -448,6 +449,8 @@ def calculate_break_even_model(data):
         x= (normal_start-rendevouz_start)/(rendevouz_op-normal_op)
         print("Rendevouz 2 is better after at least this Nubmer of operations:")
         print(x)
+        print("if assuming normal has no warmup:")
+        print((normal_op - rendevouz_start) / (rendevouz_op - normal_op))
 
 
 
