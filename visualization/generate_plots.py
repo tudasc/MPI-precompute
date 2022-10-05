@@ -419,6 +419,41 @@ def print_statistics(data):
         measurement_count, _ = print_stat(data, RENDEVOUZ2, buf_size, avg)
 
 
+def calculate_break_even_model(data):
+    select_df= data[(data['warmup'] == 0)].groupby('buflen')
+
+    for buf_size,dataset in select_df:
+
+        reference_df = data[(data['nprocs'] == process_count_to_use) &(data['cycles'] == cycles_to_use) & (data['warmup'] == warmup_to_use) & (
+                data['calctime'] == data['calctime'].max()) & (data['buflen'] == buf_size)]
+
+        print(buf_size)
+        # for inspecting the distribution
+        print("NormalNo Warmup")
+        print(dataset[(dataset['mode'] == NORMAL)]['overhead'].describe())
+        print("Normal With Warmup")
+        print(reference_df[(reference_df['mode'] == NORMAL)]['overhead'].describe())
+        print("Rendevouz 2 No Warmup")
+        print(dataset[(dataset['mode'] == RENDEVOUZ2)]['overhead'].describe())
+        print("Rendevouz 2 With Warmup")
+        print(reference_df[(reference_df['mode'] == RENDEVOUZ2)]['overhead'].describe())
+
+        normal_start=dataset[(dataset['mode'] == NORMAL)]['overhead'].median()
+        normal_op = reference_df[(reference_df['mode'] == NORMAL)]['overhead'].median()
+        rendevouz_start=dataset[(dataset['mode'] == RENDEVOUZ2)]['overhead'].median()
+        rendevouz_op = reference_df[(reference_df['mode'] == RENDEVOUZ2)]['overhead'].median()
+
+        ## linear formular ax+b b=start_cost, x operation number, a = op cost
+        # calculate intersection point
+        x= (normal_start-rendevouz_start)/(rendevouz_op-normal_op)
+        print("Rendevouz 2 is better after at least this Nubmer of operations:")
+        print(x)
+
+
+
+
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generates Visualization')
     parser.add_argument('--cache',
@@ -430,6 +465,7 @@ def main():
         data = read_data()
         data.to_csv(CACHE_FILE)
     print_statistics(data)
+    calculate_break_even_model(data)
 
     print("generating plots ...")
 
