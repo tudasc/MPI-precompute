@@ -897,6 +897,9 @@ static int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
   } else {
     assert(false && "Error: uninitialized Request");
   }
+#ifdef BUFFER_CONTENT_CHECKING
+    MPI_Wait(&request->chekcking_request,MPI_STATUS_IGNORE);
+#endif
 }
 
 static int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
@@ -957,8 +960,8 @@ static int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
       // request is finished
       *flag = 1;
 #ifdef BUFFER_CONTENT_CHECKING
-      if (request->type==RECV_REQUEST_TYPE){
         MPI_Wait(&request->chekcking_request,MPI_STATUS_IGNORE);
+      if (request->type==RECV_REQUEST_TYPE){
           int buffer_has_expected_content =
                   memcmp(request->checking_buf, request->buf, request->size);
           assert(buffer_has_expected_content == 0 &&
