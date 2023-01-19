@@ -31,7 +31,7 @@
 #define SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION 3
 #define RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION 4
 #define SEND_REQUEST_TYPE_USE_FALLBACK 5
-#define Recv_REQUEST_TYPE_USE_FALLBACK 6
+#define RECV_REQUEST_TYPE_USE_FALLBACK 6
 
 struct mpiopt_request {
   // this way it it can be used as a normal request ptr as well
@@ -231,7 +231,7 @@ static void progress_request(MPIOPT_Request *request) {
     int flag;
     // progress the fallback communication
     MPI_Test(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
-  } else if (request->type == Recv_REQUEST_TYPE_USE_FALLBACK) {
+  } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     int flag;
     // progress the fallback communication
     MPI_Test(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
@@ -710,7 +710,7 @@ static int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
     start_recv_when_searching_for_connection(request);
 
-  } else if (request->type == Recv_REQUEST_TYPE_USE_FALLBACK) {
+  } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
     MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
               request->tag, request->comm, &request->backup_request);
@@ -794,7 +794,7 @@ static void wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
     // if it has not arrived: it will never arrive
     // it is not possible, that the matching msg arrives after the palyoad msg
 
-    request->type = Recv_REQUEST_TYPE_USE_FALLBACK;
+    request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
 #ifdef STATISTIC_PRINTING
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -841,7 +841,7 @@ static int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
     e_recv(request);
   } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
     wait_recv_when_searching_for_connection(request);
-  } else if (request->type == Recv_REQUEST_TYPE_USE_FALLBACK) {
+  } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
 
     MPI_Wait(&request->backup_request, status);
   } else {
@@ -880,7 +880,7 @@ static int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
   assert(status == MPI_STATUS_IGNORE);
 
   if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
-      request->type == Recv_REQUEST_TYPE_USE_FALLBACK) {
+      request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     return MPI_Test((MPI_Request *)request, flag, status);
   } else {
     progress_request(request);
