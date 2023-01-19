@@ -176,7 +176,7 @@ static void progress_recv_request(MPIOPT_Request *request) {
     assert(request->flag == request->operation_number * 2 + 2);
 
 #ifdef STATISTIC_PRINTING
-    printf("recv fetches data\n");
+    printf("recv fetches data (in progress routine)\n");
 #endif
     ucs_status_t status =
         ucp_get_nbi(request->ep, (void *)request->buf, request->size,
@@ -348,6 +348,7 @@ static void b_send(MPIOPT_Request *request) {
     ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
 
   } else {
+      assert(request->flag == request->operation_number * 2);
     request->flag_buffer = request->operation_number * 2 + 1;
     // give him the flag that we are ready: he will RDMA get the data
     ucs_status_t status =
@@ -397,6 +398,8 @@ static void e_send(MPIOPT_Request *request) {
     // e_send_with_comm_abort_test(request);
     // TODO one could implement this and use fallback option
   }
+
+  assert(request->flag >= request->operation_number * 2 + 2);
 }
 
 static void b_recv(MPIOPT_Request *request) {
@@ -434,6 +437,7 @@ static void b_recv(MPIOPT_Request *request) {
     ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
 
   } else {
+      assert(request->flag == request->operation_number * 2);
     // request->flag = READY_TO_RECEIVE;
     request->flag_buffer = request->operation_number * 2 + 1;
     // give him the flag that we are ready: he will RDMA put the data
@@ -504,6 +508,8 @@ static void e_recv(MPIOPT_Request *request) {
 #endif
 
   } // else: nothing to do, the op has finished
+  assert(request->flag >= request->operation_number * 2 + 2);
+
 }
 
 // exchanges the RDMA info and maps all mem for RDMA op
