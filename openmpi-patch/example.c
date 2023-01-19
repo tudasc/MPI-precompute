@@ -95,9 +95,15 @@ void use_self_implemented_comm() {
       for (int i = 0; i < N; ++i) {
         buffer[i] = rank * i * n;
       }
+
+      printf("Send %d\n",n);
       MPIOPT_Start(&req);
       dummy_workload(work_buffer);
-      MPIOPT_Wait(&req, MPI_STATUS_IGNORE);
+      MPIOPT_Wait(&req,MPI_STATUS_IGNORE);
+      //int flag=0;
+      //while (! flag){
+      //MPIOPT_Test(&req,&flag, MPI_STATUS_IGNORE);
+      //}
     }
   } else {
 
@@ -108,10 +114,14 @@ void use_self_implemented_comm() {
       for (int i = 0; i < N; ++i) {
         buffer[i] = rank * i * n;
       }
-
+        printf("Recv %d\n",n);
       MPIOPT_Start(&req);
       dummy_workload(work_buffer);
       MPIOPT_Wait(&req, MPI_STATUS_IGNORE);
+      //int flag=0;
+      //while (! flag){
+      //     MPIOPT_Test(&req,&flag, MPI_STATUS_IGNORE);
+        //}
 #ifdef STATISTIC_PRINTING
       check_buffer_content(buffer, n);
 #endif
