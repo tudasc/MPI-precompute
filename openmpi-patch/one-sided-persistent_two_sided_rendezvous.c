@@ -1003,7 +1003,8 @@ static int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->flag=2;// operation 0 is completed
 
 #ifdef BUFFER_CONTENT_CHECKING
-  request->checking_buf = malloc(count);
+  // use c alloc, so that it is initialized, even if a smaller msg was received to avoid undefined behaviour
+  request->checking_buf = calloc(count,1);
 #endif
 
   send_rdma_info(request);
