@@ -101,7 +101,7 @@ void use_self_implemented_comm() {
     }
   } else {
 
-    MPIOPT_Recv_init(buffer, sizeof(int) * N,MPI_BYTE, 1, 42, MPI_COMM_WORLD,
+    MPIOPT_Recv_init(buffer, sizeof(int) * N, MPI_BYTE, 1, 42, MPI_COMM_WORLD,
                      &req);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
