@@ -877,9 +877,19 @@ static int MPIOPT_Wait_internal(MPIOPT_Request *request, MPI_Status *status) {
 
 static int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                 MPI_Status *status) {
-  assert(false);
-  // TODO implement
-  progress_request(request);
+  assert(status==MPI_STATUS_IGNORE);
+
+    if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK||request->type == Recv_REQUEST_TYPE_USE_FALLBACK) {
+        return MPI_Test((MPI_Request*)request,flag,status);
+    } else {
+        progress_request(request);
+        if (request->flag == request->operation_number * 2 + 2){
+            // request is finished
+            *flag=1;
+        } else
+            *flag=0;
+    }
+    return 0;
 }
 
 static int init_request(const void *buf, int count, MPI_Datatype datatype,
@@ -1098,6 +1108,84 @@ int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
 int MPIOPT_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   return MPIOPT_Test_internal((MPIOPT_Request *)*request, flag, status);
 }
+
+int MPIOPT_Waitany(int count, MPI_Request array_of_requests[], int *index,MPI_Status *status){
+
+    int flag=0;
+    while (! flag) {
+        for (int i = 0; i < count; ++i) {
+            MPIOPT_Test(&array_of_requests[i], &flag, status);
+            if (flag) {
+                *index = i;
+                return 0;
+            }
+        }
+    }
+    *index=MPI_UNDEFINED;
+    return 0;
+
+}
+
+int MPIOPT_Testany(int count, MPI_Request array_of_requests[], int *index,
+                int *flag, MPI_Status *status){
+
+
+    for (int i = 0; i < count ; ++i) {
+        MPIOPT_Test(&array_of_requests[i],&flag,status);
+        if(*flag){
+            *index=i;
+            return 0;
+        }
+    }
+
+    *index=MPI_UNDEFINED;
+    return 0;
+}
+
+int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
+                   MPI_Status array_of_statuses[]){
+    for (int i = 0; i < count; ++i) {
+        MPIOPT_Wait(&array_of_requests[i],&array_of_statuses[i]);
+    }
+    return 0;
+}
+
+int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
+                   MPI_Status array_of_statuses[]){
+    for (int i = 0; i < count; ++i) {
+        MPIOPT_Test(&array_of_requests[i],flag,&array_of_statuses[i]);
+        if (! flag)
+            return 0; // found one request not complete
+
+    }
+    return 0;
+}
+
+int MPIOPT_Waitsome(int incount, MPI_Request array_of_requests[],
+                    int *outcount, int array_of_indices[],
+                    MPI_Status array_of_statuses[]){
+    MPIOPT_Waitany(incount,array_of_requests,&array_of_indices[0],array_of_statuses);
+    *outcount=1;
+            return 0;
+}
+
+int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[],
+                    int *outcount, int array_of_indices[],
+                    MPI_Status array_of_statuses[]){
+    *outcount=0;
+    int flag=0;
+    for (int i = 0; i < incount; ++i) {
+        MPIOPT_Test(&array_of_requests[i],&flag,&array_of_statuses[i]);
+        if(flag)
+        {array_of_indices[*outcount]=i;
+        *outcount= *outcount+1;}
+        flag=0;
+    }
+
+    return 0;
+}
+
+
 int MPIOPT_Send_init(const void *buf, int count, MPI_Datatype datatype,
                      int dest, int tag, MPI_Comm comm, MPI_Request *request) {
 
