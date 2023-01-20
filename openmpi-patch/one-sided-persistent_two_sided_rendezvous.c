@@ -111,20 +111,30 @@ struct list_elem *to_free_list_head;
 struct list_elem_int *msg_send;
 
 static void b_send(MPIOPT_Request *request);
+
 static void b_recv(MPIOPT_Request *request);
+
 static void receive_rdma_info(MPIOPT_Request *request);
+
 static void wait_send_when_searching_for_connection(MPIOPT_Request *request);
+
 static void wait_recv_when_searching_for_connection(MPIOPT_Request *request);
+
 static int MPIOPT_Start_internal(MPIOPT_Request *request);
+
 static int MPIOPT_Wait_internal(MPIOPT_Request *request, MPI_Status *status);
+
 static int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                 MPI_Status *status);
+
 static int init_request(const void *buf, int count, MPI_Datatype datatype,
                         int dest, int tag, MPI_Comm comm,
                         MPIOPT_Request *request);
+
 static int MPIOPT_Recv_init_internal(void *buf, int count,
                                      MPI_Datatype datatype, int source, int tag,
                                      MPI_Comm comm, MPIOPT_Request *request);
+
 static int MPIOPT_Request_free_internal(MPIOPT_Request *request);
 
 // add it at beginning of list
@@ -149,8 +159,19 @@ static void remove_request_from_list(MPIOPT_Request *request) {
   free(current_elem);
 }
 
+static void wait_for_completion_blocking(void *request) {
+  assert(request != NULL);
+  ucs_status_t status;
+  do {
+    ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
+    status = ucp_request_check_status(request);
+  } while (status == UCS_INPROGRESS);
+  ucp_request_free(request);
+}
+
 static void progress_send_request(MPIOPT_Request *request) {
-  // and progress
+  assert(request->type == SEND_REQUEST_TYPE);
+  // progress
   ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
 
   // and check for completion
@@ -169,16 +190,21 @@ static void progress_send_request(MPIOPT_Request *request) {
 }
 
 static void progress_recv_request(MPIOPT_Request *request) {
+  assert(request->type == RECV_REQUEST_TYPE);
   // check if we actually need to do something
-  // code is shared with b_send
   if (request->flag == request->operation_number * 2 + 1) {
+    assert(request->ucx_request_data_transfer == NULL);
+    if (request->ucx_request_flag_transfer != NULL) {
+      wait_for_completion_blocking(request->ucx_request_flag_transfer);
+      request->ucx_request_flag_transfer = NULL;
+    }
     // only then the sender is ready, but the recv not started yet
     request->flag++; // recv is done at our side
     // no possibility of data race, WE will advance the comm
     assert(request->flag == request->operation_number * 2 + 2);
-
 #ifdef STATISTIC_PRINTING
-    printf("recv fetches data (in progress routine)\n");
+    printf("crosstalk detected\n");
+    printf("recv fetches data\n");
 #endif
     ucs_status_t status =
         ucp_get_nbi(request->ep, (void *)request->buf, request->size,
@@ -200,6 +226,16 @@ static void progress_recv_request(MPIOPT_Request *request) {
 
     request->ucx_request_data_transfer =
         ucp_ep_flush_nb(request->ep, 0, empty_function);
+
+#ifdef DISTORT_PROCESS_ORDER_ON_CROSSTALK
+    // distort process order, so that crosstalk is unlikely to happen again
+    // the larger the msg, the more important that processes are apart and no
+    // crosstalk takes place
+    usleep(rand() % (request->size));
+#endif
+#ifdef SUMMARY_STATISTIC_PRINTING
+    crosstalk_counter++;
+#endif
   }
 
   // and progress all communication regardless if we need to initiate something
@@ -343,15 +379,6 @@ static void progress_other_requests(MPIOPT_Request *current_request) {
   }
 }
 
-static void wait_for_completion_blocking(void *request) {
-  assert(request != NULL);
-  ucs_status_t status;
-  do {
-    ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
-    status = ucp_request_check_status(request);
-  } while (status == UCS_INPROGRESS);
-  ucp_request_free(request);
-}
 // operation_number*2= op has not started on remote
 // operation_number*2 +1= op has started on remote, we should initiate
 // data-transfer operation_number*2 + 2= op has finished on remote
@@ -399,20 +426,11 @@ static void b_send(MPIOPT_Request *request) {
 
 static void e_send(MPIOPT_Request *request) {
 
-  // ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
-  // will call progres only if this is necessary
-
-  if (__builtin_expect(request->ucx_request_flag_transfer != NULL, 0)) {
-    wait_for_completion_blocking(request->ucx_request_flag_transfer);
-    request->ucx_request_flag_transfer = NULL;
+  while (__builtin_expect(request->ucx_request_data_transfer != NULL &&
+                              request->ucx_request_flag_transfer != NULL,
+                          0)) {
+    progress_send_request(request);
   }
-
-  // same for data transfer
-  if (__builtin_expect(request->ucx_request_data_transfer != NULL, 0)) {
-    wait_for_completion_blocking(request->ucx_request_data_transfer);
-    request->ucx_request_data_transfer = NULL;
-  }
-
   // we need to wait until the op has finished on the remote before re-using the
   // data buffer
   int count = 0;
@@ -491,20 +509,17 @@ static void b_recv(MPIOPT_Request *request) {
 static void e_recv(MPIOPT_Request *request) {
   // ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
 
-  if (__builtin_expect(request->ucx_request_flag_transfer != NULL, 0)) {
-    wait_for_completion_blocking(request->ucx_request_flag_transfer);
-    request->ucx_request_flag_transfer = NULL;
-  }
-
-  // same for data transfer
-  if (__builtin_expect(request->ucx_request_data_transfer != NULL, 0)) {
-    wait_for_completion_blocking(request->ucx_request_data_transfer);
-    request->ucx_request_data_transfer = NULL;
+  progress_recv_request(request); // will detect crosstalk if present
+  // therefore we need one progress call if no requests are present
+  while (__builtin_expect(request->ucx_request_data_transfer != NULL &&
+                              request->ucx_request_flag_transfer != NULL,
+                          0)) {
+    progress_send_request(request);
   }
 
   int count = 0;
   // busy wait
-  while (__builtin_expect(request->flag < request->operation_number * 2 + 1 &&
+  while (__builtin_expect(request->flag < request->operation_number * 2 + 2 &&
                               count < RDMA_SPIN_WAIT_THRESHOLD,
                           0)) {
     ++count;
@@ -512,37 +527,13 @@ static void e_recv(MPIOPT_Request *request) {
   }
 
   while (
-      __builtin_expect(request->flag < request->operation_number * 2 + 1, 0)) {
+      __builtin_expect(request->flag < request->operation_number * 2 + 2, 0)) {
     progress_other_requests(request);
     ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
+    // e_recv_with_comm_abort_test(request);
+    // TODO one could implement this and use fallback if necessary
   }
 
-  // e_recv_with_comm_abort_test(request);
-  // TODO one could implement this and use fallback if necessary
-
-  if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 0)) {
-#ifdef STATISTIC_PRINTING
-    printf("crosstalk detected\n");
-#endif
-    // fetch the data
-    b_recv(request);
-    // and block until transfer finished
-    if (request->ucx_request_data_transfer != NULL) {
-      wait_for_completion_blocking(request->ucx_request_data_transfer);
-      request->ucx_request_data_transfer = NULL;
-    }
-#ifdef DISTORT_PROCESS_ORDER_ON_CROSSTALK
-    // distort process order, so that crosstalk is unlikely to happen again
-    // the larger the msg, the more important that processes are apart and no
-    // crosstalk takes place
-    usleep(rand() % (request->size));
-
-#endif
-#ifdef SUMMARY_STATISTIC_PRINTING
-    crosstalk_counter++;
-#endif
-
-  } // else: nothing to do, the op has finished
   assert(request->flag >= request->operation_number * 2 + 2);
 }
 
@@ -790,6 +781,7 @@ static int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
     assert(false && "Error: uninitialized Request");
   }
 #ifdef BUFFER_CONTENT_CHECKING
+  assert(request->chekcking_request == MPI_REQUEST_NULL);
   MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
             checking_communicator, &request->chekcking_request);
 
@@ -819,6 +811,7 @@ static int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   }
 
 #ifdef BUFFER_CONTENT_CHECKING
+  assert(request->chekcking_request == MPI_REQUEST_NULL);
   MPI_Irecv(request->checking_buf, request->size, MPI_BYTE, request->dest,
             request->tag, checking_communicator, &request->chekcking_request);
 
@@ -878,9 +871,6 @@ static int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
   } else {
     assert(false && "Error: uninitialized Request");
   }
-#ifdef BUFFER_CONTENT_CHECKING
-  MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
-#endif
 }
 
 static int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
@@ -899,18 +889,6 @@ static int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
   } else {
     assert(false && "Error: uninitialized Request");
   }
-
-#ifdef BUFFER_CONTENT_CHECKING
-  MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
-
-  // compare buffer
-  int buffer_has_expected_content =
-      memcmp(request->checking_buf, request->buf, request->size);
-
-  assert(buffer_has_expected_content == 0 &&
-         "Error, The buffer has not the content of the message");
-
-#endif
 }
 
 static int MPIOPT_Wait_internal(MPIOPT_Request *request, MPI_Status *status) {
@@ -918,44 +896,67 @@ static int MPIOPT_Wait_internal(MPIOPT_Request *request, MPI_Status *status) {
   // TODO implement MPI status?
   assert(status == MPI_STATUS_IGNORE);
 
+  int ret_status = 0;
   if (request->type == SEND_REQUEST_TYPE ||
       request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
       request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
-    return MPIOPT_Wait_send_internal(request, status);
+    ret_status = MPIOPT_Wait_send_internal(request, status);
   } else {
-    return MPIOPT_Wait_recv_internal(request, status);
+    int ret_status = MPIOPT_Wait_recv_internal(request, status);
   }
+
+#ifdef BUFFER_CONTENT_CHECKING
+  assert(request->chekcking_request != MPI_REQUEST_NULL);
+  MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
+  if (request->type == SEND_REQUEST_TYPE ||
+      request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+      request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
+    int buffer_has_expected_content =
+        memcmp(request->checking_buf, request->buf, request->size);
+    assert(buffer_has_expected_content == 0 &&
+           "Error, The buffer has not the content of the message");
+  }
+#endif
+  return ret_status;
 }
 
 static int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                 MPI_Status *status) {
   assert(status == MPI_STATUS_IGNORE);
 
+  int ret_status = 0;
   if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
       request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
-    return MPI_Test(&request->backup_request, flag, status);
+    ret_status = MPI_Test(&request->backup_request, flag, status);
   } else {
     progress_request(request);
-    // it is possible, that the other rank startet the next operation, therefore
+    // it is possible, that the other rank already started the next operation,
+    // therefore
     // >=
     if (request->flag >= request->operation_number * 2 + 2 &&
         request->ucx_request_flag_transfer == NULL &&
         request->ucx_request_data_transfer == NULL) {
       // request is finished
       *flag = 1;
-#ifdef BUFFER_CONTENT_CHECKING
-      MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
-      if (request->type == RECV_REQUEST_TYPE) {
-        int buffer_has_expected_content =
-            memcmp(request->checking_buf, request->buf, request->size);
-        assert(buffer_has_expected_content == 0 &&
-               "Error, The buffer has not the content of the message");
-      }
-#endif
     } else
       *flag = 0;
   }
-  return 0;
+#ifdef BUFFER_CONTENT_CHECKING
+  if (*flag == 1) {
+    // TODO buffer checking will break if the user tests a finished request
+    assert(request->chekcking_request != MPI_REQUEST_NULL);
+    MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
+    if (request->type == RECV_REQUEST_TYPE ||
+        request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+        request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
+      int buffer_has_expected_content =
+          memcmp(request->checking_buf, request->buf, request->size);
+      assert(buffer_has_expected_content == 0 &&
+             "Error, The buffer has not the content of the message");
+    }
+  }
+#endif
+  return ret_status;
 }
 
 static int init_request(const void *buf, int count, MPI_Datatype datatype,
@@ -993,6 +994,7 @@ static int init_request(const void *buf, int count, MPI_Datatype datatype,
   // use c alloc, so that it is initialized, even if a smaller msg was received
   // to avoid undefined behaviour
   request->checking_buf = calloc(count, 1);
+  request->chekcking_request = MPI_REQUEST_NULL;
 #endif
 
   send_rdma_info(request);
@@ -1108,6 +1110,7 @@ void MPIOPT_INIT() {
   MPI_Comm_dup(MPI_COMM_WORLD, &checking_communicator);
 #endif
 }
+
 void MPIOPT_FINALIZE() {
   MPI_Win_free(&global_comm_win);
   assert(request_list_head->next == NULL); // list should be empty
@@ -1166,9 +1169,11 @@ int MPIOPT_Start_send(MPI_Request *request) {
 int MPIOPT_Start_recv(MPI_Request *request) {
   return MPIOPT_Start_recv_internal((MPIOPT_Request *)*request);
 }
+
 int MPIOPT_Wait_send(MPI_Request *request, MPI_Status *status) {
   return MPIOPT_Wait_send_internal((MPIOPT_Request *)*request, status);
 }
+
 int MPIOPT_Wait_recv(MPI_Request *request, MPI_Status *status) {
   return MPIOPT_Wait_recv_internal((MPIOPT_Request *)*request, status);
 }
@@ -1176,6 +1181,7 @@ int MPIOPT_Wait_recv(MPI_Request *request, MPI_Status *status) {
 int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
   return MPIOPT_Wait_internal((MPIOPT_Request *)*request, status);
 }
+
 int MPIOPT_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   return MPIOPT_Test_internal((MPIOPT_Request *)*request, flag, status);
 }
