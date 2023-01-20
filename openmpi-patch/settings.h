@@ -10,5 +10,4 @@
 
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 
-
 #endif /* MPIOPT_SETTINGS_H_ */
