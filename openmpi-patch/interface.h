@@ -1,6 +1,5 @@
-// TOOD Rename File with more appropriate name
-#ifndef LOW_LEVEL_H_
-#define LOW_LEVEL_H_
+#ifndef MPIOPT_IFACE_H_
+#define MPIOPT_IFACE_H_
 
 #include <mpi.h>
 
@@ -28,4 +27,4 @@ int MPIOPT_Request_free(MPI_Request *request);
 void MPIOPT_INIT();
 void MPIOPT_FINALIZE();
 
-#endif /* LOW_LEVEL_H_ */
+#endif /* MPIOPT_IFACE_H_ */
