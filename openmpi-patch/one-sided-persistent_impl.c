@@ -7,6 +7,8 @@
 /// TODO clean up includes
 #ifndef MPI_INTERNALS_INCLUDES
 #define MPI_INTERNALS_INCLUDES
+#include <time.h>
+#include <stdio.h>
 #include "ompi/mca/osc/base/base.h"
 #include "ompi/mca/osc/base/osc_base_obj_convert.h"
 #include "ompi/mca/osc/osc.h"
