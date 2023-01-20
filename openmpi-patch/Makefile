@@ -16,7 +16,7 @@ LFLAGS = $(CFLAGS)
 LIBS   = -lopen-pal -lucp -lm
 
 TGTS = example
-OBJS = example.o one-sided-persistent_two_sided_rendezvous.o
+OBJS = example.o one-sided-persistent.o
 
 # Targets ...
 all: $(TGTS)
@@ -24,7 +24,7 @@ all: $(TGTS)
 example: $(OBJS)
 	$(MPICC) $(LFLAGS) -o $@ $(OBJS) $(LIBS)
 	
-one-sided-persistent_two_sided_rendezvous.0: one-sided-persistent_two_sided_rendezvous.c
+one-sided-persistent.o: one-sided-persistent.c
 	$(MPICC) -c $(CFLAGS) $<
 
 example.o: example.c 
