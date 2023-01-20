@@ -17,7 +17,7 @@ LIBS   = -lopen-pal -lucp -lm
 
 TGTS = example one-sided-persistent.c
 OBJS = example.o one-sided-persistent.o
-SOURCES = one-sided-persistent.h one-sided-persistent_impl.c
+SOURCES = one-sided-persistent.h settings.h request_type.h one-sided-persistent_impl.c
 
 # Targets ...
 all: $(TGTS)
