@@ -4,7 +4,7 @@
 //#include "openmpi-patch/low_level.h"
 //#include "openmpi-patch/low-level.c"
 
-#include "low_level.h"
+#include "interface.h"
 
 #include "one-sided-persistent_impl.c"
 

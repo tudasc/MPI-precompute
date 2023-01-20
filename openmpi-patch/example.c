@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#include "low_level.h"
+#include "interface.h"
 
 #include <execinfo.h>
 
