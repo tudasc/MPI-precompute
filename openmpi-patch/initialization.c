@@ -40,7 +40,7 @@ void MPIOPT_INIT() {
 #endif
 }
 
-static int init_request(const void *buf, int count, MPI_Datatype datatype,
+LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                         int dest, int tag, MPI_Comm comm,
                         MPIOPT_Request *request) {
 
@@ -87,7 +87,7 @@ static int init_request(const void *buf, int count, MPI_Datatype datatype,
   return MPI_SUCCESS;
 }
 
-static int MPIOPT_Recv_init_internal(void *buf, int count,
+LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
                                      MPI_Datatype datatype, int source, int tag,
                                      MPI_Comm comm, MPIOPT_Request *request) {
 #ifdef STATISTIC_PRINTING
@@ -101,7 +101,7 @@ static int MPIOPT_Recv_init_internal(void *buf, int count,
   return init_request(buf, count, datatype, source, tag, comm, request);
 }
 
-static int MPIOPT_Send_init_internal(void *buf, int count,
+LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
                                      MPI_Datatype datatype, int source, int tag,
                                      MPI_Comm comm, MPIOPT_Request *request) {
 #ifdef STATISTIC_PRINTING

@@ -64,7 +64,7 @@ void MPIOPT_FINALIZE() {
 #endif
 }
 
-static int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
+LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 
 #ifdef STATISTIC_PRINTING
   int rank = 0;

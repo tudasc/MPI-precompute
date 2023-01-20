@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static void progress_send_request(MPIOPT_Request *request) {
+LINKAGE_TYPE void progress_send_request(MPIOPT_Request *request) {
   assert(request->type == SEND_REQUEST_TYPE);
   // progress
   ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
@@ -40,7 +40,7 @@ static void progress_send_request(MPIOPT_Request *request) {
   }
 }
 
-static void progress_recv_request(MPIOPT_Request *request) {
+LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
   assert(request->type == RECV_REQUEST_TYPE);
   // check if we actually need to do something
   if (request->flag == request->operation_number * 2 + 1) {
@@ -107,7 +107,7 @@ static void progress_recv_request(MPIOPT_Request *request) {
   }
 }
 
-static void progress_request(MPIOPT_Request *request) {
+LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
   if (request->type == SEND_REQUEST_TYPE) {
     progress_send_request(request);
   } else if (request->type == RECV_REQUEST_TYPE) {
@@ -131,7 +131,7 @@ static void progress_request(MPIOPT_Request *request) {
 
 // call if one get stuck while waiting for a request to complete: progresses all
 // other requests
-static void progress_other_requests(MPIOPT_Request *current_request) {
+LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
   struct list_elem *current_elem = request_list_head->next;
 
   while (current_elem != NULL) {
@@ -144,7 +144,7 @@ static void progress_other_requests(MPIOPT_Request *current_request) {
   }
 }
 
-static int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
+LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                 MPI_Status *status) {
   assert(status == MPI_STATUS_IGNORE);
 

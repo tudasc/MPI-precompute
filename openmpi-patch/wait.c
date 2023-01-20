@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static void wait_for_completion_blocking(void *request) {
+LINKAGE_TYPE void wait_for_completion_blocking(void *request) {
   assert(request != NULL);
   ucs_status_t status;
   do {
@@ -33,7 +33,7 @@ static void wait_for_completion_blocking(void *request) {
 // operation_number*2 +1= op has started on remote, we should initiate
 // data-transfer operation_number*2 + 2= op has finished on remote
 
-static void e_send(MPIOPT_Request *request) {
+LINKAGE_TYPE void e_send(MPIOPT_Request *request) {
 
   while (__builtin_expect(request->ucx_request_data_transfer != NULL &&
                               request->ucx_request_flag_transfer != NULL,
@@ -64,7 +64,7 @@ static void e_send(MPIOPT_Request *request) {
   assert(request->flag >= request->operation_number * 2 + 2);
 }
 
-static void e_recv(MPIOPT_Request *request) {
+LINKAGE_TYPE void e_recv(MPIOPT_Request *request) {
   // ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
 
   progress_recv_request(request); // will detect crosstalk if present
@@ -97,7 +97,7 @@ static void e_recv(MPIOPT_Request *request) {
 
 // TODO return proper error codes
 
-static void wait_send_when_searching_for_connection(MPIOPT_Request *request) {
+LINKAGE_TYPE void wait_send_when_searching_for_connection(MPIOPT_Request *request) {
 
   int flag = 0;
 
@@ -113,7 +113,7 @@ static void wait_send_when_searching_for_connection(MPIOPT_Request *request) {
   assert(request->type != SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
 }
 
-static void wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
+LINKAGE_TYPE void wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
 
@@ -124,7 +124,7 @@ static void wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
   assert(request->type != RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
 }
 
-static int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
+LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
                                      MPI_Status *status) {
 
   // TODO implement MPI status?
@@ -141,7 +141,7 @@ static int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
   }
 }
 
-static int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
+LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
                                      MPI_Status *status) {
 
   // TODO implement MPI status?
@@ -159,7 +159,7 @@ static int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
   }
 }
 
-static int MPIOPT_Wait_internal(MPIOPT_Request *request, MPI_Status *status) {
+LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request, MPI_Status *status) {
 
   // TODO implement MPI status?
   assert(status == MPI_STATUS_IGNORE);

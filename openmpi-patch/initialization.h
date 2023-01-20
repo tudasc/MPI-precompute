@@ -4,10 +4,10 @@
 #include "request_type.h"
 #include <mpi.h>
 
-static int MPIOPT_Send_init_internal(void *buf, int count,
+LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
                                      MPI_Datatype datatype, int source, int tag,
                                      MPI_Comm comm, MPIOPT_Request *request);
-static int MPIOPT_Recv_init_internal(void *buf, int count,
+LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
                                      MPI_Datatype datatype, int source, int tag,
                                      MPI_Comm comm, MPIOPT_Request *request);
 

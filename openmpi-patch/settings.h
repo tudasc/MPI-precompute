@@ -9,5 +9,6 @@
 //#define BUFFER_CONTENT_CHECKING
 
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
+#define LINKAGE_TYPE static
 
 #endif /* MPIOPT_SETTINGS_H_ */

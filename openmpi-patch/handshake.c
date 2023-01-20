@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static void progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
+LINKAGE_TYPE void progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
 
   MPI_Comm comm_to_use = handshake_response_communicator;
   assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
@@ -67,7 +67,7 @@ static void progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
   }
 }
 
-static void progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
+LINKAGE_TYPE void progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
 
   int flag = 0;
   // check if the payload has arrived
@@ -104,7 +104,7 @@ static void progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
 }
 
 // exchanges the RDMA info and maps all mem for RDMA op
-static void send_rdma_info(MPIOPT_Request *request) {
+LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 
   assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
          request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
@@ -197,7 +197,7 @@ static void send_rdma_info(MPIOPT_Request *request) {
   ucp_rkey_buffer_release(rkey_buffer_data);
 }
 
-static void receive_rdma_info(MPIOPT_Request *request) {
+LINKAGE_TYPE void receive_rdma_info(MPIOPT_Request *request) {
 
   assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
          request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);

@@ -51,14 +51,14 @@ struct list_elem_int *msg_send;
 // helper for managing the request list
 
 // add it at beginning of list
-static void add_request_to_list(MPIOPT_Request *request) {
+LINKAGE_TYPE void add_request_to_list(MPIOPT_Request *request) {
   struct list_elem *new_elem = malloc(sizeof(struct list_elem));
   new_elem->elem = request;
   new_elem->next = request_list_head->next;
   request_list_head->next = new_elem;
 }
 
-static void remove_request_from_list(MPIOPT_Request *request) {
+LINKAGE_TYPE void remove_request_from_list(MPIOPT_Request *request) {
   struct list_elem *previous_elem = request_list_head;
   struct list_elem *current_elem = request_list_head->next;
   assert(current_elem != NULL);
