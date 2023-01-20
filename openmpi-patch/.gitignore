@@ -1,0 +1,13 @@
+# objis
+*.o
+#
+build/*
+
+#executable
+example
+a.out
+
+# resulting patch
+one-sided-persistent.c
+
+
