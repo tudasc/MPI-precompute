@@ -2,6 +2,7 @@
 #define MPIOPT_START_H_
 
 #include "request_type.h"
+#include "settings.h"
 #include <mpi.h>
 
 LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request);

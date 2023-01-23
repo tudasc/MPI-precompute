@@ -9,6 +9,9 @@
 #define RECV_REQUEST_TYPE_USE_FALLBACK 6
 
 #include <mpi.h>
+
+#include "settings.h"
+
 #include <stdbool.h>
 #include <ucp/api/ucp.h>
 #include <unistd.h>
