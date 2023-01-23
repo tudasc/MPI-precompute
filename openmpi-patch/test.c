@@ -37,7 +37,7 @@ LINKAGE_TYPE void progress_send_request(MPIOPT_Request *request) {
 LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
   assert(request->type == RECV_REQUEST_TYPE);
   // check for crosstalk
-  if (__builtin_expect( request->flag == request->operation_number * 2 + 1,0)) {
+  if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 0)) {
     assert(request->ucx_request_data_transfer == NULL);
     if (request->ucx_request_flag_transfer != NULL) {
       wait_for_completion_blocking(request->ucx_request_flag_transfer);

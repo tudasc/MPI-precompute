@@ -26,7 +26,7 @@ LINKAGE_TYPE void wait_for_completion_blocking(void *request) {
 
 LINKAGE_TYPE void e_send(MPIOPT_Request *request) {
 
-  while (__builtin_expect(request->ucx_request_data_transfer != NULL &&
+  while (__builtin_expect(request->ucx_request_data_transfer != NULL ||
                               request->ucx_request_flag_transfer != NULL,
                           0)) {
     progress_send_request(request);
@@ -60,10 +60,10 @@ LINKAGE_TYPE void e_recv(MPIOPT_Request *request) {
 
   progress_recv_request(request); // will detect crosstalk if present
   // therefore we need one progress call if no requests are present
-  while (__builtin_expect(request->ucx_request_data_transfer != NULL &&
+  while (__builtin_expect(request->ucx_request_data_transfer != NULL ||
                               request->ucx_request_flag_transfer != NULL,
                           0)) {
-      progress_recv_request(request);
+    progress_recv_request(request);
   }
 
   int count = 0;
@@ -84,6 +84,8 @@ LINKAGE_TYPE void e_recv(MPIOPT_Request *request) {
   }
 
   assert(request->flag >= request->operation_number * 2 + 2);
+  assert(request->ucx_request_data_transfer == NULL &&
+         request->ucx_request_flag_transfer == NULL);
 }
 
 // TODO return proper error codes

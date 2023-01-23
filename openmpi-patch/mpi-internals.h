@@ -5,7 +5,7 @@
 // some dont have an include guard, therefore we bundle them up all together
 // here
 
-//TODO get rid of the implicit function definition of asprintf warning
+// TODO get rid of the implicit function definition of asprintf warning
 #define _GNU_SOURCE
 #define __STDC_WANT_LIB_EXT2 1
 #include <stdio.h>
