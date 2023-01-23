@@ -33,7 +33,7 @@ example: $(OBJS)
 	$(MPICC) $(LFLAGS) -o $@ $(OBJS) $(LIBS)
 	
 one-sided-persistent.c: $(SOURCES) $(HEADERS)
-	$(MPICC) -E $(CFLAGS) one-sided-persistent.h -o $@
+	$(MPICC) -E $(CFLAGS) -DLINKAGE_TYPE=static one-sided-persistent.h -o $@
 
 %.o: %.c
 	$(MPICC) -c $(CFLAGS) $<
