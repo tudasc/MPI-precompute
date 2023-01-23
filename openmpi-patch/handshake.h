@@ -1,6 +1,7 @@
 #ifndef MPIOPT_HANDSHAKE_H_
 #define MPIOPT_HANDSHAKE_H_
 
+#include "request_type.h"
 #include "settings.h"
 
 LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request);

@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static void empty_function(void *request, ucs_status_t status) {
+  // callback if flush is completed
+}
+
 LINKAGE_TYPE void progress_send_request(MPIOPT_Request *request) {
   assert(request->type == SEND_REQUEST_TYPE);
   // progress

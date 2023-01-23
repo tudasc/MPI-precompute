@@ -16,12 +16,18 @@ LFLAGS = $(CFLAGS)
 LIBS   = -lopen-pal -lucp -lm
 
 TGTS = example one-sided-persistent.c
+# if build from a single source file
 OBJS = example.o one-sided-persistent.o
-SOURCES = finalization.c handshake.c initialization.c start.c test.c wait.c
+# if build from multiple obj files
+ALLOBJS = example.o globals.o finalization.o handshake.o initialization.o start.o test.o wait.o
+SOURCES = finalization.c globals.c handshake.c initialization.c start.c test.c wait.c
 HEADERS = one-sided-persistent.h settings.h request_type.h finalization.h handshake.h initialization.h start.h test.h wait.h
 
-# Targets ...
-all: $(TGTS)
+# default is example_debug
+all: one-sided-persistent.c example_debug
+
+example_debug: $(ALLOBJS)
+	$(MPICC) $(LFLAGS) -o example $(ALLOBJS) $(LIBS)
 
 example: $(OBJS)
 	$(MPICC) $(LFLAGS) -o $@ $(OBJS) $(LIBS)
@@ -33,5 +39,5 @@ one-sided-persistent.c: $(SOURCES) $(HEADERS)
 	$(MPICC) -c $(CFLAGS) $<
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) *.o
 	$(RM) $(TGTS)

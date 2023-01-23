@@ -18,6 +18,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+// dummy int to create some mpi win on
+int dummy_int = 0;
+
 void MPIOPT_INIT() {
   // create the global win used for rdma transfers
   // TODO maybe we need less initialization to initialize the RDMA component?

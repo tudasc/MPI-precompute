@@ -5,6 +5,7 @@
 #include "request_type.h"
 #include "settings.h"
 
+#include "globals.c"
 #include "globals.h"
 
 #include "initialization.c"

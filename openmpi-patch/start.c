@@ -22,6 +22,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static void empty_function(void *request, ucs_status_t status) {
+  // callback if flush is completed
+}
+
 LINKAGE_TYPE void b_send(MPIOPT_Request *request) {
 
   if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 1)) {
