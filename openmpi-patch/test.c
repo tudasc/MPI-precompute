@@ -36,8 +36,8 @@ LINKAGE_TYPE void progress_send_request(MPIOPT_Request *request) {
 
 LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
   assert(request->type == RECV_REQUEST_TYPE);
-  // check if we actually need to do something
-  if (request->flag == request->operation_number * 2 + 1) {
+  // check for crosstalk
+  if (__builtin_expect( request->flag == request->operation_number * 2 + 1,0)) {
     assert(request->ucx_request_data_transfer == NULL);
     if (request->ucx_request_flag_transfer != NULL) {
       wait_for_completion_blocking(request->ucx_request_flag_transfer);
@@ -81,7 +81,7 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
 #ifdef SUMMARY_STATISTIC_PRINTING
     crosstalk_counter++;
 #endif
-  }
+  } // end crosstalk check
 
   // and progress all communication regardless if we need to initiate something
   ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
