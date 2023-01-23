@@ -96,7 +96,7 @@ int MPIOPT_Testany(int count, MPI_Request array_of_requests[], int *index,
                    int *flag, MPI_Status *status) {
 
   for (int i = 0; i < count; ++i) {
-    MPIOPT_Test(&array_of_requests[i], &flag, status);
+    MPIOPT_Test(&array_of_requests[i], flag, status);
     if (*flag) {
       *index = i;
       return 0;
