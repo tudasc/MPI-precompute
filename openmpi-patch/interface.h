@@ -6,7 +6,7 @@
 // so that is easyer to integrate it in mpi.h.in header
 #ifndef OMPI_DECLSPEC
 #define OMPI_DECLSPEC
-#end
+#endif
 
 OMPI_DECLSPEC int MPIOPT_Start(MPI_Request *request);
 OMPI_DECLSPEC int MPIOPT_Wait(MPI_Request *request, MPI_Status *status);
@@ -31,9 +31,5 @@ OMPI_DECLSPEC int MPIOPT_Request_free(MPI_Request *request);
 
 OMPI_DECLSPEC void MPIOPT_INIT();
 OMPI_DECLSPEC void MPIOPT_FINALIZE();
-
-#if defined(c_plusplus) || defined(__cplusplus)
-}
-#endif
 
 #endif /* MPIOPT_IFACE_H_ */
