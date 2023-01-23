@@ -7,14 +7,14 @@
 
 // globals
 // TODO refactor and have one struct for globals?
-MPI_Win global_comm_win;
-MPI_Comm handshake_communicator;
-MPI_Comm handshake_response_communicator;
+MPI_Win global_comm_win = MPI_WIN_NULL;
+MPI_Comm handshake_communicator = MPI_COMM_NULL;
+MPI_Comm handshake_response_communicator = MPI_COMM_NULL;
 // we need a different comm here, so that send a handshake response (recv
 // handshake) cannot be mistaken for another handshake-request from a send with
 // the same tag
 #ifdef BUFFER_CONTENT_CHECKING
-MPI_Comm checking_communicator;
+MPI_Comm checking_communicator = MPI_COMM_NULL;
 #endif
 #ifdef SUMMARY_STATISTIC_PRINTING
 unsigned int crosstalk_counter = 0;

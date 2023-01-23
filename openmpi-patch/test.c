@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static void empty_function(void *request, ucs_status_t status) {
+static void empty_function_in_test_c(void *request, ucs_status_t status) {
   // callback if flush is completed
 }
 
@@ -80,7 +80,7 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
     assert(status == UCS_OK || status == UCS_INPROGRESS);
 
     request->ucx_request_data_transfer =
-        ucp_ep_flush_nb(request->ep, 0, empty_function);
+        ucp_ep_flush_nb(request->ep, 0, empty_function_in_test_c);
 
 #ifdef DISTORT_PROCESS_ORDER_ON_CROSSTALK
     // distort process order, so that crosstalk is unlikely to happen again
