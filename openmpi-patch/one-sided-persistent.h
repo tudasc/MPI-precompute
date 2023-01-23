@@ -26,6 +26,6 @@
 #include "finalization.c"
 #include "finalization.h"
 
-#include "one-sided-persistent_impl.c"
+#include "interface.c"
 
 #endif /* OPT_IMPL_H */

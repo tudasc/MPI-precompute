@@ -12,7 +12,8 @@
 
 // linkage type of all internal functions
 #ifndef LINKAGE_TYPE
-#define LINKAGE_TYPE static
+#define LINKAGE_TYPE
+//#define LINKAGE_TYPE static
 #endif
 
 #endif /* MPIOPT_SETTINGS_H_ */

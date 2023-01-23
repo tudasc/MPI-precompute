@@ -24,8 +24,12 @@
 #include "globals.h"
 #include "request_type.h"
 #include "settings.h"
+#include "start.h"
+#include "test.h"
+#include "wait.h"
 
 #include "initialization.h"
+#include "finalization.h"
 
 int MPIOPT_Send_init(const void *buf, int count, MPI_Datatype datatype,
                      int dest, int tag, MPI_Comm comm, MPI_Request *request) {
