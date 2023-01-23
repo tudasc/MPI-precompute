@@ -6,11 +6,12 @@
 // here
 
 #define _GNU_SOURCE
+#include <stdio.h>
+
 #include "ompi/mca/osc/base/base.h"
 #include "ompi/mca/osc/base/osc_base_obj_convert.h"
 #include "ompi/mca/osc/osc.h"
 #include "opal/mca/common/ucx/common_ucx.h"
-#include <stdio.h>
 
 #include "ompi/mca/osc/ucx/osc_ucx.h"
 #include "ompi/mca/osc/ucx/osc_ucx_request.h"
