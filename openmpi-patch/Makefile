@@ -17,7 +17,8 @@ LIBS   = -lopen-pal -lucp -lm
 
 TGTS = example one-sided-persistent.c
 OBJS = example.o one-sided-persistent.o
-SOURCES = one-sided-persistent.h settings.h request_type.h finalization.c finalization.h handshake.c handshake.h initialization.c initialization.h start.c start.h test.c test.h wait.c wait.h
+SOURCES = finalization.c handshake.c initialization.c start.c test.c wait.c
+HEADERS = one-sided-persistent.h settings.h request_type.h finalization.h handshake.h initialization.h start.h test.h wait.h
 
 # Targets ...
 all: $(TGTS)
@@ -25,7 +26,7 @@ all: $(TGTS)
 example: $(OBJS)
 	$(MPICC) $(LFLAGS) -o $@ $(OBJS) $(LIBS)
 	
-one-sided-persistent.c: $(SOURCES)
+one-sided-persistent.c: $(SOURCES) $(HEADERS)
 	$(MPICC) -E $(CFLAGS) $< -o $@
 
 one-sided-persistent.o: one-sided-persistent.c
