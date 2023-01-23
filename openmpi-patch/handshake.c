@@ -83,8 +83,8 @@ progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
     // post the matching receive
     assert(request->backup_request == MPI_REQUEST_NULL);
     MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
-             request->comm, &request->backup_request);
-    // we have probed, it can be received
+             request->comm, MPI_STATUS_IGNORE);
+    // we have probed, it can be received in a blocking recv
 
     // at this point the handshake was successful, or will never arrive
 
