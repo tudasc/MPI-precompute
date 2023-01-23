@@ -23,12 +23,15 @@ LINKAGE_TYPE void progress_send_request(MPIOPT_Request *request) {
   if (__builtin_expect(request->ucx_request_flag_transfer != NULL, 0)) {
     if (ucp_request_check_status(request->ucx_request_flag_transfer) !=
         UCS_INPROGRESS) {
+      ucp_request_free(request->ucx_request_flag_transfer);
       request->ucx_request_flag_transfer = NULL;
     }
   }
   if (__builtin_expect(request->ucx_request_data_transfer != NULL, 0)) {
     if (ucp_request_check_status(request->ucx_request_data_transfer) !=
         UCS_INPROGRESS) {
+      ;
+      ucp_request_free(request->ucx_request_data_transfer);
       request->ucx_request_data_transfer = NULL;
     }
   }
@@ -71,7 +74,6 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
 
     request->ucx_request_data_transfer =
         ucp_ep_flush_nb(request->ep, 0, empty_function_in_test_c);
-
 #ifdef DISTORT_PROCESS_ORDER_ON_CROSSTALK
     // distort process order, so that crosstalk is unlikely to happen again
     // the larger the msg, the more important that processes are apart and no
@@ -90,12 +92,14 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
   if (__builtin_expect(request->ucx_request_flag_transfer != NULL, 0)) {
     if (ucp_request_check_status(request->ucx_request_flag_transfer) !=
         UCS_INPROGRESS) {
+      ucp_request_free(request->ucx_request_flag_transfer);
       request->ucx_request_flag_transfer = NULL;
     }
   }
   if (__builtin_expect(request->ucx_request_data_transfer != NULL, 0)) {
     if (ucp_request_check_status(request->ucx_request_data_transfer) !=
         UCS_INPROGRESS) {
+      ucp_request_free(request->ucx_request_data_transfer);
       request->ucx_request_data_transfer = NULL;
     }
   }
