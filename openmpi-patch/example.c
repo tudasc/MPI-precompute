@@ -148,7 +148,7 @@ void use_standard_comm() {
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
   int *buffer = malloc(N * sizeof(int));
-  double *work_buffer = malloc(N * sizeof(double));
+  double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
 
   MPI_Request req;
@@ -196,7 +196,7 @@ void use_persistent_comm() {
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
   int *buffer = malloc(N * sizeof(int));
-  double *work_buffer = malloc(N * sizeof(double));
+  double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
 
   MPI_Request req;
