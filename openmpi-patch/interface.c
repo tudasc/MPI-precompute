@@ -4,19 +4,7 @@
 // why does other header miss this include?
 #include <stdbool.h>
 
-/// TODO clean up includes
-#ifndef MPI_INTERNALS_INCLUDES
-#define MPI_INTERNALS_INCLUDES
-#include "ompi/mca/osc/base/base.h"
-#include "ompi/mca/osc/base/osc_base_obj_convert.h"
-#include "ompi/mca/osc/osc.h"
-#include "opal/mca/common/ucx/common_ucx.h"
-#include <stdio.h>
-#include <time.h>
-
-#include "ompi/mca/osc/ucx/osc_ucx.h"
-#include "ompi/mca/osc/ucx/osc_ucx_request.h"
-#endif // MPI_INTERNALS_INCLUDES
+#include "mpi-internals.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -28,8 +16,8 @@
 #include "test.h"
 #include "wait.h"
 
-#include "initialization.h"
 #include "finalization.h"
+#include "initialization.h"
 
 int MPIOPT_Send_init(const void *buf, int count, MPI_Datatype datatype,
                      int dest, int tag, MPI_Comm comm, MPI_Request *request) {

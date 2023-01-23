@@ -21,7 +21,7 @@ OBJS = example.o one-sided-persistent.o
 # if build from multiple obj files
 ALLOBJS = example.o globals.o interface.o finalization.o handshake.o initialization.o start.o test.o wait.o
 SOURCES = finalization.c globals.c interface.h handshake.c initialization.c start.c test.c wait.c
-HEADERS = one-sided-persistent.h settings.h request_type.h interface.h finalization.h handshake.h initialization.h start.h test.h wait.h
+HEADERS = one-sided-persistent.h settings.h request_type.h mpi-internals.h interface.h finalization.h handshake.h initialization.h start.h test.h wait.h
 
 # default is example_debug
 all: one-sided-persistent.c example_debug

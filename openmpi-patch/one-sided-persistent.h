@@ -2,6 +2,7 @@
 #define OPT_IMPL_H
 
 #include "interface.h"
+#include "mpi-internals.h"
 #include "request_type.h"
 #include "settings.h"
 

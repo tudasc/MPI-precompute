@@ -1,20 +1,11 @@
 #include "wait.h"
 #include "globals.h"
+#include "handshake.h"
 #include "settings.h"
 
 #include "test.h"
 
-/// TODO clean up includes
-#ifndef MPI_INTERNALS_INCLUDES
-#define MPI_INTERNALS_INCLUDES
-#include "ompi/mca/osc/base/base.h"
-#include "ompi/mca/osc/base/osc_base_obj_convert.h"
-#include "ompi/mca/osc/osc.h"
-#include "opal/mca/common/ucx/common_ucx.h"
-
-#include "ompi/mca/osc/ucx/osc_ucx.h"
-#include "ompi/mca/osc/ucx/osc_ucx_request.h"
-#endif // MPI_INTERNALS_INCLUDES
+#include "mpi-internals.h"
 
 #include <stdlib.h>
 #include <unistd.h>
