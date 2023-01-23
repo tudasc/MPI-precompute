@@ -29,10 +29,7 @@ example: $(OBJS)
 one-sided-persistent.c: $(SOURCES) $(HEADERS)
 	$(MPICC) -E $(CFLAGS) $< -o $@
 
-one-sided-persistent.o: one-sided-persistent.c
-	$(MPICC) -c $(CFLAGS) $<
-
-example.o: example.c 
+%.o: %.c
 	$(MPICC) -c $(CFLAGS) $<
 
 clean:
