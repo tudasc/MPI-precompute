@@ -63,7 +63,7 @@ LINKAGE_TYPE void e_recv(MPIOPT_Request *request) {
   while (__builtin_expect(request->ucx_request_data_transfer != NULL &&
                               request->ucx_request_flag_transfer != NULL,
                           0)) {
-    progress_send_request(request);
+      progress_recv_request(request);
   }
 
   int count = 0;
