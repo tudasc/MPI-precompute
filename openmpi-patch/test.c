@@ -145,7 +145,7 @@ LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
 }
 
 LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
-                                MPI_Status *status) {
+                                      MPI_Status *status) {
   assert(status == MPI_STATUS_IGNORE);
 
   int ret_status = 0;

@@ -114,7 +114,8 @@ LINKAGE_TYPE void b_recv(MPIOPT_Request *request) {
   }
 }
 
-LINKAGE_TYPE void start_send_when_searching_for_connection(MPIOPT_Request *request) {
+LINKAGE_TYPE void
+start_send_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
 
@@ -127,7 +128,8 @@ LINKAGE_TYPE void start_send_when_searching_for_connection(MPIOPT_Request *reque
   progress_send_request_waiting_for_rdma(request);
 }
 
-LINKAGE_TYPE void start_recv_when_searching_for_connection(MPIOPT_Request *request) {
+LINKAGE_TYPE void
+start_recv_when_searching_for_connection(MPIOPT_Request *request) {
   assert(request->operation_number == 1);
 
   progress_recv_request_waiting_for_rdma(request);

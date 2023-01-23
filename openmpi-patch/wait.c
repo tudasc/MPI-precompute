@@ -97,7 +97,8 @@ LINKAGE_TYPE void e_recv(MPIOPT_Request *request) {
 
 // TODO return proper error codes
 
-LINKAGE_TYPE void wait_send_when_searching_for_connection(MPIOPT_Request *request) {
+LINKAGE_TYPE void
+wait_send_when_searching_for_connection(MPIOPT_Request *request) {
 
   int flag = 0;
 
@@ -113,7 +114,8 @@ LINKAGE_TYPE void wait_send_when_searching_for_connection(MPIOPT_Request *reques
   assert(request->type != SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
 }
 
-LINKAGE_TYPE void wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
+LINKAGE_TYPE void
+wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
 
@@ -125,7 +127,7 @@ LINKAGE_TYPE void wait_recv_when_searching_for_connection(MPIOPT_Request *reques
 }
 
 LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
-                                     MPI_Status *status) {
+                                           MPI_Status *status) {
 
   // TODO implement MPI status?
   assert(status == MPI_STATUS_IGNORE);
@@ -142,7 +144,7 @@ LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
 }
 
 LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
-                                     MPI_Status *status) {
+                                           MPI_Status *status) {
 
   // TODO implement MPI status?
   assert(status == MPI_STATUS_IGNORE);
@@ -159,7 +161,8 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
   }
 }
 
-LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request, MPI_Status *status) {
+LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
+                                      MPI_Status *status) {
 
   // TODO implement MPI status?
   assert(status == MPI_STATUS_IGNORE);

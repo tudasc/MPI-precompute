@@ -17,7 +17,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-LINKAGE_TYPE void progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
+LINKAGE_TYPE void
+progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
 
   MPI_Comm comm_to_use = handshake_response_communicator;
   assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
@@ -67,7 +68,8 @@ LINKAGE_TYPE void progress_send_request_waiting_for_rdma(MPIOPT_Request *request
   }
 }
 
-LINKAGE_TYPE void progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
+LINKAGE_TYPE void
+progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
 
   int flag = 0;
   // check if the payload has arrived

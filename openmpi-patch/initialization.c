@@ -41,8 +41,8 @@ void MPIOPT_INIT() {
 }
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
-                        int dest, int tag, MPI_Comm comm,
-                        MPIOPT_Request *request) {
+                              int dest, int tag, MPI_Comm comm,
+                              MPIOPT_Request *request) {
 
   // TODO support other dtypes as MPI_BYTE
   assert(datatype == MPI_BYTE);
@@ -88,8 +88,9 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 }
 
 LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
-                                     MPI_Datatype datatype, int source, int tag,
-                                     MPI_Comm comm, MPIOPT_Request *request) {
+                                           MPI_Datatype datatype, int source,
+                                           int tag, MPI_Comm comm,
+                                           MPIOPT_Request *request) {
 #ifdef STATISTIC_PRINTING
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -102,8 +103,9 @@ LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
 }
 
 LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
-                                     MPI_Datatype datatype, int source, int tag,
-                                     MPI_Comm comm, MPIOPT_Request *request) {
+                                           MPI_Datatype datatype, int source,
+                                           int tag, MPI_Comm comm,
+                                           MPIOPT_Request *request) {
 #ifdef STATISTIC_PRINTING
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
