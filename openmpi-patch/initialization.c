@@ -36,9 +36,20 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm,
                               MPIOPT_Request *request) {
 
-  // TODO support other dtypes as MPI_BYTE
-  assert(datatype == MPI_BYTE);
-  assert(comm == MPI_COMM_WORLD); // currently only works for comm_wolrd
+  MPI_Count type_size, type_extend, lb;
+  MPI_Type_size_x(datatype, &type_size);
+#ifndef NDEBUG
+  // only if assertion checking is on
+  MPI_Type_get_extent_x(datatype, &lb, &type_extend);
+#endif
+  // is contigous
+  assert(type_size == type_extend && lb == 0 &&
+         "Only contigous datatypes are supported yet");
+  assert(type_size != MPI_UNDEFINED);
+
+  //TODO also allow for other communicators
+  assert(comm == MPI_COMM_WORLD); // currently only works for comm_world
+
   int rank, numtasks;
   // Welchen rang habe ich?
   MPI_Comm_rank(comm, &rank);
@@ -54,7 +65,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->ep = ep;
   request->buf = buf;
   request->dest = dest;
-  request->size = count;
+  request->size = type_size * count;
   request->tag = tag;
   request->comm = comm;
   request->backup_request = MPI_REQUEST_NULL;
@@ -66,7 +77,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 #ifdef BUFFER_CONTENT_CHECKING
   // use c alloc, so that it is initialized, even if a smaller msg was received
   // to avoid undefined behaviour
-  request->checking_buf = calloc(count, 1);
+  request->checking_buf = calloc(request->size, 1);
   request->chekcking_request = MPI_REQUEST_NULL;
 #endif
 
