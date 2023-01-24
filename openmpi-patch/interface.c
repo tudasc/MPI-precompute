@@ -150,7 +150,7 @@ OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm) {
             malloc(sizeof(struct communicator_info) * (communicator_array_size + 1));
     if (communicator_array != NULL && communicator_array_size > 0) {
         // else undefined behaviour to call memcpy even with size=0
-        memcpy(communicator_array, new_array,
+        memcpy(new_array,communicator_array,
                sizeof(struct communicator_info) * (communicator_array_size));
     }
     free(communicator_array);
