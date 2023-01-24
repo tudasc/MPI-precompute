@@ -53,9 +53,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
          "Only contigous datatypes are supported yet");
   assert(type_size != MPI_UNDEFINED);
 
-  // TODO also allow for other communicators
-  assert(comm == MPI_COMM_WORLD); // currently only works for comm_world
-
   int rank, numtasks;
   // Welchen rang habe ich?
   MPI_Comm_rank(comm, &rank);
@@ -77,6 +74,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->remote_data_addr = NULL;
 
   request->communicators = find_comm(comm);
+    assert(request->communicators!=NULL);
 
   request->operation_number = 0;
   request->flag = 2; // operation 0 is completed
