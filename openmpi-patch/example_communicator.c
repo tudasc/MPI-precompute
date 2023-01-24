@@ -27,7 +27,6 @@
 
 #define DUMMY_WLOAD_TIME = 10
 
-//#define STATISTIC_PRINTING
 
 // bufsize and num iter have to be large to get performance benefit, otherwise
 // slowdown occur
@@ -75,11 +74,16 @@ void use_self_implemented_comm() {
 
   MPIOPT_INIT();
 
+  MPI_Comm comm;
+  MPI_Comm_dup(MPI_COMM_WORLD,&comm);
+
+    MPIOPT_Register_Communicator(comm);
+
   int rank, numtasks;
   // Welchen rang habe ich?
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_rank(comm, &rank);
   // wie viele Tasks gibt es?
-  MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
+  MPI_Comm_size(comm, &numtasks);
   int *buffer = malloc(N * sizeof(int));
   double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
@@ -88,7 +92,7 @@ void use_self_implemented_comm() {
 
   if (rank == 1) {
 
-    MPIOPT_Send_init(buffer, N, MPI_INT, 0, 42, MPI_COMM_WORLD, &req);
+    MPIOPT_Send_init(buffer, N, MPI_INT, 0, 42, comm, &req);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < N; ++i) {
@@ -106,7 +110,7 @@ void use_self_implemented_comm() {
     }
   } else {
 
-    MPIOPT_Recv_init(buffer, N, MPI_INT, 1, 42, MPI_COMM_WORLD, &req);
+    MPIOPT_Recv_init(buffer, N, MPI_INT, 1, 42, comm, &req);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < N; ++i) {
@@ -138,107 +142,7 @@ void use_self_implemented_comm() {
   MPIOPT_FINALIZE();
 }
 
-void use_standard_comm() {
 
-  int rank, numtasks;
-  // Welchen rang habe ich?
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  // wie viele Tasks gibt es?
-  MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  int *buffer = malloc(N * sizeof(int));
-  double *work_buffer = calloc(N, sizeof(double));
-  work_buffer[N - 1] = 0.6;
-
-  MPI_Request req;
-
-  if (rank == 1) {
-
-    for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
-      }
-      MPI_Isend(buffer, sizeof(int) * N, MPI_BYTE, 0, 42, MPI_COMM_WORLD, &req);
-      dummy_workload(work_buffer);
-      MPI_Wait(&req, MPI_STATUS_IGNORE);
-    }
-  } else {
-    for (int n = 0; n < NUM_ITERS; ++n) {
-
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
-      }
-
-      MPI_Irecv(buffer, sizeof(int) * N, MPI_BYTE, 1, 42, MPI_COMM_WORLD, &req);
-      dummy_workload(work_buffer);
-      MPI_Wait(&req, MPI_STATUS_IGNORE);
-#ifdef STATISTIC_PRINTING
-      check_buffer_content(buffer, n);
-#endif
-    }
-
-    // after comm
-    /*
-     for (int i = 0; i < N; ++i) {
-     printf("%i,", buffer[i]);
-     }
-     printf("\n");
-     */
-  }
-}
-
-void use_persistent_comm() {
-
-  int rank, numtasks;
-  // Welchen rang habe ich?
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  // wie viele Tasks gibt es?
-  MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  int *buffer = malloc(N * sizeof(int));
-  double *work_buffer = calloc(N, sizeof(double));
-  work_buffer[N - 1] = 0.6;
-
-  MPI_Request req;
-
-  if (rank == 1) {
-
-    MPI_Send_init(buffer, N, MPI_INT, 0, 42, MPI_COMM_WORLD, &req);
-
-    for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
-      }
-      MPI_Start(&req);
-      dummy_workload(work_buffer);
-      MPI_Wait(&req, MPI_STATUS_IGNORE);
-    }
-  } else {
-
-    MPI_Recv_init(buffer, N, MPI_INT, 1, 42, MPI_COMM_WORLD, &req);
-    for (int n = 0; n < NUM_ITERS; ++n) {
-
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
-      }
-
-      MPI_Start(&req);
-      dummy_workload(work_buffer);
-      MPI_Wait(&req, MPI_STATUS_IGNORE);
-#ifdef STATISTIC_PRINTING
-      check_buffer_content(buffer, n);
-#endif
-    }
-
-    // after comm
-    /*
-     for (int i = 0; i < N; ++i) {
-     printf("%i,", buffer[i]);
-     }
-     printf("\n");
-     */
-  }
-
-  MPI_Request_free(&req);
-}
 
 int main(int argc, char **argv) {
 
@@ -255,22 +159,6 @@ int main(int argc, char **argv) {
                 (stop_time.tv_usec - start_time.tv_usec) * 1e-6;
 
   printf("Self Implemented:    %f s \n", time);
-  MPI_Barrier(MPI_COMM_WORLD);
-  gettimeofday(&start_time, NULL); /*  start timer         */
-  use_standard_comm();
-  gettimeofday(&stop_time, NULL); /*  stop timer          */
-  time = (stop_time.tv_sec - start_time.tv_sec) +
-         (stop_time.tv_usec - start_time.tv_usec) * 1e-6;
-
-  printf("Standard:    %f s \n", time);
-  MPI_Barrier(MPI_COMM_WORLD);
-  gettimeofday(&start_time, NULL); /*  start timer         */
-  use_standard_comm();
-  gettimeofday(&stop_time, NULL); /*  stop timer          */
-  time = (stop_time.tv_sec - start_time.tv_sec) +
-         (stop_time.tv_usec - start_time.tv_usec) * 1e-6;
-
-  printf("Persistent:    %f s \n", time);
 
   MPI_Finalize();
   return 0;

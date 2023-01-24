@@ -7,29 +7,37 @@
 # module load openmpi/test hwloc/2.5.0
 
 # Compiler flags, paths and libraries
-# Include npath showing to openmpoi internals
+# Include path showing to openmpoi internals
 INCLUDE=-I/home/tj75qeje/openmpi-4.1.1/ -I/home/tj75qeje/openmpi-4.1.1/opal/include -I/home/tj75qeje/openmpi-4.1.1/ompi/include/ -I/home/tj75qeje/openmpi-4.1.1/orte/include
 
-#CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
-CFLAGS = -std=c11 -O3 -DNDEBUG $(INCLUDE) -flto
+CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
+#CFLAGS = -std=c11 -O3 -DNDEBUG $(INCLUDE)
 LFLAGS = $(CFLAGS)
 LIBS   = -lopen-pal -lucp -lm
 
-TGTS = example
-OBJS = example.o low-level.o
+TGTS = example one-sided-persistent.c
+# if build from a single source file
+OBJS = example.o one-sided-persistent.o
+# if build from multiple obj files
+ALLOBJS = example.o globals.o interface.o finalization.o handshake.o initialization.o start.o test.o wait.o
+SOURCES = finalization.c globals.c interface.h handshake.c initialization.c start.c test.c wait.c
+HEADERS = one-sided-persistent.h settings.h request_type.h mpi-internals.h interface.h finalization.h handshake.h initialization.h start.h test.h wait.h
 
-# Targets ...
-all: $(TGTS)
+# default is example_debug
+all: one-sided-persistent.c example_debug
+
+example_debug: $(ALLOBJS)
+	$(MPICC) $(LFLAGS) -o example $(ALLOBJS) $(LIBS)
 
 example: $(OBJS)
 	$(MPICC) $(LFLAGS) -o $@ $(OBJS) $(LIBS)
 	
-low-level.o: low-level.c 
-	$(MPICC) -c $(CFLAGS) $<
+one-sided-persistent.c: $(SOURCES) $(HEADERS)
+	$(MPICC) -E $(CFLAGS) -DLINKAGE_TYPE=static one-sided-persistent.h -o $@
 
-example.o: example.c 
+%.o: %.c
 	$(MPICC) -c $(CFLAGS) $<
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) *.o
 	$(RM) $(TGTS)
