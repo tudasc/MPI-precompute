@@ -36,5 +36,6 @@ OMPI_DECLSPEC int MPIOPT_Request_free(MPI_Request *request);
 
 OMPI_DECLSPEC void MPIOPT_INIT();
 OMPI_DECLSPEC void MPIOPT_FINALIZE();
+OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm);
 
 #endif /* MPIOPT_IFACE_H_ */

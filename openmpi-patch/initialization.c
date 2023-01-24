@@ -2,6 +2,7 @@
 #include "globals.h"
 #include "handshake.h"
 #include "settings.h"
+#include "interface.h"
 
 #include "mpi-internals.h"
 #include <stdlib.h>
@@ -26,31 +27,6 @@ void MPIOPT_INIT() {
   crosstalk_counter = 0;
 #endif
   MPIOPT_Register_Communicator(MPI_COMM_WORLD);
-}
-
-LINKAGE_TYPE void MPIOPT_Register_Communicator(MPI_Comm comm) {
-
-  struct communicator_info *new_array =
-      malloc(sizeof(struct communicator_info) * (communicator_array_size + 1));
-  if (communicator_array != NULL && communicator_array_size > 0) {
-    // else undefined behaviour to call memcpy even with size=0
-    memcpy(communicator_array, new_array,
-           sizeof(struct communicator_info) * (communicator_array_size));
-  }
-  free(communicator_array);
-  communicator_array = new_array;
-  communicator_array[communicator_array_size].original_communicator = comm;
-  MPI_Comm_dup(
-      comm,
-      &communicator_array[communicator_array_size].handshake_communicator);
-  MPI_Comm_dup(comm, &communicator_array[communicator_array_size]
-                          .handshake_response_communicator);
-#ifdef BUFFER_CONTENT_CHECKING
-  MPI_Comm_dup(
-      comm, &communicator_array[communicator_array_size].checking_communicator);
-#endif
-
-  communicator_array_size = communicator_array_size + 1;
 }
 
 struct communicator_info *find_comm(MPI_Comm comm) {
