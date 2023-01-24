@@ -88,8 +88,7 @@ void use_self_implemented_comm() {
 
   if (rank == 1) {
 
-    MPIOPT_Send_init(buffer, sizeof(int) * N, MPI_BYTE, 0, 42, MPI_COMM_WORLD,
-                     &req);
+    MPIOPT_Send_init(buffer, N, MPI_INT, 0, 42, MPI_COMM_WORLD, &req);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < N; ++i) {
@@ -107,8 +106,7 @@ void use_self_implemented_comm() {
     }
   } else {
 
-    MPIOPT_Recv_init(buffer, sizeof(int) * N, MPI_BYTE, 1, 42, MPI_COMM_WORLD,
-                     &req);
+    MPIOPT_Recv_init(buffer, N, MPI_INT, 1, 42, MPI_COMM_WORLD, &req);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < N; ++i) {
@@ -203,8 +201,7 @@ void use_persistent_comm() {
 
   if (rank == 1) {
 
-    MPI_Send_init(buffer, sizeof(int) * N, MPI_BYTE, 0, 42, MPI_COMM_WORLD,
-                  &req);
+    MPI_Send_init(buffer, N, MPI_INT, 0, 42, MPI_COMM_WORLD, &req);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < N; ++i) {
@@ -216,8 +213,7 @@ void use_persistent_comm() {
     }
   } else {
 
-    MPI_Recv_init(buffer, sizeof(int) * N, MPI_BYTE, 1, 42, MPI_COMM_WORLD,
-                  &req);
+    MPI_Recv_init(buffer, N, MPI_INT, 1, 42, MPI_COMM_WORLD, &req);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < N; ++i) {
@@ -251,6 +247,7 @@ int main(int argc, char **argv) {
 
   // Initialisiere Alle Prozesse
   MPI_Init(&argc, &argv);
+
   gettimeofday(&start_time, NULL); /*  start timer         */
   use_self_implemented_comm();
   gettimeofday(&stop_time, NULL); /*  stop timer          */
