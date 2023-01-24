@@ -15,14 +15,7 @@ struct list_elem_int {
 // globals
 // TODO refactor and have one struct for globals?
 extern MPI_Win global_comm_win;
-extern MPI_Comm handshake_communicator;
-extern MPI_Comm handshake_response_communicator;
-// we need a different comm here, so that send a handshake response (recv
-// handshake) cannot be mistaken for another handshake-request from a send with
-// the same tag
-#ifdef BUFFER_CONTENT_CHECKING
-extern MPI_Comm checking_communicator;
-#endif
+
 #ifdef SUMMARY_STATISTIC_PRINTING
 extern unsigned int crosstalk_counter;
 #endif
@@ -42,8 +35,23 @@ extern struct list_elem *to_free_list_head;
 // handshakes
 extern struct list_elem_int *msg_send;
 
-// helper for managing the request list
+struct communicator_info {
+  MPI_Comm original_communicator;
+  MPI_Comm handshake_communicator;
+  MPI_Comm handshake_response_communicator;
+// we need a different comm here, so that send a handshake response (recv
+// handshake) cannot be mistaken for another handshake-request from a send with
+// the same tag
+#ifdef BUFFER_CONTENT_CHECKING
+  MPI_Comm checking_communicator;
+#endif
+};
 
+// keep track of all the communicators
+extern struct communicator_info *communicator_array;
+extern int communicator_array_size;
+
+// helper for managing the request list
 // add it at beginning of list
 LINKAGE_TYPE void add_request_to_list(MPIOPT_Request *request);
 

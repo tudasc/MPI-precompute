@@ -12,7 +12,8 @@
 LINKAGE_TYPE void
 progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
 
-  MPI_Comm comm_to_use = handshake_response_communicator;
+  MPI_Comm comm_to_use =
+      request->communicators->handshake_response_communicator;
   assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
   if (request->remote_data_addr == NULL) {
 
@@ -65,13 +66,14 @@ progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
 
   int flag = 0;
   // check if the payload has arrived
-  MPI_Iprobe(request->dest, request->tag, request->comm, &flag,
+  MPI_Iprobe(request->dest, request->tag,
+             request->communicators->original_communicator, &flag,
              MPI_STATUS_IGNORE);
 
   if (flag && request->remote_data_addr == NULL) {
 
     int flag = 0;
-    MPI_Comm comm_to_use = handshake_communicator;
+    MPI_Comm comm_to_use = request->communicators->handshake_communicator;
     assert(request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
 
     MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
@@ -83,7 +85,7 @@ progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
     // post the matching receive
     assert(request->backup_request == MPI_REQUEST_NULL);
     MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
-             request->comm, MPI_STATUS_IGNORE);
+             request->communicators->original_communicator, MPI_STATUS_IGNORE);
     // we have probed, it can be received in a blocking recv
 
     // at this point the handshake was successful, or will never arrive
@@ -178,9 +180,9 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 
   assert(msg_size + request->rdma_info_buf == current_pos);
 
-  MPI_Comm comm_to_use = handshake_communicator;
+  MPI_Comm comm_to_use = request->communicators->handshake_communicator;
   if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
-    comm_to_use = handshake_response_communicator;
+    comm_to_use = request->communicators->handshake_response_communicator;
   }
 
   MPI_Issend(request->rdma_info_buf, msg_size, MPI_BYTE, request->dest,
@@ -206,9 +208,9 @@ LINKAGE_TYPE void receive_rdma_info(MPIOPT_Request *request) {
   }
 #endif
 
-  MPI_Comm comm_to_use = handshake_communicator;
+  MPI_Comm comm_to_use = request->communicators->handshake_communicator;
   if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
-    comm_to_use = handshake_response_communicator;
+    comm_to_use = request->communicators->handshake_response_communicator;
   }
 
   MPI_Status status;

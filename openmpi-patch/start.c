@@ -117,7 +117,8 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
   MPI_Issend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
-             request->comm, &request->backup_request);
+             request->communicators->original_communicator,
+             &request->backup_request);
   // and listen for rdma handshake
   progress_send_request_waiting_for_rdma(request);
 }
@@ -132,7 +133,8 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
   if (request->remote_data_addr == NULL) {
 
     int flag;
-    MPI_Iprobe(request->dest, request->tag, request->comm, &flag,
+    MPI_Iprobe(request->dest, request->tag,
+               request->communicators->original_communicator, &flag,
                MPI_STATUS_IGNORE);
     if (flag) {
       // if probed for matching msg failed, but this msg arrived, we can be
@@ -142,13 +144,15 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
       // post the matching recv
       printf("Post RECV, Fallback in start\n");
       MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
-                request->tag, request->comm, &request->backup_request);
+                request->tag, request->communicators->original_communicator,
+                &request->backup_request);
     }
   } else {
     // RDMA handshake complete, we can post the matching recv
     if (request->backup_request == MPI_REQUEST_NULL) {
       MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
-                request->tag, request->comm, &request->backup_request);
+                request->tag, request->communicators->original_communicator,
+                &request->backup_request);
     }
   }
 
@@ -172,7 +176,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
     MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest,
-              request->tag, request->comm, &request->backup_request);
+              request->tag, request->communicators->original_communicator,
+              &request->backup_request);
 
   } else {
     assert(false && "Error: uninitialized Request");
@@ -180,7 +185,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request == MPI_REQUEST_NULL);
   MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
-            checking_communicator, &request->chekcking_request);
+            request->communicators->checking_communicator,
+            &request->chekcking_request);
 
 #endif
 }
@@ -202,7 +208,8 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
     MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
-              request->tag, request->comm, &request->backup_request);
+              request->tag, request->communicators->original_communicator,
+              &request->backup_request);
   } else {
     assert(false && "Error: uninitialized Request");
   }
@@ -210,7 +217,8 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request == MPI_REQUEST_NULL);
   MPI_Irecv(request->checking_buf, request->size, MPI_BYTE, request->dest,
-            request->tag, checking_communicator, &request->chekcking_request);
+            request->tag, request->communicators->checking_communicator,
+            &request->chekcking_request);
 
 #endif
 }

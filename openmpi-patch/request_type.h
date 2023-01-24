@@ -37,12 +37,12 @@ struct mpiopt_request {
   ucp_mem_h mem_handle_data;
   ucp_mem_h mem_handle_flag;
   ucp_ep_h
-      ep; // save used endpoint, so we dont have to look it up over and over
-  // necessary for backup in case no other persistent op matches
+      ep; // save used endpoint, so we dont have to look it up over and over#
+  struct communicator_info *communicators;
+  // necessary for backup in case no other persistent op matches:
   MPI_Request backup_request;
   int tag;
   int dest;
-  MPI_Comm comm;
   // MPI_Request rdma_exchange_request;
   MPI_Request rdma_exchange_request_send;
   void *rdma_info_buf;

@@ -47,11 +47,14 @@ void MPIOPT_FINALIZE() {
 
   // TODO receive all pending messages from unsuccessful handshakes
 
-  MPI_Comm_free(&handshake_communicator);
-  MPI_Comm_free(&handshake_response_communicator);
+  for (int i = 0; i < communicator_array_size; ++i) {
+    MPI_Comm_free(&communicator_array[i].handshake_communicator);
+    MPI_Comm_free(&communicator_array[i].handshake_response_communicator);
 #ifdef BUFFER_CONTENT_CHECKING
-  MPI_Comm_free(&checking_communicator);
+    MPI_Comm_free(&communicator_array[i].checking_communicator);
 #endif
+  }
+  free(communicator_array);
 }
 
 LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {

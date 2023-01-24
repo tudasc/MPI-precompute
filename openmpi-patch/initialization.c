@@ -25,11 +25,41 @@ void MPIOPT_INIT() {
 #ifdef SUMMARY_STATISTIC_PRINTING
   crosstalk_counter = 0;
 #endif
-  MPI_Comm_dup(MPI_COMM_WORLD, &handshake_communicator);
-  MPI_Comm_dup(MPI_COMM_WORLD, &handshake_response_communicator);
+  MPIOPT_Register_Communicator(MPI_COMM_WORLD);
+}
+
+LINKAGE_TYPE void MPIOPT_Register_Communicator(MPI_Comm comm) {
+
+  struct communicator_info *new_array =
+      malloc(sizeof(struct communicator_info) * (communicator_array_size + 1));
+  if (communicator_array != NULL && communicator_array_size > 0) {
+    // else undefined behaviour to call memcpy even with size=0
+    memcpy(communicator_array, new_array,
+           sizeof(struct communicator_info) * (communicator_array_size));
+  }
+  free(communicator_array);
+  communicator_array = new_array;
+  communicator_array[communicator_array_size].original_communicator = comm;
+  MPI_Comm_dup(
+      comm,
+      &communicator_array[communicator_array_size].handshake_communicator);
+  MPI_Comm_dup(comm, &communicator_array[communicator_array_size]
+                          .handshake_response_communicator);
 #ifdef BUFFER_CONTENT_CHECKING
-  MPI_Comm_dup(MPI_COMM_WORLD, &checking_communicator);
+  MPI_Comm_dup(
+      comm, &communicator_array[communicator_array_size].checking_communicator);
 #endif
+
+  communicator_array_size = communicator_array_size + 1;
+}
+
+struct communicator_info *find_comm(MPI_Comm comm) {
+  for (int i = 0; i < communicator_array_size; ++i) {
+    if (communicator_array[i].original_communicator == comm)
+      return &communicator_array[i];
+  }
+  assert(false && "Communicator was not registered");
+  return NULL;
 }
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
@@ -47,7 +77,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
          "Only contigous datatypes are supported yet");
   assert(type_size != MPI_UNDEFINED);
 
-  //TODO also allow for other communicators
+  // TODO also allow for other communicators
   assert(comm == MPI_COMM_WORLD); // currently only works for comm_world
 
   int rank, numtasks;
@@ -67,9 +97,10 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->dest = dest;
   request->size = type_size * count;
   request->tag = tag;
-  request->comm = comm;
   request->backup_request = MPI_REQUEST_NULL;
   request->remote_data_addr = NULL;
+
+  request->communicators = find_comm(comm);
 
   request->operation_number = 0;
   request->flag = 2; // operation 0 is completed
