@@ -7,6 +7,8 @@
 
 // globals
 
+MPI_Win global_comm_win =MPI_WIN_NULL;
+
 struct communicator_info *communicator_array = NULL;
 int communicator_array_size = 0;
 
