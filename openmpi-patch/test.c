@@ -123,7 +123,9 @@ LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
     // progress the fallback communication
     MPI_Test(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
   } else {
-    assert(false && "Error: uninitialized Request");
+    assert((request->type != RECV_REQUEST_TYPE_NULL ||
+            request->type != SEND_REQUEST_TYPE_NULL) &&
+           "Error: uninitialized Request");
   }
 }
 

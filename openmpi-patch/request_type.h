@@ -8,6 +8,10 @@
 #define SEND_REQUEST_TYPE_USE_FALLBACK 5
 #define RECV_REQUEST_TYPE_USE_FALLBACK 6
 
+// this request is stuck, so it should not be progressed
+#define RECV_REQUEST_TYPE_NULL 7
+#define SEND_REQUEST_TYPE_NULL 8
+
 #include <mpi.h>
 
 #include "settings.h"

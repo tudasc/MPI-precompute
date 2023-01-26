@@ -63,7 +63,9 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
   assert(request->active == 0);
 #endif
 
-    assert(request->operation_number>0 &&"Freeing a request before using it may lead to a deadlock in the current implementation");
+  assert(request->operation_number > 0 &&
+         "Freeing a request before using it may lead to a deadlock in the "
+         "current implementation");
 
 #ifdef STATISTIC_PRINTING
   int rank = 0;

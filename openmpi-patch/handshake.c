@@ -252,13 +252,19 @@ LINKAGE_TYPE void receive_rdma_info(MPIOPT_Request *request) {
   // the other process has to recv the matching handshake msg sometime
   int flag;
   MPI_Test(&request->rdma_exchange_request_send, &flag, MPI_STATUS_IGNORE);
-  while (!flag) {
-    progress_other_requests(request);
-    MPI_Test(&request->rdma_exchange_request_send, &flag, MPI_STATUS_IGNORE);
+  if (!flag) {
+    // mark as stuck
+    int type_before = request->type;
+    request->type = SEND_REQUEST_TYPE_NULL;
+    while (!flag) {
+      progress_other_requests(request);
+      MPI_Test(&request->rdma_exchange_request_send, &flag, MPI_STATUS_IGNORE);
 
-    // TODO It MAY be the case, that the other rank frees the request before
-    // establishing an RDMA connection
-    // but this will not happen if a communication operations is done
+      // TODO It MAY be the case, that the other rank frees the request before
+      // establishing an RDMA connection
+      // but this will not happen if a communication operations is done
+    }
+    request->type = type_before;
   }
 
 #ifdef STATISTIC_PRINTING
