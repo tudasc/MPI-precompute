@@ -164,8 +164,8 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
   if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
       request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     ret_status = MPI_Test(&request->backup_request, flag, status);
-    if (*flag)
 #ifdef DISTINGUISH_ACTIVE_REQUESTS
+    if (*flag)
       request->active = 0;
 #endif
   } else {

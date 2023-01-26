@@ -163,8 +163,8 @@ int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
     *outcount = MPI_UNDEFINED;
   }
 #else
-  assert(false % %
-         "Not Implemented, Recompile with -DDISTINGUISH_ACTIVE_REQUESTS")
+  assert(false &&
+         "Not Implemented, Recompile with -DDISTINGUISH_ACTIVE_REQUESTS");
 #endif
   return 0;
 }
