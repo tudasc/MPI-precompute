@@ -150,6 +150,7 @@ int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
     }
     flag = 0;
   }
+    assert(*outcount<=incount)
 
   return 0;
 }
