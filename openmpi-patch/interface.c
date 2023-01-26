@@ -98,7 +98,11 @@ int MPIOPT_Testany(int count, MPI_Request array_of_requests[], int *index,
 int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
                    MPI_Status array_of_statuses[]) {
   for (int i = 0; i < count; ++i) {
-    MPIOPT_Wait(&array_of_requests[i], &array_of_statuses[i]);
+    if (array_of_statuses == MPI_STATUSES_IGNORE) {
+      MPIOPT_Wait(&array_of_requests[i], MPI_STATUS_IGNORE);
+    } else {
+      MPIOPT_Wait(&array_of_requests[i], &array_of_statuses[i]);
+    }
   }
   return 0;
 }
@@ -106,7 +110,11 @@ int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
 int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
                    MPI_Status array_of_statuses[]) {
   for (int i = 0; i < count; ++i) {
-    MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
+    if (array_of_statuses == MPI_STATUSES_IGNORE) {
+      MPIOPT_Test(&array_of_requests[i], flag, MPI_STATUS_IGNORE);
+    } else {
+      MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
+    }
     if (!flag)
       return 0; // found one request not complete
   }
@@ -115,8 +123,13 @@ int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
 
 int MPIOPT_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
                     int array_of_indices[], MPI_Status array_of_statuses[]) {
-  MPIOPT_Waitany(incount, array_of_requests, &array_of_indices[0],
-                 array_of_statuses);
+  if (array_of_statuses == MPI_STATUSES_IGNORE) {
+    MPIOPT_Waitany(incount, array_of_requests, &array_of_indices[0],
+                   MPI_STATUS_IGNORE);
+  } else {
+    MPIOPT_Waitany(incount, array_of_requests, &array_of_indices[0],
+                   array_of_statuses);
+  }
   *outcount = 1;
   return 0;
 }
@@ -126,7 +139,11 @@ int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
   *outcount = 0;
   int flag = 0;
   for (int i = 0; i < incount; ++i) {
-    MPIOPT_Test(&array_of_requests[i], &flag, &array_of_statuses[i]);
+    if (array_of_statuses == MPI_STATUSES_IGNORE) {
+      MPIOPT_Test(&array_of_requests[i], &flag, MPI_STATUS_IGNORE);
+    } else {
+      MPIOPT_Test(&array_of_requests[i], &flag, &array_of_statuses[i]);
+    }
     if (flag) {
       array_of_indices[*outcount] = i;
       *outcount = *outcount + 1;
