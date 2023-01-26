@@ -175,6 +175,12 @@ LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
     int ret_status = MPIOPT_Wait_recv_internal(request, status);
   }
 
+  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
+    status->MPI_TAG = request->tag;
+    status->MPI_SOURCE = request->dest;
+    status->MPI_ERROR = MPI_SUCCESS;
+  }
+
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request != MPI_REQUEST_NULL);
   MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
@@ -188,10 +194,4 @@ LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
   }
 #endif
   return ret_status;
-
-  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
-    status->MPI_TAG = request->tag;
-    status->MPI_SOURCE = request->dest;
-    status->MPI_ERROR = MPI_SUCCESS;
-  }
 }
