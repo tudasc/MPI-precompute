@@ -34,8 +34,18 @@ struct communicator_info *find_comm(MPI_Comm comm) {
     if (communicator_array[i].original_communicator == comm)
       return &communicator_array[i];
   }
-  assert(false && "Communicator was not registered");
+
+#ifdef REGISTER_COMMUNICATOR_ON_USE
+    MPIOPT_Register_Communicator(comm);
+    for (int i = 0; i < communicator_array_size; ++i) {
+        if (communicator_array[i].original_communicator == comm)
+            return &communicator_array[i];
+    }
+#endif
+
+assert(false && "Communicator was not registered");
   return NULL;
+
 }
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
