@@ -101,8 +101,17 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->chekcking_request = MPI_REQUEST_NULL;
 #endif
 
-  send_rdma_info(request);
-
+  if (rank == dest) {
+    // use the default implementation for communication with self
+    if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+      request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
+    } else {
+      assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
+      request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
+    }
+  } else {
+    send_rdma_info(request);
+  }
   // add request to list, so that it is progressed, if other requests have to
   // wait
   add_request_to_list(request);
