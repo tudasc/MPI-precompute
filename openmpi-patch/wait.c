@@ -156,10 +156,6 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
 
 LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
                                       MPI_Status *status) {
-
-  // TODO implement MPI status?
-  assert(status == MPI_STATUS_IGNORE);
-
   int ret_status = 0;
   if (request->type == SEND_REQUEST_TYPE ||
       request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
@@ -182,4 +178,10 @@ LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
   }
 #endif
   return ret_status;
+
+  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
+    status->MPI_TAG = request->tag;
+    status->MPI_SOURCE = request->dest;
+    status->MPI_ERROR = MPI_SUCCESS;
+  }
 }

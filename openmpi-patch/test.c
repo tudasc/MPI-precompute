@@ -144,7 +144,6 @@ LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
 
 LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                       MPI_Status *status) {
-  assert(status == MPI_STATUS_IGNORE);
 
   int ret_status = 0;
   if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
@@ -178,5 +177,11 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
     }
   }
 #endif
+
+  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
+    status->MPI_TAG = request->tag;
+    status->MPI_SOURCE = request->dest;
+    status->MPI_ERROR = MPI_SUCCESS;
+  }
   return ret_status;
 }
