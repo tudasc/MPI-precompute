@@ -64,7 +64,7 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 #endif
 
   // if other type, the handshake was successfully completed
-  assert(request->operation_number > 0 &&
+  assert(request->operation_number > 0 ||
          (request->type != SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION &&
           request->type != RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) &&
          "Freeing a request before using it may lead to a deadlock in the "
