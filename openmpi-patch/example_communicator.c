@@ -27,7 +27,6 @@
 
 #define DUMMY_WLOAD_TIME = 10
 
-
 // bufsize and num iter have to be large to get performance benefit, otherwise
 // slowdown occur
 // KB
@@ -75,9 +74,9 @@ void use_self_implemented_comm() {
   MPIOPT_INIT();
 
   MPI_Comm comm;
-  MPI_Comm_dup(MPI_COMM_WORLD,&comm);
+  MPI_Comm_dup(MPI_COMM_WORLD, &comm);
 
-    MPIOPT_Register_Communicator(comm);
+  MPIOPT_Register_Communicator(comm);
 
   int rank, numtasks;
   // Welchen rang habe ich?
@@ -141,8 +140,6 @@ void use_self_implemented_comm() {
   MPIOPT_Request_free(&req);
   MPIOPT_FINALIZE();
 }
-
-
 
 int main(int argc, char **argv) {
 

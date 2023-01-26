@@ -8,12 +8,12 @@
 #define SUMMARY_STATISTIC_PRINTING
 //#define BUFFER_CONTENT_CHECKING
 
-// not mpi standard compliant, as this makes all init methods BLOCKing until all ranks win the comm initialize at least one request
-// but makes dealing with multiple communicators easy to test things
+// not mpi standard compliant, as this makes all init methods BLOCKing until all
+// ranks win the comm initialize at least one request but makes dealing with
+// multiple communicators easy to test things
 #define REGISTER_COMMUNICATOR_ON_USE
 
 #define MAX_NUM_OF_COMMUNICATORS 64
-
 
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 

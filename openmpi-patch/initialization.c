@@ -1,8 +1,8 @@
 #include "initialization.h"
 #include "globals.h"
 #include "handshake.h"
-#include "settings.h"
 #include "interface.h"
+#include "settings.h"
 
 #include "mpi-internals.h"
 #include <stdlib.h>
@@ -23,8 +23,8 @@ void MPIOPT_INIT() {
   to_free_list_head->elem = NULL;
   to_free_list_head->next = NULL;
 
-    communicator_array =
-            malloc(sizeof(struct communicator_info) * MAX_NUM_OF_COMMUNICATORS );
+  communicator_array =
+      malloc(sizeof(struct communicator_info) * MAX_NUM_OF_COMMUNICATORS);
 
 #ifdef SUMMARY_STATISTIC_PRINTING
   crosstalk_counter = 0;
@@ -42,16 +42,15 @@ struct communicator_info *find_comm(MPI_Comm comm) {
   }
 
 #ifdef REGISTER_COMMUNICATOR_ON_USE
-    MPIOPT_Register_Communicator(comm);
-    for (int i = 0; i < communicator_array_size; ++i) {
-        if (communicator_array[i].original_communicator == comm)
-            return &communicator_array[i];
-    }
+  MPIOPT_Register_Communicator(comm);
+  for (int i = 0; i < communicator_array_size; ++i) {
+    if (communicator_array[i].original_communicator == comm)
+      return &communicator_array[i];
+  }
 #endif
 
-assert(false && "Communicator was not registered");
+  assert(false && "Communicator was not registered");
   return NULL;
-
 }
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
@@ -90,7 +89,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->remote_data_addr = NULL;
 
   request->communicators = find_comm(comm);
-    assert(request->communicators!=NULL);
+  assert(request->communicators != NULL);
 
   request->operation_number = 0;
   request->flag = 2; // operation 0 is completed

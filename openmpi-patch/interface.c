@@ -146,21 +146,20 @@ int MPIOPT_Request_free(MPI_Request *request) {
 
 OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm) {
 
+  if (communicator_array_size >= MAX_NUM_OF_COMMUNICATORS)
+    printf("Error: out of ressources\n");
+  assert(communicator_array_size < MAX_NUM_OF_COMMUNICATORS);
 
-    if (communicator_array_size< MAX_NUM_OF_COMMUNICATORS)
-        printf("Error: out of ressources");
-    assert(communicator_array_size< MAX_NUM_OF_COMMUNICATORS);
-
-    communicator_array[communicator_array_size].original_communicator = comm;
-    MPI_Comm_dup(
-            comm,
-            &communicator_array[communicator_array_size].handshake_communicator);
-    MPI_Comm_dup(comm, &communicator_array[communicator_array_size]
-            .handshake_response_communicator);
+  communicator_array[communicator_array_size].original_communicator = comm;
+  MPI_Comm_dup(
+      comm,
+      &communicator_array[communicator_array_size].handshake_communicator);
+  MPI_Comm_dup(comm, &communicator_array[communicator_array_size]
+                          .handshake_response_communicator);
 #ifdef BUFFER_CONTENT_CHECKING
-    MPI_Comm_dup(
+  MPI_Comm_dup(
       comm, &communicator_array[communicator_array_size].checking_communicator);
 #endif
 
-    communicator_array_size = communicator_array_size + 1;
+  communicator_array_size = communicator_array_size + 1;
 }
