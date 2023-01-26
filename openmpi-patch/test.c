@@ -162,6 +162,10 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
   if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
       request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     ret_status = MPI_Test(&request->backup_request, flag, status);
+    if (*flag)
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+        request->active=0;
+#endif
   } else {
     progress_request(request);
     // it is possible, that the other rank already started the next operation,
@@ -172,7 +176,9 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
         request->ucx_request_data_transfer == NULL) {
       // request is finished
       *flag = 1;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
       request->active = 0;
+#endif
     } else
       *flag = 0;
   }
