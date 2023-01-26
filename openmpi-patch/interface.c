@@ -146,15 +146,11 @@ int MPIOPT_Request_free(MPI_Request *request) {
 
 OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm) {
 
-    struct communicator_info *new_array =
-            malloc(sizeof(struct communicator_info) * (communicator_array_size + 1));
-    if (communicator_array != NULL && communicator_array_size > 0) {
-        // else undefined behaviour to call memcpy even with size=0
-        memcpy(new_array,communicator_array,
-               sizeof(struct communicator_info) * (communicator_array_size));
-    }
-    free(communicator_array);
-    communicator_array = new_array;
+
+    if (communicator_array_size< MAX_NUM_OF_COMMUNICATORS)
+        printf("Error: out of ressources");
+    assert(communicator_array_size< MAX_NUM_OF_COMMUNICATORS);
+
     communicator_array[communicator_array_size].original_communicator = comm;
     MPI_Comm_dup(
             comm,

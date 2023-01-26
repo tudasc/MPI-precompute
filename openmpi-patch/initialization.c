@@ -23,10 +23,16 @@ void MPIOPT_INIT() {
   to_free_list_head->elem = NULL;
   to_free_list_head->next = NULL;
 
+    communicator_array =
+            malloc(sizeof(struct communicator_info) * MAX_NUM_OF_COMMUNICATORS );
+
 #ifdef SUMMARY_STATISTIC_PRINTING
   crosstalk_counter = 0;
 #endif
   MPIOPT_Register_Communicator(MPI_COMM_WORLD);
+#ifdef STATISTIC_PRINTING
+  printf("Init MPIOPT\n");
+#endif
 }
 
 struct communicator_info *find_comm(MPI_Comm comm) {

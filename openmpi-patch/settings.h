@@ -12,7 +12,7 @@
 // but makes dealing with multiple communicators easy to test things
 #define REGISTER_COMMUNICATOR_ON_USE
 
-#define MAX_NUM_OF_COMMUNICATORS 32
+#define MAX_NUM_OF_COMMUNICATORS 64
 
 
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
