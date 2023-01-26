@@ -142,12 +142,12 @@ int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
   int inactive_count = 0;
   int flag = 0;
   for (int i = 0; i < incount; ++i) {
-    MPIOPT_Request *req = (MPIOPT_Request *) (array_of_requests[i]);
+    MPIOPT_Request *req = (MPIOPT_Request *)(array_of_requests[i]);
     if (req->active) {
       if (array_of_statuses == MPI_STATUSES_IGNORE) {
-          MPIOPT_Test_internal(req, &flag, MPI_STATUS_IGNORE);
+        MPIOPT_Test_internal(req, &flag, MPI_STATUS_IGNORE);
       } else {
-          MPIOPT_Test_internal(req, &flag, &array_of_statuses[i]);
+        MPIOPT_Test_internal(req, &flag, &array_of_statuses[i]);
       }
       if (flag) {
         array_of_indices[*outcount] = i;
