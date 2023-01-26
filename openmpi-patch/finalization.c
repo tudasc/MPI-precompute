@@ -59,6 +59,10 @@ void MPIOPT_FINALIZE() {
 
 LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  assert(request->active == 0);
+#endif
+
 #ifdef STATISTIC_PRINTING
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);

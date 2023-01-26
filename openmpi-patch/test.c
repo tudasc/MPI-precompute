@@ -145,6 +145,13 @@ LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
 LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                       MPI_Status *status) {
 
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  if (request->active == 0) {
+    *flag = 1;
+    return MPI_SUCCESS;
+  }
+#endif
+
   int ret_status = 0;
   if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
       request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
@@ -159,6 +166,7 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
         request->ucx_request_data_transfer == NULL) {
       // request is finished
       *flag = 1;
+      request->active = 0;
     } else
       *flag = 0;
   }

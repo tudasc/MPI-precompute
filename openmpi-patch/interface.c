@@ -136,22 +136,36 @@ int MPIOPT_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
 
 int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
                     int array_of_indices[], MPI_Status array_of_statuses[]) {
+
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
   *outcount = 0;
+  int inactive_count = 0;
   int flag = 0;
   for (int i = 0; i < incount; ++i) {
-    if (array_of_statuses == MPI_STATUSES_IGNORE) {
-      MPIOPT_Test(&array_of_requests[i], &flag, MPI_STATUS_IGNORE);
+    MPIOPT_Request *req = (MPIOPT_Request *)&array_of_requests[i];
+    if (req->active) {
+      if (array_of_statuses == MPI_STATUSES_IGNORE) {
+        MPIOPT_Test(req, &flag, MPI_STATUS_IGNORE);
+      } else {
+        MPIOPT_Test(req, &flag, &array_of_statuses[i]);
+      }
+      if (flag) {
+        array_of_indices[*outcount] = i;
+        *outcount = *outcount + 1;
+      }
+      flag = 0;
     } else {
-      MPIOPT_Test(&array_of_requests[i], &flag, &array_of_statuses[i]);
+      ++inactive_count;
     }
-    if (flag) {
-      array_of_indices[*outcount] = i;
-      *outcount = *outcount + 1;
-    }
-    flag = 0;
   }
-    assert(*outcount<=incount)
-
+  assert(*outcount <= incount);
+  if (inactive_count == incount) {
+    *outcount = MPI_UNDEFINED;
+  }
+#else
+  assert(false % %
+         "Not Implemented, Recompile with -DDISTINGUISH_ACTIVE_REQUESTS")
+#endif
   return 0;
 }
 

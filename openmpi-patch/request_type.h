@@ -51,6 +51,9 @@ struct mpiopt_request {
   void *checking_buf;
   MPI_Request chekcking_request;
 #endif
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  int active;
+#endif
 };
 typedef struct mpiopt_request MPIOPT_Request;
 

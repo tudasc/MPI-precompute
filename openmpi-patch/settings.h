@@ -15,6 +15,9 @@
 
 #define MAX_NUM_OF_COMMUNICATORS 64
 
+// necessary, if one uses MPI_testsome:
+#define DISTINGUISH_ACTIVE_REQUESTS
+
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 
 // linkage type of all internal functions
