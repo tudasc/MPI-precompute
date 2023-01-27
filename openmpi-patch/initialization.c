@@ -57,8 +57,8 @@ struct communicator_info *find_comm(MPI_Comm comm) {
 #ifdef CHECK_FOR_MATCHING_CONFLICTS
 LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
 
-  struct list_elem *current = request_list_head;
-  while (current != NULL && current->elem != NULL) {
+  struct list_elem *current = request_list_head->next;
+  while (current != NULL) {
     MPIOPT_Request *other = current->elem;
     assert(other != NULL);
     if (other != request) {
