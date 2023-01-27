@@ -70,7 +70,7 @@ LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
             request->communicators->original_communicator ==
                 other->communicators->original_communicator) {
           assert(false &&
-                 "Requests with the a matching envelope are not permitted");
+                 "Requests with a matching envelope are not permitted");
           return 1;
         }
       }
