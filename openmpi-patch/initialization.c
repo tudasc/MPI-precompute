@@ -3,6 +3,7 @@
 #include "handshake.h"
 #include "interface.h"
 #include "settings.h"
+#include "request_type.h"
 
 #include "mpi-internals.h"
 #include <stdlib.h>
@@ -53,6 +54,31 @@ struct communicator_info *find_comm(MPI_Comm comm) {
   return NULL;
 }
 
+#ifdef CHECK_FOR_MATCHING_CONFLICTS
+LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request){
+
+    struct list_elem* current=request_list_head;
+    while (current!=NULL && current->elem!=NULL){
+        MPIOPT_Request* other = current->elem;
+        assert(other!=NULL);
+        if (other!=request){
+            // same communication direction
+            if((is_sending_type(request) && is_sending_type(other))||(is_recv_type(request)&& is_recv_type(other))){
+                //same envelope
+                if(request->dest==other->dest && request->tag==other->tag&&request->communicators->original_communicator==other->communicators->original_communicator)
+                {
+                    assert(false && "Requests with the a matching envelope are not permitted");
+                    return 1;
+                }
+            }
+
+        }
+        current=current->next;
+    }
+    return 0;
+}
+#endif
+
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm,
                               MPIOPT_Request *request) {
@@ -101,7 +127,12 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->chekcking_request = MPI_REQUEST_NULL;
 #endif
 
-  if (rank == dest) {
+  int conflicts=0;
+#ifdef CHECK_FOR_MATCHING_CONFLICTS
+  conflicts = check_for_conflicting_request(request);
+#endif
+
+  if (rank == dest || conflicts) {
     // use the default implementation for communication with self
     if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
       request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
