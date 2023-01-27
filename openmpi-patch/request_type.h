@@ -61,11 +61,17 @@ struct mpiopt_request {
 };
 typedef struct mpiopt_request MPIOPT_Request;
 
-static inline is_sending_type(MPIOPT_Request* request){
-return request->type==SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION || request->type==SEND_REQUEST_TYPE || request->type==SEND_REQUEST_TYPE_USE_FALLBACK || request->type==SEND_REQUEST_TYPE_NULL;
+static inline is_sending_type(MPIOPT_Request *request) {
+  return request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+         request->type == SEND_REQUEST_TYPE ||
+         request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
+         request->type == SEND_REQUEST_TYPE_NULL;
 }
-static inline is_recv_type(MPIOPT_Request* request){
-return request->type==RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION || request->type==RECV_REQUEST_TYPE || request->type==RECV_REQUEST_TYPE_USE_FALLBACK || request->type==RECV_REQUEST_TYPE_NULL;
+static inline is_recv_type(MPIOPT_Request *request) {
+  return request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+         request->type == RECV_REQUEST_TYPE ||
+         request->type == RECV_REQUEST_TYPE_USE_FALLBACK ||
+         request->type == RECV_REQUEST_TYPE_NULL;
 }
 
 #endif // MPIOPT_REQUEST_TYPE_H

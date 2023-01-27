@@ -10,7 +10,8 @@
 #define SUMMARY_STATISTIC_PRINTING
 // check the contents of the buffers send around to detect race conditions
 //#define BUFFER_CONTENT_CHECKING
-// check that no matching conflicts exist to double check that the compiler analysis made no mistake
+// check that no matching conflicts exist to double check that the compiler
+// analysis made no mistake
 #define CHECK_FOR_MATCHING_CONFLICTS
 
 // not mpi standard compliant, as this makes all init methods BLOCKing until all

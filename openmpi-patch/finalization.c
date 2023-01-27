@@ -63,25 +63,23 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
   assert(request->active == 0);
 #endif
 
-    // cancel any search for RDMA connection, if necessary
-    // completing the handshake, if necessary so that other rank will not deadlock
-  if(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-          request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION){
+  // cancel any search for RDMA connection, if necessary
+  // completing the handshake, if necessary so that other rank will not deadlock
+  if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+      request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
 
-      MPI_Comm comm_to_use =
-              request->communicators->handshake_response_communicator;
-      if (request->type==RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION)
-          comm_to_use =
-                  request->communicators->handshake_communicator;
+    MPI_Comm comm_to_use =
+        request->communicators->handshake_response_communicator;
+    if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION)
+      comm_to_use = request->communicators->handshake_communicator;
 
-      int flag=0;
-      MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
-                 MPI_STATUS_IGNORE);
-      if (flag) {
-          // found matching counterpart
-          receive_rdma_info(request);
-      }
-
+    int flag = 0;
+    MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
+               MPI_STATUS_IGNORE);
+    if (flag) {
+      // found matching counterpart
+      receive_rdma_info(request);
+    }
   }
 
 #ifdef STATISTIC_PRINTING
@@ -96,8 +94,6 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
   }
 #endif
   remove_request_from_list(request);
-
-
 
   // defer free of memory until finalize, as the other process may start an RDMA
   // communication ON THE FLAG, not on the data which may lead to error, if we
