@@ -134,8 +134,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   conflicts = check_for_conflicting_request(request);
 #endif
 
-  if (rank == dest || conflicts) {
-    // use the default implementation for communication with self
+  if (rank == dest || rank == MPI_PROC_NULL || conflicts) {
+    // use the default implementation for communication with self / no-op
     if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
       request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
     } else {
