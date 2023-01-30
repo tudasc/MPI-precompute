@@ -8,7 +8,7 @@
 
 # Compiler flags, paths and libraries
 # Include path showing to openmpoi internals
-INCLUDE=-I/home/tj75qeje/openmpi-4.1.1/ -I/home/tj75qeje/openmpi-4.1.1/opal/include -I/home/tj75qeje/openmpi-4.1.1/ompi/include/ -I/home/tj75qeje/openmpi-4.1.1/orte/include
+INCLUDE=-I/home/td37cari/openmpi-4.1.1/ -I/home/td37cari/openmpi-4.1.1/opal/include -I/home/td37cari/openmpi-4.1.1/ompi/include/ -I/home/td37cari/openmpi-4.1.1/orte/include
 
 CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
 #CFLAGS = -std=c11 -O3 -DNDEBUG $(INCLUDE)
