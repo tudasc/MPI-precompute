@@ -35,14 +35,14 @@
 #include <mpi.h>
 
 struct comm_info {
-  // communication partners
-  // may be MPI_PROC_NULL
-  // if one calls an MPI routine with MPI_PROC_NULL as source or destination of
-  // a message: this send/receive is a No-Op this makes the code more readable
-  int up;
-  int down;
-  int left;
-  int right;
+    // communication partners
+    // may be MPI_PROC_NULL
+    // if one calls an MPI routine with MPI_PROC_NULL as source or destination of
+    // a message: this send/receive is a No-Op this makes the code more readable
+    int up;
+    int down;
+    int left;
+    int right;
 };
 
 // distributes the matrix across all processes
@@ -53,58 +53,102 @@ std::pair<int, int> distribute_matrix(struct comm_info &comm_partners, int rank,
 
 class Matrix {
 public:
-  double **data;
+    double **data;
 
-  Matrix(int x, int y) { allocateMatrix(x, y); }
+    MPI_Request comm_requests[4];
+    int rows, columns;
 
-  ~Matrix() { freeMatrix(); }
-
-  // may be useful for debugging
-  void print_matrix(int N, int M) {
-    for (int i = 0; i < N + 2; ++i) {
-      std::cout << '\n';
-      for (int j = 0; j < M + 2; ++j) {
-        std::cout << std::fixed << std::setw(11) << std::setprecision(6)
-                  << data[i][j];
-      }
+    Matrix(const int rows, const int columns, const double inner_value) {
+        int rank, size;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Comm_size(MPI_COMM_WORLD, &size);
+        distribute_matrix(rows, columns, rank, size);
+        init_matrix(rank,size,inner_value);
     }
-    std::cout << '\n';
-  }
 
-  void init_matrix(struct comm_info comm_partners, int rows, int columns,
-                   double inner_value);
+    Matrix(const Matrix &other) {
+        int rank, size;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Comm_size(MPI_COMM_WORLD, &size);
+        distribute_matrix(other.rows, other.columns, rank, size);
+        memcpy(data[0], other.data[0], sizeof(double) * (other.rows + 2) * other.columns);
+    }
+
+    ~Matrix() {
+        for (int i = 0; i < 4; ++i) {
+            if (comm_requests[i] != MPI_REQUEST_NULL) {
+                MPI_Request_free(&comm_requests[i]);
+            }
+        }
+        freeMatrix();
+    }
+
+    // may be useful for debugging
+    void print_matrix(const int N, const int M) {
+        for (int i = 0; i < N + 2; ++i) {
+            std::cout << '\n';
+            for (int j = 0; j < M; ++j) {
+                std::cout << std::fixed << std::setw(11) << std::setprecision(6)
+                          << data[i][j];
+            }
+        }
+        std::cout << '\n';
+    }
+
+
+
+
+    void begin_halo_receive() {
+        MPI_Start(&comm_requests[1]);
+        MPI_Start(&comm_requests[3]);
+    }
+
+    void begin_halo_send() {
+        MPI_Start(&comm_requests[0]);
+        MPI_Start(&comm_requests[2]);
+    }
+
+    void end_halo_exchange() {
+        // could also use MPI_waitall
+        for (int i = 0; i < 4; ++i) {
+            MPI_Wait(&comm_requests[i],MPI_STATUS_IGNORE);
+        }
+    }
 
 private:
-  /* ************************************************************************ */
-  /* helper function: freeMatrix: frees memory of the matrix                  */
-  /* ************************************************************************ */
-  void freeMatrix() {
-    free(data[0]);
-    data[0] = nullptr;
-    free(data);
-    data = nullptr;
-  }
-
-  /* ************************************************************************ */
-  /* helper function: allocateMatrix: allocates memory for a matrix           */
-  /* ************************************************************************ */
-  void allocateMatrix(int x, int y) {
-    int i;
-
-    double *data_layer = (double *)malloc(x * y * sizeof(double));
-    double **resultmatrix = (double **)malloc(x * sizeof(double *));
-
-    if (data_layer == NULL || resultmatrix == NULL) {
-      printf("ERROR ALLOCATING MEMORY\n");
-      exit(1);
+    void init_matrix(const int rank, const int numTasks,
+                     const double inner_value);
+    void distribute_matrix(const int rows, const int columns, const int rank, const int numTasks);
+    /* ************************************************************************ */
+    /* helper function: freeMatrix: frees memory of the matrix                  */
+    /* ************************************************************************ */
+    void freeMatrix() {
+        free(data[0]);
+        data[0] = nullptr;
+        free(data);
+        data = nullptr;
     }
 
-    for (i = 0; i < x; i++) {
-      resultmatrix[i] = data_layer + i * y;
-    }
+    /* ************************************************************************ */
+    /* helper function: allocateMatrix: allocates memory for a matrix           */
+    /* ************************************************************************ */
+    void allocateMatrix(int x, int y) {
+        int i;
 
-    data = resultmatrix;
-  }
+        double *data_layer = (double *) malloc(x * y * sizeof(double));
+        double **resultmatrix = (double **) malloc(x * sizeof(double *));
+
+        if (data_layer == NULL || resultmatrix == NULL) {
+            printf("ERROR ALLOCATING MEMORY\n");
+            exit(1);
+        }
+
+        for (i = 0; i < x; i++) {
+            resultmatrix[i] = data_layer + i * y;
+        }
+
+        data = resultmatrix;
+    }
 };
 
 //  iterate until the  new solution W differs from the old solution U
@@ -114,3 +158,4 @@ std::pair<int, double> calculate(int rank, double epsilon, int rows,
                                  int columns, Matrix &Matrix_In,
                                  Matrix &Matrix_Out,
                                  struct comm_info comm_partners);
+
