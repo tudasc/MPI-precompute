@@ -34,17 +34,6 @@
 
 #include <mpi.h>
 
-struct comm_info {
-    // communication partners
-    // may be MPI_PROC_NULL
-    // if one calls an MPI routine with MPI_PROC_NULL as source or destination of
-    // a message: this send/receive is a No-Op this makes the code more readable
-    int up;
-    int down;
-    int left;
-    int right;
-};
-
 // distributes the matrix across all processes
 // returns (rows,columns) for local process and fills the comm_info struct
 std::pair<int, int> distribute_matrix(struct comm_info &comm_partners, int rank,
@@ -54,24 +43,29 @@ std::pair<int, int> distribute_matrix(struct comm_info &comm_partners, int rank,
 class Matrix {
 public:
     double **data;
-
     MPI_Request comm_requests[4];
     int rows, columns;
 
-    Matrix(const int rows, const int columns, const double inner_value) {
+    Matrix(const int global_rows, const int global_columns, const double inner_value) {
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
-        distribute_matrix(rows, columns, rank, size);
-        init_matrix(rank,size,inner_value);
+        calculate_num_local_rows(global_rows,global_columns,rank,size);
+        // allocate additional space for the halo lines
+        allocateMatrix(this->rows + 2, this->columns);
+        init_communication(rank,size);
     }
 
     Matrix(const Matrix &other) {
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
-        distribute_matrix(other.rows, other.columns, rank, size);
-        memcpy(data[0], other.data[0], sizeof(double) * (other.rows + 2) * other.columns);
+        this->rows=other.rows;
+        this->columns=other.columns;
+        // allocate additional space for the halo lines
+        allocateMatrix(this->rows + 2, this->columns);
+        init_communication(rank,size);
+        memcpy(this->data[0], other.data[0], sizeof(double) * (other.rows + 2) * other.columns);
     }
 
     ~Matrix() {
@@ -95,9 +89,6 @@ public:
         std::cout << '\n';
     }
 
-
-
-
     void begin_halo_receive() {
         MPI_Start(&comm_requests[1]);
         MPI_Start(&comm_requests[3]);
@@ -118,7 +109,8 @@ public:
 private:
     void init_matrix(const int rank, const int numTasks,
                      const double inner_value);
-    void distribute_matrix(const int rows, const int columns, const int rank, const int numTasks);
+    void calculate_num_local_rows(const int global_rows,const int global_columns, const int rank, const int numTasks);
+    void init_communication(const int rank, const int numTasks);
     /* ************************************************************************ */
     /* helper function: freeMatrix: frees memory of the matrix                  */
     /* ************************************************************************ */

@@ -28,12 +28,12 @@
 // TODO: get an appropriate block size for best cache performance
 #define MAX_BLK_SIZE 1200
 
-void Matrix::distribute_matrix(const int rows, const int columns, const int rank, const int numTasks) {
+void Matrix::calculate_num_local_rows(const int global_rows,const int global_columns, const int rank, const int numTasks){
     int local_cols = 0, local_rows = 0;
 
-    local_cols = columns;
+    local_cols = global_columns;
 
-    local_rows = rows / numTasks;
+    local_rows = global_rows / numTasks;
 
     if (rank < rows % numTasks) {
         // split the remainder equally among the first few processes
@@ -42,16 +42,17 @@ void Matrix::distribute_matrix(const int rows, const int columns, const int rank
 
     this->rows = local_rows;
     this->columns = local_cols;
-    // allocate additional space for the halo lines
-    allocateMatrix(local_rows + 2, local_cols);
+}
+
+void Matrix::init_communication(const int rank, const int numTasks) {
 
     int other = MPI_PROC_NULL;
     if (rank != 0) {
         other = rank - 1;
     }
-    MPI_Send_init(data[1], local_cols, MPI_DOUBLE, other,
+    MPI_Send_init(data[1], this->columns, MPI_DOUBLE, other,
                   MSG_TAG, MPI_COMM_WORLD, &comm_requests[0]);
-    MPI_Recv_init(data[0], local_cols, MPI_DOUBLE, other,
+    MPI_Recv_init(data[0], this->columns, MPI_DOUBLE, other,
                   MSG_TAG, MPI_COMM_WORLD, &comm_requests[1]);
 
     other = MPI_PROC_NULL;
@@ -59,9 +60,9 @@ void Matrix::distribute_matrix(const int rows, const int columns, const int rank
         other = rank + 1;
     }
 
-    MPI_Send_init(data[local_rows], local_cols, MPI_DOUBLE, other,
+    MPI_Send_init(data[this->rows], this->columns, MPI_DOUBLE, other,
                   MSG_TAG, MPI_COMM_WORLD, &comm_requests[2]);
-    MPI_Recv_init(data[local_rows + 1], local_cols, MPI_DOUBLE, other,
+    MPI_Recv_init(data[this->rows + 1], this->columns, MPI_DOUBLE, other,
                   MSG_TAG, MPI_COMM_WORLD, &comm_requests[3]);
 
 }
@@ -116,7 +117,7 @@ run_iteration(double **Matrix_In, double **Matrix_Out, const int rows, const int
     for (int blk = 0; blk < number_of_blocks; ++blk) {
         const int block_begin = blk * size_of_block;
         const int block_end =
-                std::min((blk * size_of_block), columns);
+                std::min(((blk+1) * size_of_block), columns);
         //#pragma omp simd collapse(2) nontemporal(Matrix_Out) reduction(max : diff)
         for (int i = 1; i < rows + 1; i++) {
             // tell the compiler that we want to prefetch the next necessary line to the cache
@@ -154,6 +155,7 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
     Matrix temp_matrix = Matrix(matrix_in);
 
     double diff;
+
     if (rank == 0) {
         std::cout << "\n";
         std::cout << " Iteration  Change\n";
@@ -164,18 +166,18 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
     // get block size
 #ifdef _OPENMP
     int threads = omp_get_max_threads();
+#else
+    int threads = 1;
+#endif
     int size_of_block = columns / threads;
     // in case smaller blocks are needed for caching
     // choose a block size, so that all threads get an equal part
     while (size_of_block > MAX_BLK_SIZE) {
-      size_of_block = size_of_block / 2;
+        size_of_block = size_of_block / 2;
     }
-#else
-    const int size_of_block = columns;
-#endif
 
-    diff = epsilon;
 
+    diff=epsilon;
     // unroll the loop for two iterations, to eliminate the branch in the loop
     // TODO verify this claim in godbolt
 #ifdef __clang__
@@ -183,7 +185,8 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
 #elif __GNUG__
 #pragma GCC unroll 2
 #endif
-    while (epsilon <= diff) {
+
+   while (epsilon <= diff) {
         diff = 0.0;
 
         // just swap the pointer
