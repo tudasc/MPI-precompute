@@ -50,10 +50,16 @@ public:
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
+        std::cout << rows << "\n";
         calculate_num_local_rows(global_rows,global_columns,rank,size);
+        std::cout << rows << "\n";
+        this->rows = global_rows;
+        std::cout << rows << "\n";
+        assert(rows<=global_rows);
         // allocate additional space for the halo lines
-        allocateMatrix(this->rows + 2, this->columns);
+        allocateMatrix(this->rows + 2, this->columns+2);
         init_communication(rank,size);
+        init_matrix(rank,size,inner_value);
     }
 
     Matrix(const Matrix &other) {
@@ -63,9 +69,9 @@ public:
         this->rows=other.rows;
         this->columns=other.columns;
         // allocate additional space for the halo lines
-        allocateMatrix(this->rows + 2, this->columns);
+        allocateMatrix(this->rows + 2, this->columns+2);
         init_communication(rank,size);
-        memcpy(this->data[0], other.data[0], sizeof(double) * (other.rows + 2) * other.columns);
+        memcpy(this->data[0], other.data[0], sizeof(double) * (other.rows + 2) * (other.columns+2));
     }
 
     ~Matrix() {
