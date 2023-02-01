@@ -26,7 +26,8 @@
 // TODO: get an appropriate block size for best cache performance
 #define MAX_BLK_SIZE 1200
 
-void Matrix::calculate_num_local_rows(const int global_rows,const int global_columns, const int rank, const int numTasks){
+void
+Matrix::calculate_num_local_rows(const int global_rows, const int global_columns, const int rank, const int numTasks) {
     int local_cols = 0, local_rows = 0;
 
     local_cols = global_columns;
@@ -42,7 +43,7 @@ void Matrix::calculate_num_local_rows(const int global_rows,const int global_col
     this->columns = local_cols;
 }
 
-int Matrix::tag_to_use =0;
+int Matrix::tag_to_use = 0;
 
 void Matrix::init_communication(const int rank, const int numTasks) {
 
@@ -64,7 +65,7 @@ void Matrix::init_communication(const int rank, const int numTasks) {
                   tag_to_use, MPI_COMM_WORLD, &comm_requests[2]);
     MPI_Recv_init(data[this->rows + 1], this->columns, MPI_DOUBLE, other,
                   tag_to_use, MPI_COMM_WORLD, &comm_requests[3]);
-        tag_to_use++;
+    tag_to_use++;
 
 }
 
@@ -78,7 +79,7 @@ void Matrix::init_matrix(const int rank, const int numTasks,
     //
     // the boundaries will be overwritten afterwards
     for (i = 0; i < rows + 1 + 1; i++) {
-        for (int j = 0; j < columns+1+1; j++) {
+        for (int j = 0; j < columns + 1 + 1; j++) {
             data[i][j] = inner_value;
         }
     }
@@ -88,19 +89,19 @@ void Matrix::init_matrix(const int rank, const int numTasks,
     //
     for (i = 0; i < rows + 1; i++) {
         data[i][0] = 100.0;
-        data[i][columns +1] = 100.0;
+        data[i][columns + 1] = 100.0;
     }
 
     // has global lower boundary
     if (rank == numTasks - 1) {
-        for (i = 0; i < columns +1+1; i++) {
+        for (i = 0; i < columns + 1 + 1; i++) {
             data[rows + 1][i] = 100.0;
         }
     }
 
     // has global upper boundary
     if (rank == 0) {
-        for (i = 0; i < columns +1+1; i++) {
+        for (i = 0; i < columns + 1 + 1; i++) {
             data[0][i] = 0.0;
         }
     }
@@ -116,9 +117,9 @@ run_iteration(double **Matrix_In, double **Matrix_Out, const int rows, const int
 
 #pragma omp parallel for reduction(max : diff)
     for (int blk = 0; blk < number_of_blocks; ++blk) {
-        const int block_begin = 1+ blk * size_of_block;
+        const int block_begin = 1 + blk * size_of_block;
         const int block_end =
-                std::min(1+((blk+1) * size_of_block), columns);
+                std::min(1 + ((blk + 1) * size_of_block), columns);
         //#pragma omp simd collapse(2) nontemporal(Matrix_Out) reduction(max : diff)
         for (int i = 1; i < rows + 1; i++) {
             // tell the compiler that we want to prefetch the next necessary line to the cache
@@ -178,7 +179,7 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
     }
 
 
-    diff=epsilon;
+    diff = epsilon;
     // unroll the loop for two iterations, to eliminate the branch in the loop
     // TODO verify this claim in godbolt
 #ifdef __clang__
@@ -186,7 +187,7 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
 #elif __GNUG__
 #pragma GCC unroll 2
 #endif
-   while (epsilon <= diff) {
+    while (epsilon <= diff) {
         diff = 0.0;
 
         // just swap the pointer

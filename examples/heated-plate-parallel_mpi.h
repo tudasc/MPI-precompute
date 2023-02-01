@@ -51,27 +51,27 @@ public:
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
         std::cout << rows << "\n";
-        calculate_num_local_rows(global_rows,global_columns,rank,size);
+        calculate_num_local_rows(global_rows, global_columns, rank, size);
         std::cout << rows << "\n";
         this->rows = global_rows;
         std::cout << rows << "\n";
-        assert(rows<=global_rows);
+        assert(rows <= global_rows);
         // allocate additional space for the halo lines
-        allocateMatrix(this->rows + 2, this->columns+2);
-        init_communication(rank,size);
-        init_matrix(rank,size,inner_value);
+        allocateMatrix(this->rows + 2, this->columns + 2);
+        init_communication(rank, size);
+        init_matrix(rank, size, inner_value);
     }
 
     Matrix(const Matrix &other) {
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
-        this->rows=other.rows;
-        this->columns=other.columns;
+        this->rows = other.rows;
+        this->columns = other.columns;
         // allocate additional space for the halo lines
-        allocateMatrix(this->rows + 2, this->columns+2);
-        init_communication(rank,size);
-        memcpy(this->data[0], other.data[0], sizeof(double) * (other.rows + 2) * (other.columns+2));
+        allocateMatrix(this->rows + 2, this->columns + 2);
+        init_communication(rank, size);
+        memcpy(this->data[0], other.data[0], sizeof(double) * (other.rows + 2) * (other.columns + 2));
     }
 
     ~Matrix() {
@@ -108,15 +108,18 @@ public:
     void end_halo_exchange() {
         // could also use MPI_waitall
         for (int i = 0; i < 4; ++i) {
-            MPI_Wait(&comm_requests[i],MPI_STATUS_IGNORE);
+            MPI_Wait(&comm_requests[i], MPI_STATUS_IGNORE);
         }
     }
 
 private:
     static int tag_to_use;
+
     void init_matrix(const int rank, const int numTasks,
                      const double inner_value);
-    void calculate_num_local_rows(const int global_rows,const int global_columns, const int rank, const int numTasks);
+
+    void calculate_num_local_rows(const int global_rows, const int global_columns, const int rank, const int numTasks);
+
     void init_communication(const int rank, const int numTasks);
     /* ************************************************************************ */
     /* helper function: freeMatrix: frees memory of the matrix                  */
