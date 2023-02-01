@@ -34,7 +34,7 @@ Matrix::calculate_num_local_rows(const int global_rows, const int global_columns
 
     local_rows = global_rows / numTasks;
 
-    if (rank < rows % numTasks) {
+    if (rank < global_rows % numTasks) {
         // split the remainder equally among the first few processes
         ++local_rows;
     }

@@ -50,12 +50,7 @@ public:
         int rank, size;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &size);
-        std::cout << rows << "\n";
         calculate_num_local_rows(global_rows, global_columns, rank, size);
-        std::cout << rows << "\n";
-        this->rows = global_rows;
-        std::cout << rows << "\n";
-        assert(rows <= global_rows);
         // allocate additional space for the halo lines
         allocateMatrix(this->rows + 2, this->columns + 2);
         init_communication(rank, size);
