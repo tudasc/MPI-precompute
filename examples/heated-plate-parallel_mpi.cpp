@@ -22,8 +22,6 @@
 
 #include "heated-plate-parallel_mpi.h"
 
-// message tag
-#define MSG_TAG 42
 
 // TODO: get an appropriate block size for best cache performance
 #define MAX_BLK_SIZE 1200
@@ -44,6 +42,8 @@ void Matrix::calculate_num_local_rows(const int global_rows,const int global_col
     this->columns = local_cols;
 }
 
+int Matrix::tag_to_use =0;
+
 void Matrix::init_communication(const int rank, const int numTasks) {
 
     int other = MPI_PROC_NULL;
@@ -51,9 +51,9 @@ void Matrix::init_communication(const int rank, const int numTasks) {
         other = rank - 1;
     }
     MPI_Send_init(data[1], this->columns, MPI_DOUBLE, other,
-                  MSG_TAG, MPI_COMM_WORLD, &comm_requests[0]);
+                  tag_to_use, MPI_COMM_WORLD, &comm_requests[0]);
     MPI_Recv_init(data[0], this->columns, MPI_DOUBLE, other,
-                  MSG_TAG, MPI_COMM_WORLD, &comm_requests[1]);
+                  tag_to_use, MPI_COMM_WORLD, &comm_requests[1]);
 
     other = MPI_PROC_NULL;
     if (rank != numTasks - 1) {
@@ -61,9 +61,10 @@ void Matrix::init_communication(const int rank, const int numTasks) {
     }
 
     MPI_Send_init(data[this->rows], this->columns, MPI_DOUBLE, other,
-                  MSG_TAG, MPI_COMM_WORLD, &comm_requests[2]);
+                  tag_to_use, MPI_COMM_WORLD, &comm_requests[2]);
     MPI_Recv_init(data[this->rows + 1], this->columns, MPI_DOUBLE, other,
-                  MSG_TAG, MPI_COMM_WORLD, &comm_requests[3]);
+                  tag_to_use, MPI_COMM_WORLD, &comm_requests[3]);
+        tag_to_use++;
 
 }
 

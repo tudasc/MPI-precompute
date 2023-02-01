@@ -113,6 +113,7 @@ public:
     }
 
 private:
+    static int tag_to_use;
     void init_matrix(const int rank, const int numTasks,
                      const double inner_value);
     void calculate_num_local_rows(const int global_rows,const int global_columns, const int rank, const int numTasks);
