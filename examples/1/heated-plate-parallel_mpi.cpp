@@ -154,7 +154,7 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
     int iterations_print = 1;
 
     // temporary second matrix
-    Matrix temp_matrix = Matrix(matrix_in);
+    double **temp_matrix = allocateMatrix(rows + 2, columns + 2);
 
     double diff;
 
@@ -180,41 +180,27 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
 
 
     diff = epsilon;
-    // unroll the loop for two iterations, to eliminate the branch in the loop
-    // TODO verify this claim in godbolt
-#ifdef __clang__
-#pragma clang loop unroll_count(2)
-#elif __GNUG__
-#pragma GCC unroll 2
-#endif
+
+
     while (epsilon <= diff) {
         diff = 0.0;
 
-        // just swap the pointer
-        if (iterations % 2 == 0) // even
-        {
-            // begin receive from other rank
-            temp_matrix.begin_halo_receive();
-            diff = run_iteration(temp_matrix.data, matrix_in.data, rows, columns, size_of_block);
-            // in theory, it is possible to start sending the halo lines around right
-            // after they are computed, but this will mess up the current implementation with cache blocking
-            temp_matrix.begin_halo_send();
+        memcpy(temp_matrix[0], matrix_in.data[0],
+               sizeof(double) * (rows + 2) * (columns + 2));
 
-        } else { // odd
-            matrix_in.begin_halo_receive();
-            diff = run_iteration(matrix_in.data, temp_matrix.data, rows, columns, size_of_block);
-            matrix_in.begin_halo_send();
-        }
+
+        // begin receive from other rank
+        matrix_in.begin_halo_receive();
+        diff = run_iteration(temp_matrix, matrix_in.data, rows, columns, size_of_block);
+        // in theory, it is possible to start sending the halo lines around right
+        // after they are computed, but this will mess up the current implementation with cache blocking
+        matrix_in.begin_halo_send();
 
         MPI_Allreduce(MPI_IN_PLACE, &diff, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
         // wait for communication to end
-        if (iterations % 2 == 0) // even
-        {
-            temp_matrix.end_halo_exchange();
-        } else { // odd
-            matrix_in.end_halo_exchange();
-        }
+        matrix_in.end_halo_exchange();
+
 
         iterations++;
         if (iterations == iterations_print && rank == 0) {
@@ -224,13 +210,8 @@ std::pair<int, double> calculate(int rank, double epsilon, Matrix &matrix_in
         }
     }// end while
 
-    // copy result into correct matrix if necessary
-    if (iterations % 2 == 0) // even
-    {
-        memcpy(matrix_in.data[0], temp_matrix.data[0],
-               sizeof(double) * (rows + 2) * (columns+2));
-    }
 
+    freeMatrix(temp_matrix);
     return std::make_pair(iterations, diff);
 }
 
