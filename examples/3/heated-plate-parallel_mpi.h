@@ -34,12 +34,6 @@
 
 #include <mpi.h>
 
-// distributes the matrix across all processes
-// returns (rows,columns) for local process and fills the comm_info struct
-std::pair<int, int> distribute_matrix(struct comm_info &comm_partners, int rank,
-                                      int numtasks, unsigned long N,
-                                      unsigned long M);
-
 class Matrix {
 public:
     double **data;
