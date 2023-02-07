@@ -25,7 +25,11 @@
 #define SEND 3
 #define RECEIVED 4
 
-#define DUMMY_WLOAD_TIME = 10
+#define NUM_REQUESTS 10
+
+#define DUMMY_WLOAD_TIME 10
+
+//#define STATISTIC_PRINTING
 
 // bufsize and num iter have to be large to get performance benefit, otherwise
 // slowdown occur
@@ -73,71 +77,47 @@ void use_self_implemented_comm() {
 
   MPIOPT_INIT();
 
-  MPI_Comm comm;
-  MPI_Comm_dup(MPI_COMM_WORLD, &comm);
-
-  MPIOPT_Register_Communicator(comm);
-
   int rank, numtasks;
   // Welchen rang habe ich?
-  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
-  MPI_Comm_size(comm, &numtasks);
-  int *buffer = malloc(N * sizeof(int));
+  MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
+  int *buffer = malloc(N * NUM_REQUESTS * sizeof(int));
   double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
 
-  MPI_Request req;
+  MPI_Request reqs[NUM_REQUESTS];
 
-  if (rank == 1) {
-
-    MPIOPT_Send_init(buffer, N, MPI_INT, 0, 42, comm, &req);
-
-    for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
-      }
-
-      printf("Send %d\n", n);
-      MPIOPT_Start(&req);
-      dummy_workload(work_buffer);
-      // MPIOPT_Wait(&req,MPI_STATUS_IGNORE);
-      int flag = 0;
-      while (!flag) {
-        MPIOPT_Test(&req, &flag, MPI_STATUS_IGNORE);
-      }
+  for (int i = 0; i < NUM_REQUESTS; ++i) {
+    if (rank == 1) {
+      MPIOPT_Send_init(&buffer[i * N], N, MPI_INT, 0, 42 + i, MPI_COMM_WORLD,
+                       &reqs[i]);
+    } else {
+      MPIOPT_Recv_init(&buffer[i * N], N, MPI_INT, 1, 42 + i, MPI_COMM_WORLD,
+                       &reqs[i]);
     }
-  } else {
-
-    MPIOPT_Recv_init(buffer, N, MPI_INT, 1, 42, comm, &req);
-    for (int n = 0; n < NUM_ITERS; ++n) {
-
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
-      }
-      printf("Recv %d\n", n);
-      MPIOPT_Start(&req);
-      dummy_workload(work_buffer);
-      MPIOPT_Wait(&req, MPI_STATUS_IGNORE);
-      // int flag=0;
-      // while (! flag){
-      //     MPIOPT_Test(&req,&flag, MPI_STATUS_IGNORE);
-      //}
-#ifdef STATISTIC_PRINTING
-      check_buffer_content(buffer, n);
-#endif
-    }
-
-    // after comm
-    /*
-     for (int i = 0; i < N; ++i) {
-     printf("%i,", buffer[i]);
-     }
-     printf("\n");
-     */
   }
 
-  MPIOPT_Request_free(&req);
+  for (int n = 0; n < NUM_ITERS; ++n) {
+    for (int i = 0; i < N * NUM_REQUESTS; ++i) {
+      buffer[i] = rank * i * n;
+    }
+    for (int i = 0; i < NUM_REQUESTS; ++i) {
+      MPIOPT_Start(&reqs[i]);
+    }
+    dummy_workload(work_buffer);
+    for (int i = 0; i < NUM_REQUESTS; ++i) {
+      MPIOPT_Wait(&reqs[i], MPI_STATUS_IGNORE);
+    }
+    /*int flag = 0;
+    while (!flag) {
+      MPIOPT_Test(&reqs, &flag, MPI_STATUS_IGNORE);
+    }*/
+  }
+
+  for (int i = 0; i < NUM_REQUESTS; ++i) {
+    MPIOPT_Request_free(&reqs[i]);
+  }
   MPIOPT_FINALIZE();
 }
 

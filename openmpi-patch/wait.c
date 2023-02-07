@@ -122,8 +122,12 @@ wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
 LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
                                            MPI_Status *status) {
 
-  // TODO implement MPI status?
-  assert(status == MPI_STATUS_IGNORE);
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  if (request->active == 0) {
+    return MPI_SUCCESS;
+  }
+  request->active = 0;
+#endif
 
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
     e_send(request);
@@ -134,13 +138,18 @@ LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
   } else {
     assert(false && "Error: uninitialized Request");
   }
+  return MPI_SUCCESS;
 }
 
 LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
                                            MPI_Status *status) {
 
-  // TODO implement MPI status?
-  assert(status == MPI_STATUS_IGNORE);
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  if (request->active == 0) {
+    return MPI_SUCCESS;
+  }
+  request->active = 0;
+#endif
 
   if (__builtin_expect(request->type == RECV_REQUEST_TYPE, 1)) {
     e_recv(request);
@@ -152,14 +161,11 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
   } else {
     assert(false && "Error: uninitialized Request");
   }
+  return MPI_SUCCESS;
 }
 
 LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
                                       MPI_Status *status) {
-
-  // TODO implement MPI status?
-  assert(status == MPI_STATUS_IGNORE);
-
   int ret_status = 0;
   if (request->type == SEND_REQUEST_TYPE ||
       request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
@@ -167,6 +173,12 @@ LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
     ret_status = MPIOPT_Wait_send_internal(request, status);
   } else {
     int ret_status = MPIOPT_Wait_recv_internal(request, status);
+  }
+
+  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
+    status->MPI_TAG = request->tag;
+    status->MPI_SOURCE = request->dest;
+    status->MPI_ERROR = MPI_SUCCESS;
   }
 
 #ifdef BUFFER_CONTENT_CHECKING

@@ -123,7 +123,9 @@ LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
     // progress the fallback communication
     MPI_Test(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
   } else {
-    assert(false && "Error: uninitialized Request");
+    assert((request->type != RECV_REQUEST_TYPE_NULL ||
+            request->type != SEND_REQUEST_TYPE_NULL) &&
+           "Error: uninitialized Request");
   }
 }
 
@@ -144,12 +146,28 @@ LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
 
 LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                       MPI_Status *status) {
-  assert(status == MPI_STATUS_IGNORE);
+
+  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
+    status->MPI_TAG = request->tag;
+    status->MPI_SOURCE = request->dest;
+    status->MPI_ERROR = MPI_SUCCESS;
+  }
+
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  if (request->active == 0) {
+    *flag = 1;
+    return MPI_SUCCESS;
+  }
+#endif
 
   int ret_status = 0;
   if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
       request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     ret_status = MPI_Test(&request->backup_request, flag, status);
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+    if (*flag)
+      request->active = 0;
+#endif
   } else {
     progress_request(request);
     // it is possible, that the other rank already started the next operation,
@@ -160,6 +178,9 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
         request->ucx_request_data_transfer == NULL) {
       // request is finished
       *flag = 1;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+      request->active = 0;
+#endif
     } else
       *flag = 0;
   }
@@ -178,5 +199,6 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
     }
   }
 #endif
+
   return ret_status;
 }

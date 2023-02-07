@@ -59,6 +59,29 @@ void MPIOPT_FINALIZE() {
 
 LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  assert(request->active == 0);
+#endif
+
+  // cancel any search for RDMA connection, if necessary
+  // completing the handshake, if necessary so that other rank will not deadlock
+  if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+      request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+
+    MPI_Comm comm_to_use =
+        request->communicators->handshake_response_communicator;
+    if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION)
+      comm_to_use = request->communicators->handshake_communicator;
+
+    int flag = 0;
+    MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
+               MPI_STATUS_IGNORE);
+    if (flag) {
+      // found matching counterpart
+      receive_rdma_info(request);
+    }
+  }
+
 #ifdef STATISTIC_PRINTING
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -71,8 +94,6 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
   }
 #endif
   remove_request_from_list(request);
-
-  // cancel any search for RDMA connection, if necessary
 
   // defer free of memory until finalize, as the other process may start an RDMA
   // communication ON THE FLAG, not on the data which may lead to error, if we

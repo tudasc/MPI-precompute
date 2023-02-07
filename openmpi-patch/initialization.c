@@ -1,8 +1,9 @@
 #include "initialization.h"
 #include "globals.h"
 #include "handshake.h"
-#include "settings.h"
 #include "interface.h"
+#include "request_type.h"
+#include "settings.h"
 
 #include "mpi-internals.h"
 #include <stdlib.h>
@@ -23,10 +24,16 @@ void MPIOPT_INIT() {
   to_free_list_head->elem = NULL;
   to_free_list_head->next = NULL;
 
+  communicator_array =
+      malloc(sizeof(struct communicator_info) * MAX_NUM_OF_COMMUNICATORS);
+
 #ifdef SUMMARY_STATISTIC_PRINTING
   crosstalk_counter = 0;
 #endif
   MPIOPT_Register_Communicator(MPI_COMM_WORLD);
+#ifdef STATISTIC_PRINTING
+  printf("Init MPIOPT\n");
+#endif
 }
 
 struct communicator_info *find_comm(MPI_Comm comm) {
@@ -34,9 +41,45 @@ struct communicator_info *find_comm(MPI_Comm comm) {
     if (communicator_array[i].original_communicator == comm)
       return &communicator_array[i];
   }
+
+#ifdef REGISTER_COMMUNICATOR_ON_USE
+  MPIOPT_Register_Communicator(comm);
+  for (int i = 0; i < communicator_array_size; ++i) {
+    if (communicator_array[i].original_communicator == comm)
+      return &communicator_array[i];
+  }
+#endif
+
   assert(false && "Communicator was not registered");
   return NULL;
 }
+
+#ifdef CHECK_FOR_MATCHING_CONFLICTS
+LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
+
+  struct list_elem *current = request_list_head->next;
+  while (current != NULL) {
+    MPIOPT_Request *other = current->elem;
+    assert(other != NULL);
+    if (other != request) {
+      // same communication direction
+      if ((is_sending_type(request) && is_sending_type(other)) ||
+          (is_recv_type(request) && is_recv_type(other))) {
+        // same envelope
+        if (request->dest == other->dest && request->tag == other->tag &&
+            request->communicators->original_communicator ==
+                other->communicators->original_communicator) {
+          assert(false &&
+                 "Requests with a matching envelope are not permitted");
+          return 1;
+        }
+      }
+    }
+    current = current->next;
+  }
+  return 0;
+}
+#endif
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm,
@@ -74,7 +117,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->remote_data_addr = NULL;
 
   request->communicators = find_comm(comm);
-    assert(request->communicators!=NULL);
+  assert(request->communicators != NULL);
 
   request->operation_number = 0;
   request->flag = 2; // operation 0 is completed
@@ -86,8 +129,22 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->chekcking_request = MPI_REQUEST_NULL;
 #endif
 
-  send_rdma_info(request);
+  int conflicts = 0;
+#ifdef CHECK_FOR_MATCHING_CONFLICTS
+  conflicts = check_for_conflicting_request(request);
+#endif
 
+  if (rank == dest || rank == MPI_PROC_NULL || conflicts) {
+    // use the default implementation for communication with self / no-op
+    if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+      request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
+    } else {
+      assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
+      request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
+    }
+  } else {
+    send_rdma_info(request);
+  }
   // add request to list, so that it is progressed, if other requests have to
   // wait
   add_request_to_list(request);

@@ -98,7 +98,11 @@ int MPIOPT_Testany(int count, MPI_Request array_of_requests[], int *index,
 int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
                    MPI_Status array_of_statuses[]) {
   for (int i = 0; i < count; ++i) {
-    MPIOPT_Wait(&array_of_requests[i], &array_of_statuses[i]);
+    if (array_of_statuses == MPI_STATUSES_IGNORE) {
+      MPIOPT_Wait(&array_of_requests[i], MPI_STATUS_IGNORE);
+    } else {
+      MPIOPT_Wait(&array_of_requests[i], &array_of_statuses[i]);
+    }
   }
   return 0;
 }
@@ -106,7 +110,11 @@ int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
 int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
                    MPI_Status array_of_statuses[]) {
   for (int i = 0; i < count; ++i) {
-    MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
+    if (array_of_statuses == MPI_STATUSES_IGNORE) {
+      MPIOPT_Test(&array_of_requests[i], flag, MPI_STATUS_IGNORE);
+    } else {
+      MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
+    }
     if (!flag)
       return 0; // found one request not complete
   }
@@ -115,25 +123,49 @@ int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
 
 int MPIOPT_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
                     int array_of_indices[], MPI_Status array_of_statuses[]) {
-  MPIOPT_Waitany(incount, array_of_requests, &array_of_indices[0],
-                 array_of_statuses);
+  if (array_of_statuses == MPI_STATUSES_IGNORE) {
+    MPIOPT_Waitany(incount, array_of_requests, &array_of_indices[0],
+                   MPI_STATUS_IGNORE);
+  } else {
+    MPIOPT_Waitany(incount, array_of_requests, &array_of_indices[0],
+                   array_of_statuses);
+  }
   *outcount = 1;
   return 0;
 }
 
 int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
                     int array_of_indices[], MPI_Status array_of_statuses[]) {
+
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
   *outcount = 0;
+  int inactive_count = 0;
   int flag = 0;
   for (int i = 0; i < incount; ++i) {
-    MPIOPT_Test(&array_of_requests[i], &flag, &array_of_statuses[i]);
-    if (flag) {
-      array_of_indices[*outcount] = i;
-      *outcount = *outcount + 1;
+    MPIOPT_Request *req = (MPIOPT_Request *)(array_of_requests[i]);
+    if (req->active) {
+      if (array_of_statuses == MPI_STATUSES_IGNORE) {
+        MPIOPT_Test_internal(req, &flag, MPI_STATUS_IGNORE);
+      } else {
+        MPIOPT_Test_internal(req, &flag, &array_of_statuses[*outcount]);
+      }
+      if (flag) {
+        array_of_indices[*outcount] = i;
+        *outcount = *outcount + 1;
+      }
+      flag = 0;
+    } else {
+      ++inactive_count;
     }
-    flag = 0;
   }
-
+  assert(*outcount <= incount);
+  if (inactive_count == incount) {
+    *outcount = MPI_UNDEFINED;
+  }
+#else
+  assert(false &&
+         "Not Implemented, Recompile with -DDISTINGUISH_ACTIVE_REQUESTS");
+#endif
   return 0;
 }
 
@@ -146,25 +178,20 @@ int MPIOPT_Request_free(MPI_Request *request) {
 
 OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm) {
 
-    struct communicator_info *new_array =
-            malloc(sizeof(struct communicator_info) * (communicator_array_size + 1));
-    if (communicator_array != NULL && communicator_array_size > 0) {
-        // else undefined behaviour to call memcpy even with size=0
-        memcpy(new_array,communicator_array,
-               sizeof(struct communicator_info) * (communicator_array_size));
-    }
-    free(communicator_array);
-    communicator_array = new_array;
-    communicator_array[communicator_array_size].original_communicator = comm;
-    MPI_Comm_dup(
-            comm,
-            &communicator_array[communicator_array_size].handshake_communicator);
-    MPI_Comm_dup(comm, &communicator_array[communicator_array_size]
-            .handshake_response_communicator);
+  if (communicator_array_size >= MAX_NUM_OF_COMMUNICATORS)
+    printf("Error: out of ressources\n");
+  assert(communicator_array_size < MAX_NUM_OF_COMMUNICATORS);
+
+  communicator_array[communicator_array_size].original_communicator = comm;
+  MPI_Comm_dup(
+      comm,
+      &communicator_array[communicator_array_size].handshake_communicator);
+  MPI_Comm_dup(comm, &communicator_array[communicator_array_size]
+                          .handshake_response_communicator);
 #ifdef BUFFER_CONTENT_CHECKING
-    MPI_Comm_dup(
+  MPI_Comm_dup(
       comm, &communicator_array[communicator_array_size].checking_communicator);
 #endif
 
-    communicator_array_size = communicator_array_size + 1;
+  communicator_array_size = communicator_array_size + 1;
 }
