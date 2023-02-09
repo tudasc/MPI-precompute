@@ -65,29 +65,28 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 
   // cancel any search for RDMA connection, if necessary
   // completing the handshake, if necessary so that other rank will not deadlock
-  if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+      request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
 
-    MPI_Comm comm_to_use =
-        request->communicators->handshake_response_communicator;
-    if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION)
-      comm_to_use = request->communicators->handshake_communicator;
+    assert(false && "Freeing a request before using it may lead to deadlock");
+    /*    MPI_Comm comm_to_use =
+            request->communicators->handshake_response_communicator;
+        if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED)
+          comm_to_use = request->communicators->handshake_communicator;
 
-    int flag = 0;
-    MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
-               MPI_STATUS_IGNORE);
-    if (flag) {
-      // found matching counterpart
-      receive_rdma_info(request);
-    }
+        int flag = 0;
+        MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
+                   MPI_STATUS_IGNORE);
+        if (flag) {
+          // found matching counterpart
+          receive_rdma_info(request);
+        }*/
   }
 
 #ifdef STATISTIC_PRINTING
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == SEND_REQUEST_TYPE ||
-      request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
+  if (is_sending_type(request)) {
     printf("Rank %d: SENDING: Request Free\n", rank);
   } else {
     printf("Rank %d: RECV: Request Free \n", rank);

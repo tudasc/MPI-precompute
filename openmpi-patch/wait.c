@@ -99,12 +99,14 @@ wait_send_when_searching_for_connection(MPIOPT_Request *request) {
 
   while (!flag) {
     progress_send_request_waiting_for_rdma(request);
-    if (request->type != SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION)
+    if (request->type != SEND_REQUEST_TYPE_HANDSHAKE_INITIATED &&
+        request->type != SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS)
       flag = 1; // done
     progress_other_requests(request);
   }
 
-  assert(request->type != SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
+  assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_INITIATED &&
+         request->type != SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
 }
 
 LINKAGE_TYPE void
@@ -112,11 +114,13 @@ wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
 
-  while (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  while (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+         request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     progress_other_requests(request);
     progress_recv_request_waiting_for_rdma(request);
   }
-  assert(request->type != RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
+  assert(request->type != RECV_REQUEST_TYPE_HANDSHAKE_INITIATED &&
+         request->type != RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
 }
 
 LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
@@ -131,7 +135,8 @@ LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
 
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
     e_send(request);
-  } else if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+             request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     wait_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     MPI_Wait(&request->backup_request, status);
@@ -153,7 +158,8 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
 
   if (__builtin_expect(request->type == RECV_REQUEST_TYPE, 1)) {
     e_recv(request);
-  } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+             request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     wait_recv_when_searching_for_connection(request);
   } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
 
@@ -167,9 +173,7 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
 LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
                                       MPI_Status *status) {
   int ret_status = 0;
-  if (request->type == SEND_REQUEST_TYPE ||
-      request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
+  if (is_sending_type(request)) {
     ret_status = MPIOPT_Wait_send_internal(request, status);
   } else {
     int ret_status = MPIOPT_Wait_recv_internal(request, status);

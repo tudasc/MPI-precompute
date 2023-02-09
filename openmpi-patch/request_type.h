@@ -1,16 +1,22 @@
 #ifndef MPIOPT_REQUEST_TYPE_H
 #define MPIOPT_REQUEST_TYPE_H
 
-#define RECV_REQUEST_TYPE 1
-#define SEND_REQUEST_TYPE 2
-#define SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION 3
-#define RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION 4
-#define SEND_REQUEST_TYPE_USE_FALLBACK 5
-#define RECV_REQUEST_TYPE_USE_FALLBACK 6
+// TODO enum for the request type?
+#define SEND_REQUEST_TYPE 1
+#define RECV_REQUEST_TYPE 2
+
+#define SEND_REQUEST_TYPE_USE_FALLBACK 3
+#define RECV_REQUEST_TYPE_USE_FALLBACK 4
+
+#define SEND_REQUEST_TYPE_HANDSHAKE_INITIATED 5
+#define RECV_REQUEST_TYPE_HANDSHAKE_INITIATED 6
+
+#define SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS 7
+#define RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS 8
 
 // this request is stuck, so it should not be progressed
-#define RECV_REQUEST_TYPE_NULL 7
-#define SEND_REQUEST_TYPE_NULL 8
+#define RECV_REQUEST_TYPE_NULL 9
+#define SEND_REQUEST_TYPE_NULL 10
 
 #include <mpi.h>
 
@@ -23,7 +29,7 @@
 #include "mpi-internals.h"
 
 struct mpiopt_request {
-  // this way it it can be used as a normal request ptr as well
+  // this way the request ptr can be used as a normal request ptr as well
   struct ompi_request_t original_request;
   int flag;
   int flag_buffer;
@@ -41,7 +47,7 @@ struct mpiopt_request {
   ucp_mem_h mem_handle_data;
   ucp_mem_h mem_handle_flag;
   ucp_ep_h
-      ep; // save used endpoint, so we dont have to look it up over and over#
+      ep; // save used endpoint, so we dont have to look it up over and over
   struct communicator_info *communicators;
   // necessary for backup in case no other persistent op matches:
   MPI_Request backup_request;
@@ -62,13 +68,15 @@ struct mpiopt_request {
 typedef struct mpiopt_request MPIOPT_Request;
 
 static inline is_sending_type(MPIOPT_Request *request) {
-  return request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+  return request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+         request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS ||
          request->type == SEND_REQUEST_TYPE ||
          request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
          request->type == SEND_REQUEST_TYPE_NULL;
 }
 static inline is_recv_type(MPIOPT_Request *request) {
-  return request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
+  return request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+         request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS ||
          request->type == RECV_REQUEST_TYPE ||
          request->type == RECV_REQUEST_TYPE_USE_FALLBACK ||
          request->type == RECV_REQUEST_TYPE_NULL;

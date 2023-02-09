@@ -136,10 +136,10 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
   if (rank == dest || rank == MPI_PROC_NULL || conflicts) {
     // use the default implementation for communication with self / no-op
-    if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+    if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
       request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
     } else {
-      assert(request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION);
+      assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
       request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
     }
   } else {
@@ -163,7 +163,7 @@ LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
 #endif
 
   memset(request, 0, sizeof(MPIOPT_Request));
-  request->type = RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION;
+  request->type = RECV_REQUEST_TYPE_HANDSHAKE_INITIATED;
   return init_request(buf, count, datatype, source, tag, comm, request);
 }
 
@@ -177,6 +177,6 @@ LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
   printf("Rank %d: Init SEND to %d with msg size %d\n", rank, source, count);
 #endif
   memset(request, 0, sizeof(MPIOPT_Request));
-  request->type = SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION;
+  request->type = SEND_REQUEST_TYPE_HANDSHAKE_INITIATED;
   return init_request(buf, count, datatype, source, tag, comm, request);
 }

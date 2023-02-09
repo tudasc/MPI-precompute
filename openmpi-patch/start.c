@@ -176,7 +176,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
     b_send(request);
 
-  } else if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED) {
     start_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
@@ -185,6 +185,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
               &request->backup_request);
 
   } else {
+    assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
   }
 #ifdef BUFFER_CONTENT_CHECKING
@@ -212,7 +213,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   if (__builtin_expect(request->type == RECV_REQUEST_TYPE, 1)) {
     b_recv(request);
 
-  } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
     start_recv_when_searching_for_connection(request);
 
   } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
@@ -221,6 +222,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
               request->tag, request->communicators->original_communicator,
               &request->backup_request);
   } else {
+    assert(request->type != RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
   }
 
@@ -235,9 +237,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 
 LINKAGE_TYPE int MPIOPT_Start_internal(MPIOPT_Request *request) {
 
-  if (request->type == SEND_REQUEST_TYPE ||
-      request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
+  if (is_sending_type(request)) {
     return MPIOPT_Start_send_internal(request);
   } else {
     return MPIOPT_Start_recv_internal(request);

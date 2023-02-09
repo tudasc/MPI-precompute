@@ -110,9 +110,11 @@ LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
     progress_send_request(request);
   } else if (request->type == RECV_REQUEST_TYPE) {
     progress_recv_request(request);
-  } else if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+             request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     progress_send_request_waiting_for_rdma(request);
-  } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+             request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     progress_recv_request_waiting_for_rdma(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     int flag;
