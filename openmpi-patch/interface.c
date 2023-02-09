@@ -40,12 +40,11 @@ int MPIOPT_Start(MPI_Request *request) {
 }
 
 int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
-    for (int i = 0; i < count; ++i) {
-            MPIOPT_Start(&array_of_requests[i]);
-    }
-    return 0;
+  for (int i = 0; i < count; ++i) {
+    MPIOPT_Start(&array_of_requests[i]);
+  }
+  return 0;
 }
-
 
 int MPIOPT_Start_send(MPI_Request *request) {
   return MPIOPT_Start_send_internal((MPIOPT_Request *)*request);
