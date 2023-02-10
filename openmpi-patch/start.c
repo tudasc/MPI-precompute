@@ -128,7 +128,6 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
   assert(request->operation_number == 1);
 
   progress_recv_request_waiting_for_rdma(request);
-
 }
 
 LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {

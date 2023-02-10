@@ -6,7 +6,7 @@
 
 // print what is going on
 #define STATISTIC_PRINTING
-// print a summery on the amount of crosstalk at the end
+// print a summary on the amount of crosstalk at the end
 #define SUMMARY_STATISTIC_PRINTING
 // check the contents of the buffers send around to detect race conditions
 //#define BUFFER_CONTENT_CHECKING
@@ -23,7 +23,7 @@
 #define MAX_NUM_OF_COMMUNICATORS 64
 
 // necessary, if one uses MPI_testsome:
-// adds a small overhead to distinguish actifr from inactive requests
+// adds a small overhead to distinguish active from inactive requests
 #define DISTINGUISH_ACTIVE_REQUESTS
 
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
