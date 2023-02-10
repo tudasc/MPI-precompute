@@ -28,7 +28,9 @@ void MPIOPT_FINALIZE() {
       free(req->rdma_info_buf);
       // release all RDMA resources
 
-      if (req->type == RECV_REQUEST_TYPE || req->type == SEND_REQUEST_TYPE) {
+      if (req->type == RECV_REQUEST_TYPE || req->type == SEND_REQUEST_TYPE ||
+          req->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+          req->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
         // otherwise this resource was never acquired
         ucp_mem_unmap(context, req->mem_handle_flag);
         // ucp_mem_unmap(context, req->mem_handle_data); // was freed before
@@ -65,8 +67,9 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
   // completing the handshake, if necessary so that other rank will not deadlock
   if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
       request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
-
+#ifdef WARN_ON_REQUEST_FREE
     printf("WARNING: Freeing a request before using it may lead to deadlock\n");
+#endif
     // clean up all RDMA related resources anyway
     ucp_context_h context = mca_osc_ucx_component.ucp_context;
     // ucp_mem_unmap(context, request->mem_handle_flag);// deferred

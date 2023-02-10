@@ -22,6 +22,10 @@
 // number of communicatros we can handle before running out of ressources
 #define MAX_NUM_OF_COMMUNICATORS 64
 
+// print warning that deadlocks/left over resources are possible when freeing
+// unused requests
+#define WARN_ON_REQUEST_FREE
+
 // necessary, if one uses MPI_testsome:
 // adds a small overhead to distinguish active from inactive requests
 #define DISTINGUISH_ACTIVE_REQUESTS
