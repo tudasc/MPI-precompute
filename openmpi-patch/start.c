@@ -129,35 +129,6 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
 
   progress_recv_request_waiting_for_rdma(request);
 
-  // meaning no RDMA connection is presnt
-  if (request->remote_data_addr == NULL) {
-
-    int flag;
-    MPI_Iprobe(request->dest, request->tag,
-               request->communicators->original_communicator, &flag,
-               MPI_STATUS_IGNORE);
-    if (flag) {
-      // if probed for matching msg failed, but this msg arrived, we can be
-      // shure that no matching msg will be sent in the future
-      // as msg order is defined
-      assert(request->backup_request == MPI_REQUEST_NULL);
-      // post the matching recv
-      printf("Post RECV, Fallback in start\n");
-      MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
-                request->tag, request->communicators->original_communicator,
-                &request->backup_request);
-    }
-  } else {
-    // RDMA handshake complete, we can post the matching recv
-    if (request->backup_request == MPI_REQUEST_NULL) {
-      MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
-                request->tag, request->communicators->original_communicator,
-                &request->backup_request);
-    }
-  }
-
-  // ordering guarantees, that the probe for matching msg will return true
-  // before probe of the payload does
 }
 
 LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
