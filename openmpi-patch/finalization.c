@@ -26,13 +26,11 @@ void MPIOPT_FINALIZE() {
 
     if (req != NULL) {
       free(req->rdma_info_buf);
-      // release all RDMA ressources
+      // release all RDMA resources
 
       if (req->type == RECV_REQUEST_TYPE || req->type == SEND_REQUEST_TYPE) {
-        // otherwise all these resources where never acquired
+        // otherwise this resource was never acquired
         ucp_mem_unmap(context, req->mem_handle_flag);
-        ucp_rkey_destroy(req->remote_flag_rkey);
-
         // ucp_mem_unmap(context, req->mem_handle_data); // was freed before
       }
       free(req);
@@ -69,18 +67,16 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
       request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
 
     printf("WARNING: Freeing a request before using it may lead to deadlock\n");
-    /*    MPI_Comm comm_to_use =
-            request->communicators->handshake_response_communicator;
-        if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED)
-          comm_to_use = request->communicators->handshake_communicator;
-
-        int flag = 0;
-        MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
-                   MPI_STATUS_IGNORE);
-        if (flag) {
-          // found matching counterpart
-          receive_rdma_info(request);
-        }*/
+    // clean up all RDMA related resources anyway
+    ucp_context_h context = mca_osc_ucx_component.ucp_context;
+    // ucp_mem_unmap(context, request->mem_handle_flag);// deferred
+    ucp_mem_unmap(context, request->mem_handle_data);
+    if (request->remote_data_rkey != NULL) {
+      ucp_rkey_destroy(request->remote_data_rkey);
+    }
+    if (request->remote_flag_rkey != NULL) {
+      ucp_rkey_destroy(request->remote_flag_rkey);
+    }
   }
 
 #ifdef STATISTIC_PRINTING
@@ -96,8 +92,8 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 
   // defer free of memory until finalize, as the other process may start an RDMA
   // communication ON THE FLAG, not on the data which may lead to error, if we
-  // free the mem beforehand but we can unmap the data part, as the oter process
-  // will not rdma to it
+  // free the mem beforehand. but we can unmap the data part, as the other
+  // process will not rdma to it
   if (request->type == RECV_REQUEST_TYPE ||
       request->type == SEND_REQUEST_TYPE) {
 
@@ -107,6 +103,7 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
     // ucp_mem_unmap(context, request->mem_handle_flag);// deferred
     ucp_mem_unmap(context, request->mem_handle_data);
     ucp_rkey_destroy(request->remote_data_rkey);
+    ucp_rkey_destroy(request->remote_flag_rkey);
   }
 
   struct list_elem *new_elem = malloc(sizeof(struct list_elem));
