@@ -68,7 +68,7 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
   if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
       request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
 
-    assert(false && "Freeing a request before using it may lead to deadlock");
+    printf("WARNING: Freeing a request before using it may lead to deadlock\n");
     /*    MPI_Comm comm_to_use =
             request->communicators->handshake_response_communicator;
         if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED)
