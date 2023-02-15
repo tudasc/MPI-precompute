@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-INSTALL_PATH=/home/tj75qeje/TEMP/
+INSTALL_PATH=/home/tj75qeje/mpi-comp-match_sample_codes
 
 WD=$(pwd)
 
