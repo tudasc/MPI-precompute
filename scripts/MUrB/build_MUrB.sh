@@ -28,6 +28,7 @@ mkdir $INSTALL_PATH/MUrB/build
 cd $INSTALL_PATH/MUrB
 
 git submodule update --init --recursive
+# apply the changes to use the optimized Versions of persistent MPI operations:
 git apply $PATCH_FILE
 
 cd build
