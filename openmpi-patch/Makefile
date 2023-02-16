@@ -7,8 +7,10 @@
 # module load openmpi/test hwloc/2.5.0
 
 # Compiler flags, paths and libraries
-# Include path showing to openmpoi internals
-INCLUDE=-I/home/tj75qeje/openmpi-4.1.1/ -I/home/tj75qeje/openmpi-4.1.1/opal/include -I/home/tj75qeje/openmpi-4.1.1/ompi/include/ -I/home/tj75qeje/openmpi-4.1.1/orte/include
+# Include path showing to openmpi internals
+MPI_SRC_PATH=/home/tj75qeje/openmpi-4.1.1
+
+INCLUDE=-I$(MPI_SRC_PATH) -I$(MPI_SRC_PATH)/opal/include -I$(MPI_SRC_PATH)/ompi/include/ -I$(MPI_SRC_PATH)/orte/include
 
 CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
 #CFLAGS = -std=c11 -O3 -march=native -mtune=native -DNDEBUG $(INCLUDE)
