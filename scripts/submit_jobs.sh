@@ -7,6 +7,14 @@ echo "Error: Invalid configuration file"
 exit -1
 fi
 
+NUM_REPETITIONS=$2
+if ! [ "$NUM_REPETITIONS" -eq "$NUM_REPETITIONS" ] 2> /dev/null
+then
+# not a number
+    echo "only building scripts, not submitting them"
+    NUM_REPETITIONS=0
+fi
+
 config_file=$(realpath $1)
 source $config_file
 
@@ -26,20 +34,22 @@ ARRAY_SIZE=$(wc -l $VARIABLE_PARAM_FILE | cut -d' ' -f1)
 
 for NP in ${NPROC_ARRAY[@]}; do
 
-JOB_SCRIPT=$EXPERIMENT_DIR/$NP.sh
+	JOB_SCRIPT=$EXPERIMENT_DIR/$NP.sh
   
-cp SLURM_Header.sh $JOB_SCRIPT
-echo "#SBATCH --ntasks $NP" >> $JOB_SCRIPT
-echo "#SBATCH --job-name $APPLICATION_NAME" >> $JOB_SCRIPT
-echo "#SBATCH --chdir $EXPERIMENT_DIR" >> $JOB_SCRIPT
-echo "#SBATCH --output $EXPERIMENT_DIR/job_%A_%a.out" >> $JOB_SCRIPT
-echo "#SBATCH --array 1-$ARRAY_SIZE" >> $JOB_SCRIPT
-echo " " >> $JOB_SCRIPT
-echo "source $config_file" >> $JOB_SCRIPT
+	cp SLURM_Header.sh $JOB_SCRIPT
+	echo "#SBATCH --ntasks $NP" >> $JOB_SCRIPT
+	echo "#SBATCH --job-name $APPLICATION_NAME" >> $JOB_SCRIPT
+	echo "#SBATCH --chdir $EXPERIMENT_DIR" >> $JOB_SCRIPT
+	echo "#SBATCH --output $EXPERIMENT_DIR/job_%A_%a.out" >> $JOB_SCRIPT
+	echo "#SBATCH --array 1-$ARRAY_SIZE" >> $JOB_SCRIPT
+	echo " " >> $JOB_SCRIPT
+	echo "source $config_file" >> $JOB_SCRIPT
 
-cat job_script_body.sh >> $JOB_SCRIPT
+	cat job_script_body.sh >> $JOB_SCRIPT
 
-# and submit
-sbatch -A $CUR_PROJ $JOB_SCRIPT
+	# and submit
+	for i in $(seq 1 $NUM_REPETITIONS); do 
+		sbatch -A $CUR_PROJ $JOB_SCRIPT
+	done
 done
 
