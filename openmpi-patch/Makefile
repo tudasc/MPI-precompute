@@ -12,8 +12,8 @@ MPI_SRC_PATH=/home/tj75qeje/openmpi-4.1.1
 
 INCLUDE=-I$(MPI_SRC_PATH) -I$(MPI_SRC_PATH)/opal/include -I$(MPI_SRC_PATH)/ompi/include/ -I$(MPI_SRC_PATH)/orte/include
 
-CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
-#CFLAGS = -std=c11 -O3 -march=native -mtune=native -DNDEBUG $(INCLUDE)
+#CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
+CFLAGS = -std=c11 -O3 -march=native -mtune=native -DNDEBUG $(INCLUDE)
 LFLAGS = $(CFLAGS)
 LIBS   = -lopen-pal -lucp -lm
 
@@ -40,6 +40,10 @@ one-sided-persistent.c: $(SOURCES) $(HEADERS)
 %.o: %.c
 	$(MPICC) -c $(CFLAGS) $<
 
+.PHONY: clean
 clean:
 	$(RM) *.o
 	$(RM) $(TGTS)
+
+install: one-sided-persistent.c
+	cp one-sided-persistent.c $(MPI_SRC_PATH)/ompi/mca/osc/ucx/one-sided-persistent.c
