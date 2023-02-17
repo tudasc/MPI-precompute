@@ -75,8 +75,11 @@ LINKAGE_TYPE void e_recv(MPIOPT_Request *request) {
     ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
   }
 
-  while (
-      __builtin_expect(request->flag < request->operation_number * 2 + 2, 0)) {
+  while (__builtin_expect(request->ucx_request_data_transfer != NULL ||
+                              request->ucx_request_flag_transfer != NULL ||
+                              request->flag < request->operation_number * 2 + 2,
+                          0)) {
+    progress_recv_request(request);
     progress_other_requests(request);
     ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
     // e_recv_with_comm_abort_test(request);
