@@ -8,94 +8,27 @@ import numpy as np
 import argparse
 import pandas as pd
 
-DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/"
-
 CACHE_FILE = "cache.csv"
 PLTSIZE = (12, 8)
-PLTSIZE_BAR_PLT = (12, 4)
-PLTSIZE_VIOLIN_PLT = (15, 8)
 
-NORMAL = 1
-EAGER = 2
-RENDEVOUZ1 = 3
-RENDEVOUZ2 = 4
-
-names = {NORMAL: "Normal", EAGER: "Eager", RENDEVOUZ1: "Rendezvous 1", RENDEVOUZ2: "Rendezvous 2"}
-# color sceme by Paul Tol https://personal.sron.nl/~pault/
-colors = {NORMAL: "#4477AA", EAGER: "#EE6677", RENDEVOUZ1: "#AA3377", RENDEVOUZ2: "#228833"}
-colors_list = ["#4477AA", "#EE6677", "#AA3377", "#228833"]
-
-buffer_sizes = [4, 8, 32, 512, 1024, 4906, 16384, 65536, 1048576, 4194304, 16777216]
-# buffer_sizes = [4, 8, 32, 512, 1024, 16384, 1048576, 4194304, 16777216]
-# buffer_sizes = [1048576,4194304,16777216]
-buffer_sizes_scaling = [65536, 1048576, 4194304, 16777216]
-nrows = 1
-
-comptime_for_barplots = 10000
-cycles_to_use = 64
-warmup_to_use = 8
-process_count_to_use = 2
-
-# limited set for faster measurement
-# buffer_sizes = [8,1024,16384,65536,262144,1048576,4194304,16777216]
-# buffer_sizes = [8,32,512,1024,16384]
-# nrows = 2
-
-upper = 100
 lower = 0
+upper = 100
+
+colors_list = ["#4477AA", "#228833"]
 
 
-def mean_percentile_range(array, upper, lower):
-    # from:
-    # https://stackoverflow.com/questions/61391138/numpy-mean-percentile-range-eg-mean-25th-to-50th-percentile
-    # find the indexes of the element below 25th and 50th percentile
-    idx_under_25 = np.argwhere(array < np.percentile(array, lower))
-    idx_under_50 = np.argwhere(array <= np.percentile(array, upper))
-    # the values for 25 and 50 are both included
+def add_violin(ax, x, df, y_selector, color="#4477AA"):
+    y = df[y_selector].to_numpy()
 
-    # find the number of the elements in between 25th and 50th percentile
-    diff_num = len(idx_under_50) - len(idx_under_25)
+    if len(y) > 0:  # if data is present
+        violin_parts = ax.violinplot([y], [x], widths=[1.5], quantiles=[lower / 100, upper / 100], showmeans=True,
+                                     showmedians=True, showextrema=False)
 
-    # find the sum difference
-    diff_sum = np.sum(np.take(array, idx_under_50)) - np.sum(np.take(array, idx_under_25))
-
-    # get the mean
-    mean = diff_sum / diff_num
-    return mean
-
-
-# TODO this can be done all in pandas, which may be quicker
-def get_data_bufsize(data, key, buf_size, calctime):
-    select_df = data[(data['nprocs'] == process_count_to_use) & (data['cycles'] == cycles_to_use) & (
-            data['warmup'] == warmup_to_use) & (data['mode'] == key) & (
-                             data['calctime'] == calctime) & (data['buflen'] == buf_size)]
-
-    if len(select_df.index) == 0:
-        # empty
-        return 0, 0, 0, 0, [0]
-    y = select_df['overhead'].to_numpy()
-    y_min = np.percentile(y, lower)
-    y_max = np.percentile(y, upper)
-    y_avg = mean_percentile_range(y, upper, lower)
-
-    y_median = np.median(y)
-
-    return y_min, y_max, y_avg, y_median, y
-
-
-def add_violin(ax, x, data, key, buf_size, comp_time, show_in_legend=True):
-    _, max, _, _, y = get_data_bufsize(data, key, buf_size, comp_time)
-
-    violin_parts = ax.violinplot([y], [x * 2], widths=[1.5], quantiles=[lower / 100, upper / 100], showmeans=True,
-                                 showmedians=True, showextrema=False)
-
-    swarm = simple_beeswarm(y, nbins=6)
-    swarm = swarm + x * 2
-    ax.plot(swarm, y, 'o', color=colors[key])
-    for pc in violin_parts['bodies']:
-        pc.set_color(colors[key])
-
-    return (mpatches.Patch(color=colors[key]), names[key]), max
+        swarm = simple_beeswarm(y, nbins=6)
+        swarm = swarm + x
+        ax.plot(swarm, y, 'o', color=color)
+        for pc in violin_parts['bodies']:
+            pc.set_color(color)
 
 
 # from
@@ -146,115 +79,29 @@ def simple_beeswarm(y, nbins=None):
     return x
 
 
-def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=False, normal=True, eager=True,
-                    rendevouz1=True, rendevouz2=True, scaling_key=NORMAL, split_point=5):
+def get_plot(df, plot_fname, plot_title, x_axis='nprocs', y_axis='runtime'):
     ftsize = 16
     plt.rcParams.update({'font.size': ftsize})
     # plt.rcParams.update({'font.size': 18, 'hatch.linewidth': 0.0075})
-    figsz = PLTSIZE_VIOLIN_PLT
+    figsz = PLTSIZE
 
-    num_violins = 1  # the space in between two different buffer length
-    if normal:
-        num_violins += 1
-    if eager:
-        num_violins += 1
-    if rendevouz1:
-        num_violins += 1
-    if rendevouz2:
-        num_violins += 1
+    fig = plt.figure(figsize=figsz)
+    ax = plt.gca()
 
-    y_pos = range(num_violins * 2 * len(buffer_sizes))
-    y_scale = 0
+    for x_val, group in df.groupby(x_axis):
+        add_violin(ax, x_val - 0.5, group.loc[group['is_altered'] == False], y_axis, colors_list[0])
+        add_violin(ax, x_val + 0.5, group.loc[group['is_altered'] == True], y_axis, colors_list[1])
 
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsz, sharex=False, sharey=False)
-    local_split_point = split_point
-
-    current_bar = 0
-    show_in_legend = True
-    i = 0
-    for ax in axs:
-        legend_labels = []
-        x_tics_labels = []
-        x_tics = []
-        # reshape axis to have 1d-array we can iterate over
-        while i < len(buffer_sizes):
-            if current_bar >= local_split_point * num_violins:
-                local_split_point = len(buffer_sizes)
-                show_in_legend = True
-                break
-
-            buf_size = buffer_sizes[i]
-            i += 1
-            x_tics.append(num_violins / 2 + current_bar * 2)
-            # only plot eager for smaller message sizes
-            if eager and ax == axs[0]:
-                label, max_y = add_violin(ax, current_bar, data, EAGER, buf_size, comp_time, show_in_legend)
-                current_bar += 1
-                if show_in_legend:
-                    legend_labels.append(label)
-                if scaling_key == EAGER:
-                    y_scale = max(max_y, y_scale)
-            if rendevouz1:
-                label, max_y = add_violin(ax, current_bar, data, RENDEVOUZ1, buf_size, comp_time, show_in_legend)
-                current_bar += 1
-                if show_in_legend:
-                    legend_labels.append(label)
-                if scaling_key == RENDEVOUZ1:
-                    y_scale = max(max_y, y_scale)
-            if rendevouz2:
-                label, max_y = add_violin(ax, current_bar, data, RENDEVOUZ2, buf_size, comp_time, show_in_legend)
-                current_bar += 1
-                if show_in_legend:
-                    legend_labels.append(label)
-                if scaling_key == RENDEVOUZ2:
-                    y_scale = max(max_y, y_scale)
-            if normal:
-                label, max_y = add_violin(ax, current_bar, data, NORMAL, buf_size, comp_time, show_in_legend)
-                current_bar += 1
-                if show_in_legend:
-                    legend_labels.append(label)
-                if scaling_key == NORMAL:
-                    y_scale = max(max_y, y_scale)
-            current_bar += 1
-            show_in_legend = False
-
-            if buf_size < 1024:
-                x_tics_labels.append("%d\nB" % buf_size)
-            elif buf_size < 1048576:
-                x_tics_labels.append("%d\nKiB" % (buf_size / 1024))
-            else:
-                x_tics_labels.append("%d\nMiB" % (buf_size / 1048576))
-
-        ax.set_xlabel("Buffer Size")
-        if ax == axs[0]:
-            ax.set_ylabel("communication overhead in $\mu$s")
-        else:
-            ax.yaxis.tick_right()
-
-        # locator = plt.MaxNLocator(nbins=7)
-        # ax.xaxis.set_major_locator(locator)
-        # ax.locator_params(axis='x', tight=True, nbins=4)
-        if ax == axs[1]:
-            ax.legend(*zip(*legend_labels), loc='upper left')
-
-        if scaling:
-            ax.set_ylim(0, y_scale * 1.02)
-            if ax == axs[0]:
-                ax.set_ylim(0, y_scale * 0.25)
-
-        # scale to microseconds
-        scale_y = 1e6
-        ticks_y = mticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x * scale_y))
-        ax.yaxis.set_major_formatter(ticks_y)
-
-        # convert to seconds easy comparision with y axis
-
-        ax.set_xticks(x_tics)
-        ax.set_xticklabels(x_tics_labels)
+    patches = [mpatches.Patch(color=colors_list[0], label="Original"),
+               mpatches.Patch(color=colors_list[1], label="Altered")]
+    ax.legend(handles=patches, loc='upper left')
+    ax.set_xlabel(x_axis)
+    ax.set_ylabel(y_axis)
+    plt.title(plot_title)
 
     plt.tight_layout()
     output_format = "pdf"
-    plt.savefig(plot_name + "." + output_format, bbox_inches='tight')
+    plt.savefig(plot_fname + "." + output_format, bbox_inches='tight')
 
 
 def get_data_process_count(data, key, buf_size, calctime):
@@ -263,68 +110,6 @@ def get_data_process_count(data, key, buf_size, calctime):
                              data['calctime'] == calctime) & (data['buflen'] == buf_size)]
 
     return select_df.groupby('nprocs')['overhead'].median()
-
-
-def get_scaling_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill=False, normal=True, eager=True,
-                     rendevouz1=True, rendevouz2=True):
-    ftsize = 16
-    plt.rcParams.update({'font.size': ftsize})
-    # plt.rcParams.update({'font.size': 18, 'hatch.linewidth': 0.0075})
-    figsz = PLTSIZE
-
-    ncols = math.ceil(len(buffer_sizes) * 1.0 / nrows)
-
-    fig = plt.figure(figsize=figsz)
-    ax = plt.gca()
-
-    for buf_size, color in zip(buffer_sizes, colors_list):
-        size_str = ""
-        if buf_size < 1024:
-            size_str = ("%dB" % buf_size)
-        elif buf_size < 1048576:
-            size_str = ("%dKiB" % (buf_size / 1024))
-        else:
-            size_str = ("%dMiB" % (buf_size / 1048576))
-
-        # empty lableed entity for legend
-        plt.plot([], marker="", ls="", label=size_str)
-
-        # get the data
-        if normal:
-            dat = get_data_process_count(data, NORMAL, buf_size, comp_time)
-            ax.plot(dat, linestyle='-', label="Normal", color=color)
-        if eager:
-            dat = get_data_process_count(data, EAGER, buf_size, comp_time)
-            ax.plot(dat, linestyle='--', label="Eager", color=color)
-        if rendevouz1:
-            dat = get_data_process_count(data, RENDEVOUZ1, buf_size, comp_time)
-            ax.plot(dat, linestyle='-.', label="Rendezvous 1", color=color)
-        if rendevouz2:
-            dat = get_data_process_count(data, RENDEVOUZ2, buf_size, comp_time)
-            ax.plot(dat, linestyle=':', label="Rendezvous 2", color=color)
-
-    # ax.title("Overhead with different number")
-    ax.set_xlabel("number of processes")
-
-    ax.legend(loc='upper right', ncol=4)
-    max_y = 8000 / 1e6
-
-    if scaling:
-        ax.set_ylim(0, max_y * 1.05)
-
-    ax.set_ylabel("communication overhead in $\mu$s")
-    # scale to microseconds
-    scale_y = 1e6
-    ticks_y = mticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x * scale_y))
-    ax.yaxis.set_major_formatter(ticks_y)
-
-    xtics = [2, 8, 16, 32, 64]
-    # labels = [0, 0.005, 0.01]
-    ax.set_xticks(xtics)
-    # ax.set_xticklabels(labels)
-    plt.tight_layout()
-    output_format = "pdf"
-    plt.savefig(plot_name + "." + output_format, bbox_inches='tight')
 
 
 def read_file_to_df(filename, is_altered, param_list):
@@ -374,6 +159,7 @@ def read_data(data_dir, param_file):
 
     return df
 
+
 def get_param_list(file):
     with open(file, 'r') as f:
         lines = f.readlines()
@@ -407,16 +193,10 @@ def main():
         data = read_data(data_dir, param_file)
         data.to_csv(CACHE_FILE)
 
-
     print("generating plots ...")
 
-    get_scaling_plot(data, buffer_sizes_scaling, comptime_for_barplots, "overhead_scaling_full", scaling=False,
-                     eager=False, rendevouz1=False)
-    get_scaling_plot(data, buffer_sizes_scaling, comptime_for_barplots, "overhead_scaling", scaling=True, eager=False,
-                     rendevouz1=False)
-    get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins", scaling=False)
-    get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins_scaled", scaling=True, eager=False,
-                    rendevouz1=False)
+    to_plot = data.loc[(data['n'] == 100) & (data['i'] == 1000)]
+    get_plot(to_plot, "plot", app_name)
 
     print("done")
 
