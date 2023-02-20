@@ -28,9 +28,20 @@ LINKAGE_TYPE void b_send(MPIOPT_Request *request) {
     printf("send pushes data\n");
 #endif
     request->flag_buffer = request->operation_number * 2 + 2;
-    ucs_status_t status =
-        ucp_put_nbi(request->ep, request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+
+    ucs_status_t status;
+    if(request->is_cont){
+      status =
+          ucp_put_nbi(request->ep, request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      status =
+          ucp_put_nbi(request->ep, request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    }
+
+    
     // ensure order:
     status = ucp_worker_fence(mca_osc_ucx_component.ucp_worker);
     status = ucp_put_nbi(request->ep, &request->flag_buffer, sizeof(int),
@@ -67,9 +78,18 @@ LINKAGE_TYPE void b_recv(MPIOPT_Request *request) {
 #ifdef STATISTIC_PRINTING
     printf("recv fetches data\n");
 #endif
-    ucs_status_t status =
-        ucp_get_nbi(request->ep, (void *)request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+    ucs_status_t status;
+
+    if(request->is_cont){
+      status =
+          ucp_get_nbi(request->ep, (void *)request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      status =
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);
     /*
@@ -166,6 +186,15 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   assert(request->active == 0);
   request->active = 1;
 #endif
+
+  // Pack data into cont. buffer
+  if(!(request->is_cont)){
+    int position = 0;
+
+    // fix communicator
+    MPI_Pack(request->buf, request->count, 
+      request->dtype, request->packed_buf, request->pack_size, &position, MPI_COMM_WORLD);
+  }
 
   // TODO atomic increment for multi threading
   request->operation_number++;

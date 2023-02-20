@@ -38,12 +38,17 @@
 
 // 10KB
 #define BUFFER_SIZE 10000
-#define NUM_ITERS 100000
+#define NUM_ITERS 5
+
+// Count of blocks in non contiguous datatype
+#define BLOCK_COUNT 100
+#define BLOCK_SIZE 1000
 
 //#define BUFFER_SIZE 10
 //#define NUM_ITERS 10
 
-#define N BUFFER_SIZE
+//#define N BUFFER_SIZE
+#define N 10000
 
 void dummy_workload(double *buf) {
 
@@ -55,9 +60,9 @@ void dummy_workload(double *buf) {
 void check_buffer_content(int *buf, int n) {
   int not_correct = 0;
 
-  for (int i = 0; i < N; ++i) {
-    if (buf[i] != 1 * i * n) {
-      not_correct++;
+  for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+    if (buf[i] != 2 * n) {
+        not_correct++;
     }
   }
 
@@ -80,19 +85,62 @@ void use_self_implemented_comm() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  int *buffer = malloc(N * sizeof(int));
+  char *buffer = malloc(BLOCK_COUNT * BLOCK_SIZE * N);
   double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
+
+  // create non contiguous datatype
+  // blocklengths cycle through 1 ... 5
+  // displacements is 10 * blockindex at all times (could use another datatype constructer in this case)
+  // -> [a, b, b, ..., a, a, b, b, ..., a, a, a, b, ...] where a is a sent entry and b is a not sent entry.
+  // full array has size BLOCK_COUNT * 10
+
+  // size = size of all sent elements
+  // extent = size of sent and unsent elements
+
+  // MPI represents any created type as a map with {(type0, displ0), (type1, displ1), ..., (typeN-1, displN-1)}
+
+  int *block_lenghts = malloc(BLOCK_COUNT * sizeof(int));
+  int *displacements = malloc(BLOCK_COUNT * sizeof(int));
+
+  for(int i = 0; i < BLOCK_COUNT; ++i){
+    block_lenghts[i] = (i % 5) + 1;
+    //block_lenghts[i] = 2;
+    displacements[i] = BLOCK_SIZE*i;
+  }
+
+  block_lenghts[BLOCK_COUNT - 1] = BLOCK_SIZE;
+
+  MPI_Datatype nc_datatype;
+
+  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE, &nc_datatype);
+  MPI_Type_commit(&nc_datatype);
+
+  MPI_Count typesize, lb, extent;
+  MPI_Type_size_x(nc_datatype, &typesize);
+  MPI_Type_get_extent_x(nc_datatype, &lb, &extent);
+
+  //int num_integers, num_adresses, num_datatypes, combiner;
+  //MPI_Type_get_envelope(nc_datatype, &num_integers, &num_adresses, &num_datatypes, &combiner);
+
+  //int *array_of_ints = malloc(num_integers * sizeof(int));
+  //MPI_Aint *array_of_addresses = malloc(num_adresses * sizeof(MPI_Aint));
+  //MPI_Datatype *array_of_datatypes = malloc(num_datatypes * sizeof(MPI_Datatype));
+
+  //MPI_Type_get_contents(nc_datatype, num_integers, num_adresses, num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
+
+  printf("Typesize: %d, Type extent: %d\n", typesize, extent);
 
   MPI_Request req;
 
   if (rank == 1) {
 
-    MPIOPT_Send_init(buffer, N, MPI_INT, 0, 42, MPI_COMM_WORLD, &req);
+    MPIOPT_Send_init(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
+      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+        //buffer[i] = rank * i * n;
+        buffer[i] = 2 * n;
       }
 
       printf("Send %d\n", n);
@@ -106,12 +154,14 @@ void use_self_implemented_comm() {
     }
   } else {
 
-    MPIOPT_Recv_init(buffer, N, MPI_INT, 1, 42, MPI_COMM_WORLD, &req);
+    MPIOPT_Recv_init(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
+      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+        //buffer[i] = rank * i * n;
+        buffer[i] = 1 * n;
       }
+
       printf("Recv %d\n", n);
       MPIOPT_Start(&req);
       dummy_workload(work_buffer);
@@ -145,30 +195,66 @@ void use_standard_comm() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  int *buffer = malloc(N * sizeof(int));
+  char *buffer = malloc(BLOCK_COUNT * BLOCK_SIZE * N);
   double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
+
+  // create nc Datatype
+  int *block_lenghts = malloc(BLOCK_COUNT * sizeof(int));
+  int *displacements = malloc(BLOCK_COUNT * sizeof(int));
+
+  for(int i = 0; i < BLOCK_COUNT; ++i){
+    block_lenghts[i] = (i % 5) + 1;
+    //block_lenghts[i] = 2;
+    displacements[i] = BLOCK_SIZE*i;
+  }
+
+  block_lenghts[BLOCK_COUNT - 1] = BLOCK_SIZE;
+
+  MPI_Datatype nc_datatype;
+
+  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE, &nc_datatype);
+  MPI_Type_commit(&nc_datatype);
+
+  MPI_Count typesize, lb, extent;
+  MPI_Type_size_x(nc_datatype, &typesize);
+  MPI_Type_get_extent_x(nc_datatype, &lb, &extent);
+
+  //int num_integers, num_adresses, num_datatypes, combiner;
+  //MPI_Type_get_envelope(nc_datatype, &num_integers, &num_adresses, &num_datatypes, &combiner);
+
+  //int *array_of_ints = malloc(num_integers * sizeof(int));
+  //MPI_Aint *array_of_addresses = malloc(num_adresses * sizeof(MPI_Aint));
+  //MPI_Datatype *array_of_datatypes = malloc(num_datatypes * sizeof(MPI_Datatype));
+
+  //MPI_Type_get_contents(nc_datatype, num_integers, num_adresses, num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
+
+  printf("Typesize: %d, Type extent: %d\n", typesize, extent);
+
+
 
   MPI_Request req;
 
   if (rank == 1) {
 
     for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
+      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+        //buffer[i] = rank * i * n;
+        buffer[i] = 2 * n;
       }
-      MPI_Isend(buffer, sizeof(int) * N, MPI_BYTE, 0, 42, MPI_COMM_WORLD, &req);
+
+      MPI_Isend(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req);
       dummy_workload(work_buffer);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
   } else {
     for (int n = 0; n < NUM_ITERS; ++n) {
-
-      for (int i = 0; i < N; ++i) {
-        buffer[i] = rank * i * n;
+      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+        //buffer[i] = rank * i * n;
+        buffer[i] = 1 * n;
       }
 
-      MPI_Irecv(buffer, sizeof(int) * N, MPI_BYTE, 1, 42, MPI_COMM_WORLD, &req);
+      MPI_Irecv(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req);
       dummy_workload(work_buffer);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
 #ifdef STATISTIC_PRINTING

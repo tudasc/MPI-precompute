@@ -54,9 +54,16 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
     printf("crosstalk detected\n");
     printf("recv fetches data\n");
 #endif
-    ucs_status_t status =
-        ucp_get_nbi(request->ep, (void *)request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+    ucs_status_t status;
+    if(request->is_cont){
+      status =
+          ucp_get_nbi(request->ep, (void *)request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      status =
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);
     /*
