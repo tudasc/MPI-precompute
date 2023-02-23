@@ -16,6 +16,8 @@ upper = 100
 
 colors_list = ["#4477AA", "#228833"]
 
+RESULT_COLS=['runtime', 'num_p','num_t','b_p_proc','mem']
+
 
 def add_violin(ax, x, df, y_selector, color="#4477AA"):
     y = df[y_selector].to_numpy()
@@ -113,7 +115,7 @@ def get_data_process_count(data, key, buf_size, calctime):
 
 
 def read_file_to_df(filename, is_altered, param_list):
-    temp_df = pd.read_csv(filename, names=['nprocs', 'runtime'])
+    temp_df = pd.read_csv(filename, names=['nprocs']+RESULT_COLS)
     temp_df['is_altered'] = is_altered
     for i in range(0, len(param_list), 2):
         temp_df[param_list[i][1:]] = param_list[i + 1]
@@ -122,7 +124,7 @@ def read_file_to_df(filename, is_altered, param_list):
 
 def read_data(data_dir, param_file):
     param_list = get_param_list(param_file)
-    cols = ['nprocs', 'runtime', 'is_altered'] + param_list
+    cols = ['nprocs']+RESULT_COLS+['is_altered'] + param_list
     df = pd.DataFrame(columns=cols)
     print("Read Data ...")
 
@@ -133,6 +135,7 @@ def read_data(data_dir, param_file):
         p_list = p.split()
 
         p_fname = p.replace(' ', '').strip()  # remove trailing newline
+        p_fname= p_fname[2:]
 
         altered_fname = data_dir + "/ALTERED_" + p_fname + ".csv"
         if os.path.isfile(altered_fname):
@@ -193,12 +196,12 @@ def main():
 
     print("generating plots ...")
 
-    to_plot = data.loc[(data['n'] == 100) & (data['i'] == 1000)]
-    get_plot(to_plot, "n100-i1000", app_name)
-    to_plot = data.loc[(data['n'] == 1000) & (data['i'] == 1000)]
-    get_plot(to_plot, "n1000-i1000", app_name)
-    to_plot = data.loc[(data['n'] == 10000) & (data['i'] == 1000)]
-    get_plot(to_plot, "n10000-i1000", app_name)
+    to_plot = data.loc[(data['n'] == 100) & (data['i'] == 2500)]
+    get_plot(to_plot, "n100-i2500", app_name)
+    to_plot = data.loc[(data['n'] == 1000) & (data['i'] == 2500)]
+    get_plot(to_plot, "n1000-i2500", app_name)
+    to_plot = data.loc[(data['n'] == 10000) & (data['i'] == 2500)]
+    get_plot(to_plot, "n10000-i2500", app_name)
     print("done")
 
 
