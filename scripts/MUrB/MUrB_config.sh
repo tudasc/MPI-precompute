@@ -14,5 +14,10 @@ export FIXED_PARAMS="-v --im 100"
 
 
 function read_output {
-  grep "Entire simulation took" $1 | cut -d ' ' -f 4
+  runtime=$(grep "Entire simulation took" $1 | cut -d ' ' -f 4)
+  num_p=$(grep "nb. of MPI procs" $1 | cut -d ':' -f 2)
+  num_t=$(grep "nb. of threads" $1 | cut -d ':' -f 2)
+  b_p_proc=$(grep "nb. of bodies per proc" $1 | cut -d ':' -f 2)  
+  mem=$(grep "mem. allocated" $1 | cut -d ':' -f 2)  
+  echo "$runtime,$num_p,$num_t,$b_p_proc,$mem"
 }
