@@ -20,7 +20,7 @@ colors_list = ["#4477AA", "#228833"]
 def add_violin(ax, x, df, y_selector, color="#4477AA"):
     y = df[y_selector].to_numpy()
 
-    if len(y) > 0:  # if data is present
+    if len(y) > 1:  # if data is present
         violin_parts = ax.violinplot([y], [x], widths=[1.5], quantiles=[lower / 100, upper / 100], showmeans=True,
                                      showmedians=True, showextrema=False)
 
