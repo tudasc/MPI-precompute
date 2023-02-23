@@ -133,6 +133,9 @@ def read_data(data_dir, param_file):
         p_list = p.split()
 
         p_fname = p.replace(' ', '').strip()  # remove trailing newline
+        
+        # workaround for wrong file name
+        p_fname = p_fname[2:]
 
         altered_fname = data_dir + "/ALTERED_" + p_fname + ".csv"
         if os.path.isfile(altered_fname):
@@ -193,11 +196,11 @@ def main():
 
     print("generating plots ...")
 
-    to_plot = data.loc[(data['n'] == 100) & (data['i'] == 1000)]
+    to_plot = data.loc[(data['n'] == 100) & (data['i'] == 2500)]
     get_plot(to_plot, "n100-i1000", app_name)
-    to_plot = data.loc[(data['n'] == 1000) & (data['i'] == 1000)]
+    to_plot = data.loc[(data['n'] == 1000) & (data['i'] == 2500)]
     get_plot(to_plot, "n1000-i1000", app_name)
-    to_plot = data.loc[(data['n'] == 10000) & (data['i'] == 1000)]
+    to_plot = data.loc[(data['n'] == 10000) & (data['i'] == 2500)]
     get_plot(to_plot, "n10000-i1000", app_name)
     print("done")
 
