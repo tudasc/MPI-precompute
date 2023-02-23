@@ -137,6 +137,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
+  assert(is_sending_type(request));
+
   // TODO atomic increment for multi threading
   request->operation_number++;
   assert(request->flag >= request->operation_number * 2);
@@ -146,7 +148,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
     b_send(request);
 
-  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED) {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+             request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     start_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
@@ -155,7 +158,6 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
               &request->backup_request);
 
   } else {
-    assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
   }
 #ifdef BUFFER_CONTENT_CHECKING
@@ -173,6 +175,8 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   assert(request->active == 0);
   request->active = 1;
 #endif
+
+  assert(is_recv_type(request));
 
   // TODO atomic increment for multi threading
   request->operation_number++;
