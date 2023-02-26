@@ -134,7 +134,17 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   conflicts = check_for_conflicting_request(request);
 #endif
 
-  if (rank == dest || rank == MPI_PROC_NULL || conflicts) {
+#ifdef USE_FALLBACK_UNTIL_THRESHOLD
+    const bool use_fallback = request->size < FALLBACK_THRESHOLD;
+#ifdef SUMMARY_STATISTIC_PRINTING
+    if (use_fallback)
+        printf("Use Fallback for small msg\n");
+#endif
+#else
+    const bool use_fallback = 0;
+#endif
+
+  if (use_fallback || rank == dest || rank == MPI_PROC_NULL || conflicts) {
     // use the default implementation for communication with self / no-op
     if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
       request->type = RECV_REQUEST_TYPE_USE_FALLBACK;

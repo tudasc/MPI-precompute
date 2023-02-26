@@ -32,6 +32,9 @@
 
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 
+//#define USE_FALLBACK_UNTIL_THRESHOLD
+//#define FALLBACK_THRESHOLD 1000
+
 // linkage type of all internal functions
 #ifndef LINKAGE_TYPE
 #define LINKAGE_TYPE
