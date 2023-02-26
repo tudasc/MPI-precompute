@@ -43,6 +43,13 @@ int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
   for (int i = 0; i < count; ++i) {
     MPIOPT_Start(&array_of_requests[i]);
   }
+#ifdef WAIT_ON_STARTALL_TO_PREVENT_CROSSTALK
+  usleep(WAIT_ON_STARTALL_WAIT_TIME);
+  int flag=0;
+    for (int i = 0; i < count; ++i) {
+        MPIOPT_Wait(&array_of_requests[i],&flag,MPI_STATUS_IGNORE);
+    }
+#endif
   return 0;
 }
 

@@ -35,6 +35,11 @@
 //#define USE_FALLBACK_UNTIL_THRESHOLD
 //#define FALLBACK_THRESHOLD 1000
 
+#define WAIT_ON_STARTALL_TO_PREVENT_CROSSTALK
+#define WAIT_ON_STARTALL_WAIT_TIME 0
+// this should be based on latency
+//TODO Implementation should automatically adjust this time in necesssary
+
 // linkage type of all internal functions
 #ifndef LINKAGE_TYPE
 #define LINKAGE_TYPE
