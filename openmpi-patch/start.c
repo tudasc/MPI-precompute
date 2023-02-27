@@ -141,6 +141,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
+  assert(is_sending_type(request));
+
   // TODO atomic increment for multi threading
   request->operation_number++;
 
@@ -152,6 +154,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
     b_send(request);
 
   } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
+
     start_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
@@ -160,6 +163,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
               &request->backup_request);
 
   } else {
+
     assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
     assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
@@ -179,6 +183,8 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   assert(request->active == 0);
   request->active = 1;
 #endif
+
+  assert(is_recv_type(request));
 
   // TODO atomic increment for multi threading
   request->operation_number++;
