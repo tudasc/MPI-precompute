@@ -18,8 +18,8 @@
 #define RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS 10
 
 // this request is stuck, so it should not be progressed
-#define RECV_REQUEST_TYPE_NULL 11
-#define SEND_REQUEST_TYPE_NULL 12
+#define SEND_REQUEST_TYPE_NULL 11
+#define RECV_REQUEST_TYPE_NULL 12
 
 #include <mpi.h>
 
@@ -70,23 +70,28 @@ struct mpiopt_request {
 };
 typedef struct mpiopt_request MPIOPT_Request;
 
-static inline is_sending_type(MPIOPT_Request *request) {
-  // TODO: check if odd
-  return request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED ||
-         request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
-         request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS ||
-         request->type == SEND_REQUEST_TYPE ||
-         request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
-         request->type == SEND_REQUEST_TYPE_NULL;
+static inline bool is_sending_type(MPIOPT_Request *request) {
+  // odd
+  return request->type % 2 == 1;
+
+  static_assert(SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED % 2 == 1, "");
+  static_assert(SEND_REQUEST_TYPE_HANDSHAKE_INITIATED % 2 == 1, "");
+  static_assert(SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS % 2 == 1, "");
+  static_assert(SEND_REQUEST_TYPE % 2 == 1, "");
+  static_assert(SEND_REQUEST_TYPE_USE_FALLBACK % 2 == 1, "");
+  static_assert(SEND_REQUEST_TYPE_NULL % 2 == 1, "");
 }
-static inline is_recv_type(MPIOPT_Request *request) {
-  // TODO: check if even
-  return request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED ||
-         request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
-         request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS ||
-         request->type == RECV_REQUEST_TYPE ||
-         request->type == RECV_REQUEST_TYPE_USE_FALLBACK ||
-         request->type == RECV_REQUEST_TYPE_NULL;
+
+static inline bool is_recv_type(MPIOPT_Request *request) {
+  // even
+  return request->type % 2 == 0;
+
+  static_assert(RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED % 2 == 0, "");
+  static_assert(RECV_REQUEST_TYPE_HANDSHAKE_INITIATED % 2 == 0, "");
+  static_assert(RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS % 2 == 0, "");
+  static_assert(RECV_REQUEST_TYPE % 2 == 0, "");
+  static_assert(RECV_REQUEST_TYPE_USE_FALLBACK % 2 == 0, "");
+  static_assert(RECV_REQUEST_TYPE_NULL % 2 == 0, "");
 }
 
 #endif // MPIOPT_REQUEST_TYPE_H
