@@ -186,6 +186,14 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
     } else
       *flag = 0;
   }
+
+  if (*flag) {
+    assert(request->type == SEND_REQUEST_TYPE ||
+           request->type == RECV_REQUEST_TYPE ||
+           request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
+           request->type == RECV_REQUEST_TYPE_USE_FALLBACK);
+  }
+
 #ifdef BUFFER_CONTENT_CHECKING
   if (*flag == 1) {
     // TODO buffer checking will break if the user tests a finished request

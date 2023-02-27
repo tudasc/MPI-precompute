@@ -99,6 +99,7 @@ wait_send_when_searching_for_connection(MPIOPT_Request *request) {
   int flag = 0;
 
   assert(request->operation_number == 1);
+  assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
 
   while (!flag) {
     progress_send_request_waiting_for_rdma(request);
@@ -116,6 +117,7 @@ LINKAGE_TYPE void
 wait_recv_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
+  assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
 
   while (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
          request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
