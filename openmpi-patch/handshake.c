@@ -118,7 +118,7 @@ progress_recv_request_handshake_begin(MPIOPT_Request *request) {
       MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
                  MPI_STATUS_IGNORE);
       if (flag) {
-        // found matching counterpart
+        // found matching handshake
         begin_handshake_response(request);
         request->type = RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
         progress_recv_request_handshake_end(request);
