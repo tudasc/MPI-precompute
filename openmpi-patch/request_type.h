@@ -71,14 +71,18 @@ struct mpiopt_request {
 typedef struct mpiopt_request MPIOPT_Request;
 
 static inline is_sending_type(MPIOPT_Request *request) {
-  return request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+  // TODO: check if odd
+  return request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED ||
+         request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
          request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS ||
          request->type == SEND_REQUEST_TYPE ||
          request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
          request->type == SEND_REQUEST_TYPE_NULL;
 }
 static inline is_recv_type(MPIOPT_Request *request) {
-  return request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+  // TODO: check if even
+  return request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED ||
+         request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
          request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS ||
          request->type == RECV_REQUEST_TYPE ||
          request->type == RECV_REQUEST_TYPE_USE_FALLBACK ||
