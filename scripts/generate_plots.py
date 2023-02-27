@@ -196,12 +196,12 @@ def main():
 
     print("generating plots ...")
 
-    to_plot = data.loc[(data['n'] == 100) & (data['i'] == 2500)]
-    get_plot(to_plot, "n100-i2500", app_name)
-    to_plot = data.loc[(data['n'] == 1000) & (data['i'] == 2500)]
-    get_plot(to_plot, "n1000-i2500", app_name)
-    to_plot = data.loc[(data['n'] == 10000) & (data['i'] == 2500)]
-    get_plot(to_plot, "n10000-i2500", app_name)
+    to_plot = data.loc[(data['n'] == 100) & (data['i'] == 250)]
+    get_plot(to_plot, "n100-i250", app_name)
+    to_plot = data.loc[(data['n'] == 1000) & (data['i'] == 250)]
+    get_plot(to_plot, "n1000-i250", app_name)
+    to_plot = data.loc[(data['n'] == 10000) & (data['i'] == 250)]
+    get_plot(to_plot, "n10000-i250", app_name)
     print("done")
 
 
