@@ -45,10 +45,10 @@ int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
   }
 #ifdef WAIT_ON_STARTALL_TO_PREVENT_CROSSTALK
   usleep(WAIT_ON_STARTALL_WAIT_TIME);
-  int flag=0;
-    for (int i = 0; i < count; ++i) {
-        MPIOPT_Test(&array_of_requests[i],&flag,MPI_STATUS_IGNORE);
-    }
+  int flag = 0;
+  for (int i = 0; i < count; ++i) {
+    MPIOPT_Test(&array_of_requests[i], &flag, MPI_STATUS_IGNORE);
+  }
 #endif
   return 0;
 }
@@ -125,11 +125,11 @@ int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
 
 int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
                    MPI_Status array_of_statuses[]) {
-    int flag=0;
-    while (! flag){
-        MPIOPT_Testall(count,array_of_requests,&flag,array_of_statuses);
-    }
-    return 0;
+  int flag = 0;
+  while (!flag) {
+    MPIOPT_Testall(count, array_of_requests, &flag, array_of_statuses);
+  }
+  return 0;
 }
 
 int MPIOPT_Waitsome(int incount, MPI_Request array_of_requests[], int *outcount,
