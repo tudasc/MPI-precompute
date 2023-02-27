@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-LINKAGE_TYPE void begin_handshake(MPIOPT_Request *request);
+LINKAGE_TYPE void begin_handshake_response(MPIOPT_Request *request);
 
 LINKAGE_TYPE void complete_handshake(MPIOPT_Request *request);
 
@@ -37,7 +37,7 @@ progress_send_request_handshake_begin(MPIOPT_Request *request) {
                MPI_STATUS_IGNORE);
     if (flag) {
       // found matching counterpart
-      begin_handshake(request);
+      begin_handshake_response(request);
       request->type = SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
       progress_send_request_handshake_end(request);
     }
@@ -54,7 +54,7 @@ progress_send_request_handshake_begin(MPIOPT_Request *request) {
                    MPI_STATUS_IGNORE);
         if (flag) {
           // found matching counterpart
-          begin_handshake(request);
+          begin_handshake_response(request);
           request->type = SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
           progress_send_request_handshake_end(request);
         } else {
@@ -119,7 +119,7 @@ progress_recv_request_handshake_begin(MPIOPT_Request *request) {
                  MPI_STATUS_IGNORE);
       if (flag) {
         // found matching counterpart
-        begin_handshake(request);
+        begin_handshake_response(request);
         request->type = RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
         progress_recv_request_handshake_end(request);
       } else {
@@ -246,7 +246,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 }
 
 // begins the handshake if we found that the other rank is participating
-LINKAGE_TYPE void begin_handshake(MPIOPT_Request *request) {
+LINKAGE_TYPE void begin_handshake_response(MPIOPT_Request *request) {
   assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
          request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
 
