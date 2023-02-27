@@ -135,13 +135,13 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 #endif
 
 #ifdef USE_FALLBACK_UNTIL_THRESHOLD
-    const bool use_fallback = request->size < FALLBACK_THRESHOLD;
+  const bool use_fallback = request->size < FALLBACK_THRESHOLD;
 #ifdef SUMMARY_STATISTIC_PRINTING
-    if (use_fallback)
-        printf("Use Fallback for small msg\n");
+  if (use_fallback)
+    printf("Use Fallback for small msg\n");
 #endif
 #else
-    const bool use_fallback = 0;
+  const bool use_fallback = 0;
 #endif
 
   if (use_fallback || rank == dest || rank == MPI_PROC_NULL || conflicts) {
@@ -152,8 +152,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
       assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
       request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
     }
-  } else {
-    send_rdma_info(request);
   }
   // add request to list, so that it is progressed, if other requests have to
   // wait
@@ -173,7 +171,7 @@ LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
 #endif
 
   memset(request, 0, sizeof(MPIOPT_Request));
-  request->type = RECV_REQUEST_TYPE_HANDSHAKE_INITIATED;
+  request->type = RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED;
   return init_request(buf, count, datatype, source, tag, comm, request);
 }
 
@@ -187,6 +185,6 @@ LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
   printf("Rank %d: Init SEND to %d with msg size %d\n", rank, source, count);
 #endif
   memset(request, 0, sizeof(MPIOPT_Request));
-  request->type = SEND_REQUEST_TYPE_HANDSHAKE_INITIATED;
+  request->type = SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED;
   return init_request(buf, count, datatype, source, tag, comm, request);
 }

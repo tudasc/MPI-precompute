@@ -113,6 +113,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
 
+  send_rdma_info(request); // begin handshake
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
@@ -127,7 +128,10 @@ LINKAGE_TYPE void
 start_recv_when_searching_for_connection(MPIOPT_Request *request) {
   assert(request->operation_number == 1);
 
+  send_rdma_info(request); // begin handshake
+
   progress_recv_request_waiting_for_rdma(request);
+  // the recv will be posted, after a check for the handshake was done
 }
 
 LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
@@ -139,6 +143,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
 
   // TODO atomic increment for multi threading
   request->operation_number++;
+
+  printf("Type: %d\n", request->type);
   assert(request->flag >= request->operation_number * 2);
   assert(request->ucx_request_data_transfer == NULL &&
          request->ucx_request_flag_transfer == NULL);
@@ -146,7 +152,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
     b_send(request);
 
-  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED) {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
     start_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
@@ -155,6 +161,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
               &request->backup_request);
 
   } else {
+    assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
     assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
   }
@@ -183,7 +190,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   if (__builtin_expect(request->type == RECV_REQUEST_TYPE, 1)) {
     b_recv(request);
 
-  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
+  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
     start_recv_when_searching_for_connection(request);
 
   } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
@@ -192,6 +199,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
               request->tag, request->communicators->original_communicator,
               &request->backup_request);
   } else {
+    assert(request->type != RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
     assert(request->type != RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
   }

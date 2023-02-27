@@ -95,7 +95,7 @@ progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
 
   if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED) {
     progress_send_request_handshake_begin(request);
-  } else {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     progress_send_request_handshake_end(request);
   }
 }
@@ -146,16 +146,17 @@ progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
 
   if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
     progress_recv_request_handshake_begin(request);
-  } else {
+  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     progress_recv_request_handshake_end(request);
   }
+  // else: Handshake not started: nothing to do, operation is not active
 }
 
 // exchanges the RDMA info and maps all mem for RDMA op
 LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 
-  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
-         request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
+  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED ||
+         request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
 
   uint64_t flag_ptr = &request->flag;
   uint64_t data_ptr = request->buf;
@@ -243,6 +244,12 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   // free temp buf
   ucp_rkey_buffer_release(rkey_buffer_flag);
   ucp_rkey_buffer_release(rkey_buffer_data);
+
+  if (is_recv_type(request)) {
+    request->type = RECV_REQUEST_TYPE_HANDSHAKE_INITIATED;
+  } else {
+    request->type = SEND_REQUEST_TYPE_HANDSHAKE_INITIATED;
+  }
 }
 
 // begins the handshake if we found that the other rank is participating
