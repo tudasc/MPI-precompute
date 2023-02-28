@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "debug.h"
+
 void MPIOPT_FINALIZE() {
   MPI_Win_free(&global_comm_win);
   assert(request_list_head->next == NULL); // list should be empty
@@ -61,6 +63,10 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 
 #ifdef DISTINGUISH_ACTIVE_REQUESTS
   assert(request->active == 0);
+#endif
+#ifndef NDEBUG
+  dump_trace_to_file(request);
+  free_debug_data(request);
 #endif
 
   // cancel any search for RDMA connection, if necessary

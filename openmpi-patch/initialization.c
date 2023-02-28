@@ -5,6 +5,7 @@
 #include "request_type.h"
 #include "settings.h"
 
+#include "debug.h"
 #include "mpi-internals.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -121,6 +122,10 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
   request->operation_number = 0;
   request->flag = 2; // operation 0 is completed
+
+#ifndef NDEBUG
+  init_debug_data(request);
+#endif
 
 #ifdef BUFFER_CONTENT_CHECKING
   // use c alloc, so that it is initialized, even if a smaller msg was received

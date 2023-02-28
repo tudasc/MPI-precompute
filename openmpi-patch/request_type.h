@@ -30,6 +30,10 @@
 #include <unistd.h>
 
 #include "mpi-internals.h"
+#ifndef NDEBUG
+// instead of #include "debug.h" to avoid cyclic inclusion
+struct debug_data;
+#endif
 
 struct mpiopt_request {
   // this way the request ptr can be used as a normal request ptr as well
@@ -66,6 +70,9 @@ struct mpiopt_request {
 #endif
 #ifdef DISTINGUISH_ACTIVE_REQUESTS
   int active;
+#endif
+#ifndef NDEBUG
+  struct debug_data *debug_data;
 #endif
 };
 typedef struct mpiopt_request MPIOPT_Request;

@@ -9,6 +9,9 @@
 #include "globals.c"
 #include "globals.h"
 
+#include "debug.c"
+#include "debug.h"
+
 #include "initialization.c"
 #include "initialization.h"
 
