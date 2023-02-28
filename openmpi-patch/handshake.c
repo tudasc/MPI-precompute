@@ -128,9 +128,9 @@ progress_recv_request_handshake_begin(MPIOPT_Request *request) {
       // post the matching receive
       assert(request->backup_request == MPI_REQUEST_NULL);
       // blocking, as we have probed before
-      MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest,
-               request->tag, request->communicators->original_communicator,
-               MPI_STATUS_IGNORE);
+        MPI_Recv(request->buf, request->count, request->dtype, request->dest,
+                  request->tag, request->communicators->original_communicator,
+                  MPI_STATUS_IGNORE);
     }
   }
 }
