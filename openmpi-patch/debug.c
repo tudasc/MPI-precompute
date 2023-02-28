@@ -21,6 +21,9 @@ void add_operation_to_trace(MPIOPT_Request *request, char *operation) {
   assert(request->debug_data->trace_list_tail->next == NULL);
   request->debug_data->trace_list_tail->next = new_elem;
   request->debug_data->trace_list_tail = new_elem;
+#ifdef DUMP_DEBUG_TRACE_EVERY_TIME
+    dump_trace_to_file(request);
+#endif
 }
 
 char *get_trace_filename(MPIOPT_Request *request) {

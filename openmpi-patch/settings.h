@@ -4,6 +4,8 @@
 // config :
 #define RDMA_SPIN_WAIT_THRESHOLD 32
 
+
+#define DUMP_DEBUG_TRACE_EVERY_TIME
 // print a summary on the amount of crosstalk at the end
 #define SUMMARY_STATISTIC_PRINTING
 // check the contents of the buffers send around to detect race conditions
