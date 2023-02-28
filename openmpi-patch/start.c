@@ -168,7 +168,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   // TODO atomic increment for multi threading
   request->operation_number++;
 
-  assert(request->flag >= request->operation_number * 2);
+  assert(request->flag >= request->operation_number * 2 || request->type==SEND_REQUEST_TYPE_USE_FALLBACK);
   assert(request->ucx_request_data_transfer == NULL &&
          request->ucx_request_flag_transfer == NULL);
 
@@ -218,7 +218,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 
   // TODO atomic increment for multi threading
   request->operation_number++;
-  assert(request->flag >= request->operation_number * 2);
+  assert(request->flag >= request->operation_number * 2 || request->type==RECV_REQUEST_TYPE_USE_FALLBACK);
   assert(request->ucx_request_data_transfer == NULL &&
          request->ucx_request_flag_transfer == NULL);
 
