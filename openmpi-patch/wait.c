@@ -158,7 +158,7 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
     if(!(request->is_cont)){
       int position = 0;
       MPI_Unpack(request->packed_buf, request->pack_size, 
-        &position, request->buf, request->count, request->dtype, MPI_COMM_WORLD);
+        &position, request->buf, request->count, request->dtype, request->communicators->original_communicator);
     }
 
   } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {

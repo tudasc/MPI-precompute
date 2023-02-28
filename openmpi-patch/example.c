@@ -27,7 +27,7 @@
 
 #define DUMMY_WLOAD_TIME = 10
 
-//#define STATISTIC_PRINTING
+#define STATISTIC_PRINTING
 
 // bufsize and num iter have to be large to get performance benefit, otherwise
 // slowdown occur
@@ -38,17 +38,17 @@
 
 // 10KB
 #define BUFFER_SIZE 10000
-#define NUM_ITERS 5
+#define NUM_ITERS 3
 
 // Count of blocks in non contiguous datatype
-#define BLOCK_COUNT 100
-#define BLOCK_SIZE 1000
+#define BLOCK_COUNT 2
+#define BLOCK_SIZE 5
 
 //#define BUFFER_SIZE 10
 //#define NUM_ITERS 10
 
 //#define N BUFFER_SIZE
-#define N 10000
+#define N 2
 
 void dummy_workload(double *buf) {
 
@@ -57,19 +57,45 @@ void dummy_workload(double *buf) {
   }
 }
 
-void check_buffer_content(int *buf, int n) {
+void check_buffer_content(char *buf, int n, int* block_sizes) {
   int not_correct = 0;
+  char sent_item = 0;
+  int sent_item_count = 0;
+  int block = -1;
 
   for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-    if (buf[i] != 2 * n) {
+
+    if(sent_item && sent_item_count == block_sizes[block]) {
+      sent_item = 0;
+      sent_item_count = 0;
+    }
+
+    if(i % BLOCK_SIZE == 0){
+      sent_item = 1;
+      block++;
+      block %= BLOCK_COUNT;
+    }
+
+    if(sent_item){
+      sent_item_count++;
+      
+      if(buf[i] != 2 * (n + 1)){
         not_correct++;
+        printf("position %d: %d exptected %d\n", i, buf[i], 2 * (n+1));
+      }
+    } else {
+      if(buf[i] != n + 1) {
+        not_correct++;
+        printf("position %d: %d exptected %d\n", i, buf[i], n+1);
+      }
     }
   }
 
   if (not_correct != 0) {
-    printf("ERROR: %d: buffer has unexpected content\n", n);
+    printf("ERROR: %d: buffer has unexpected content (counted %d wrong values)\n", n, not_correct);
     // exit(-1);
   }
+
 }
 
 #define tag_entry 42
@@ -91,7 +117,7 @@ void use_self_implemented_comm() {
 
   // create non contiguous datatype
   // blocklengths cycle through 1 ... 5
-  // displacements is 10 * blockindex at all times (could use another datatype constructer in this case)
+  // displacements is BLOCK_SIZE * blockindex at all times (could use another datatype constructer in this case)
   // -> [a, b, b, ..., a, a, b, b, ..., a, a, a, b, ...] where a is a sent entry and b is a not sent entry.
   // full array has size BLOCK_COUNT * 10
 
@@ -128,8 +154,9 @@ void use_self_implemented_comm() {
   //MPI_Datatype *array_of_datatypes = malloc(num_datatypes * sizeof(MPI_Datatype));
 
   //MPI_Type_get_contents(nc_datatype, num_integers, num_adresses, num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
-
+#ifdef STATISTIC_PRINTING
   printf("Typesize: %d, Type extent: %d\n", typesize, extent);
+#endif
 
   MPI_Request req;
 
@@ -140,7 +167,7 @@ void use_self_implemented_comm() {
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
         //buffer[i] = rank * i * n;
-        buffer[i] = 2 * n;
+        buffer[i] = 2 * (n + 1);
       }
 
       printf("Send %d\n", n);
@@ -159,7 +186,7 @@ void use_self_implemented_comm() {
 
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
         //buffer[i] = rank * i * n;
-        buffer[i] = 1 * n;
+        buffer[i] = (n + 1);
       }
 
       printf("Recv %d\n", n);
@@ -171,7 +198,7 @@ void use_self_implemented_comm() {
       //     MPIOPT_Test(&req,&flag, MPI_STATUS_IGNORE);
       //}
 #ifdef STATISTIC_PRINTING
-      check_buffer_content(buffer, n);
+      check_buffer_content(buffer, n, block_lenghts);
 #endif
     }
 
@@ -183,6 +210,8 @@ void use_self_implemented_comm() {
      printf("\n");
      */
   }
+
+  MPI_Type_free(&nc_datatype);
 
   MPIOPT_Request_free(&req);
   MPIOPT_FINALIZE();
@@ -229,8 +258,9 @@ void use_standard_comm() {
 
   //MPI_Type_get_contents(nc_datatype, num_integers, num_adresses, num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
 
+#ifdef STATISTIC_PRINTING
   printf("Typesize: %d, Type extent: %d\n", typesize, extent);
-
+#endif
 
 
   MPI_Request req;
@@ -240,7 +270,7 @@ void use_standard_comm() {
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
         //buffer[i] = rank * i * n;
-        buffer[i] = 2 * n;
+        buffer[i] = 2 * (n + 1);
       }
 
       MPI_Isend(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req);
@@ -251,14 +281,14 @@ void use_standard_comm() {
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
         //buffer[i] = rank * i * n;
-        buffer[i] = 1 * n;
+        buffer[i] = n + 1;
       }
 
       MPI_Irecv(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req);
       dummy_workload(work_buffer);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
 #ifdef STATISTIC_PRINTING
-      check_buffer_content(buffer, n);
+      check_buffer_content(buffer, n, block_lenghts);
 #endif
     }
 
@@ -270,6 +300,7 @@ void use_standard_comm() {
      printf("\n");
      */
   }
+  MPI_Type_free(&nc_datatype);
 }
 
 void use_persistent_comm() {
@@ -310,7 +341,7 @@ void use_persistent_comm() {
       dummy_workload(work_buffer);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
 #ifdef STATISTIC_PRINTING
-      check_buffer_content(buffer, n);
+      //check_buffer_content(buffer, n);
 #endif
     }
 
@@ -351,7 +382,7 @@ int main(int argc, char **argv) {
   printf("Standard:    %f s \n", time);
   MPI_Barrier(MPI_COMM_WORLD);
   gettimeofday(&start_time, NULL); /*  start timer         */
-  use_standard_comm();
+  //use_persistent_comm();
   gettimeofday(&stop_time, NULL); /*  stop timer          */
   time = (stop_time.tv_sec - start_time.tv_sec) +
          (stop_time.tv_usec - start_time.tv_usec) * 1e-6;

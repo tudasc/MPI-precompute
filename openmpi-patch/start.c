@@ -136,7 +136,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
-  MPI_Issend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
+  MPI_Issend(request->buf, request->count, request->dtype, request->dest, request->tag,
              request->communicators->original_communicator,
              &request->backup_request);
   // and listen for rdma handshake
@@ -145,6 +145,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
 
 LINKAGE_TYPE void
 start_recv_when_searching_for_connection(MPIOPT_Request *request) {
+
   assert(request->operation_number == 1);
 
   progress_recv_request_waiting_for_rdma(request);
@@ -163,14 +164,14 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
       assert(request->backup_request == MPI_REQUEST_NULL);
       // post the matching recv
       printf("Post RECV, Fallback in start\n");
-      MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
+      MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
                 request->tag, request->communicators->original_communicator,
                 &request->backup_request);
     }
   } else {
     // RDMA handshake complete, we can post the matching recv
     if (request->backup_request == MPI_REQUEST_NULL) {
-      MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
+      MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
                 request->tag, request->communicators->original_communicator,
                 &request->backup_request);
     }
@@ -187,15 +188,6 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
-  // Pack data into cont. buffer
-  if(!(request->is_cont)){
-    int position = 0;
-
-    // fix communicator
-    MPI_Pack(request->buf, request->count, 
-      request->dtype, request->packed_buf, request->pack_size, &position, MPI_COMM_WORLD);
-  }
-
   // TODO atomic increment for multi threading
   request->operation_number++;
   assert(request->flag >= request->operation_number * 2);
@@ -203,13 +195,21 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
          request->ucx_request_flag_transfer == NULL);
 
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
+
+    // Pack data into cont. buffer
+    if(!(request->is_cont)){
+      int position = 0;
+
+      MPI_Pack(request->buf, request->count, 
+        request->dtype, request->packed_buf, request->pack_size, &position, request->communicators->original_communicator);
+    }
     b_send(request);
 
   } else if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
     start_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
-    MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest,
+    MPI_Isend(request->buf, request->count, request->dtype, request->dest,
               request->tag, request->communicators->original_communicator,
               &request->backup_request);
 
@@ -218,7 +218,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   }
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request == MPI_REQUEST_NULL);
-  MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
+  MPI_Isend(request->buf, request->count, request->dtype, request->dest, request->tag,
             request->communicators->checking_communicator,
             &request->chekcking_request);
 
@@ -246,7 +246,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 
   } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
-    MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
+    MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
               request->tag, request->communicators->original_communicator,
               &request->backup_request);
   } else {
@@ -255,7 +255,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request == MPI_REQUEST_NULL);
-  MPI_Irecv(request->checking_buf, request->size, MPI_BYTE, request->dest,
+  MPI_Irecv(request->checking_buf, request->count, request->dtype, request->dest,
             request->tag, request->communicators->checking_communicator,
             &request->chekcking_request);
 

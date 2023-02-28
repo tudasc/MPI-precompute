@@ -117,8 +117,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
   if(!(request->is_cont)){
     MPI_Pack_size(count, datatype, comm, &request->pack_size);
-    printf("pack size is %d\n", request->pack_size * count);
-    request->packed_buf = malloc(request->pack_size * count);
+    request->packed_buf = malloc(request->pack_size);
   }
 
   request->dest = dest;
