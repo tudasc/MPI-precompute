@@ -142,15 +142,6 @@ LINKAGE_TYPE int MPIOPT_Wait_send_internal(MPIOPT_Request *request,
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
     e_send(request);
 
-    if(!(request->is_cont)){
-      printf("unpacking...\n");
-      int position = 0;
-
-      MPI_Unpack(request->packed_buf, request->pack_size, &position,
-        request->buf, request->count, request->dtype, 
-        request->communicators->original_communicator);
-    }
-
   } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
              request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     wait_send_when_searching_for_connection(request);
@@ -174,6 +165,16 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
 
   if (__builtin_expect(request->type == RECV_REQUEST_TYPE, 1)) {
     e_recv(request);
+
+    if(!(request->is_cont)){
+      printf("unpacking...\n");
+      int position = 0;
+
+      MPI_Unpack(request->packed_buf, request->pack_size, &position,
+        request->buf, request->count, request->dtype, 
+        request->communicators->original_communicator);
+    }
+    
   } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
              request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     wait_recv_when_searching_for_connection(request);
