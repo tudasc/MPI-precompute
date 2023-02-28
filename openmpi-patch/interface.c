@@ -117,7 +117,7 @@ int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
     } else {
       MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
     }
-    if (!flag)
+    if (!*flag)
       return 0; // found one request not complete
   }
   return 0;
