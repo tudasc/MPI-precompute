@@ -331,7 +331,7 @@ LINKAGE_TYPE void complete_handshake(MPIOPT_Request *request) {
     add_operation_to_trace(request, "completed Handshake");
 #endif
     assert(request->operation_number == 1);
-    assert(request->flag == 2);
+    assert(request->flag >= 2);// other rank could have completed the handshake AND started nex operation by now therefore >= instead of ==
     request->flag = 4; // done with this communication
     if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
       request->type = SEND_REQUEST_TYPE;
