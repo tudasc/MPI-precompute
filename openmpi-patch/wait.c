@@ -5,6 +5,7 @@
 
 #include "test.h"
 
+#include "debug.h"
 #include "mpi-internals.h"
 
 #include <stdlib.h>
@@ -177,6 +178,9 @@ LINKAGE_TYPE int MPIOPT_Wait_recv_internal(MPIOPT_Request *request,
 
 LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
                                       MPI_Status *status) {
+#ifndef NDEBUG
+  add_operation_to_trace(request, "MPI_Wait");
+#endif
   int ret_status = 0;
   if (is_sending_type(request)) {
     ret_status = MPIOPT_Wait_send_internal(request, status);

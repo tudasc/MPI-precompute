@@ -4,6 +4,7 @@
 #include "settings.h"
 #include "test.h"
 
+#include "debug.h"
 #include "mpi-internals.h"
 
 #include <stdlib.h>
@@ -64,10 +65,9 @@ progress_send_request_handshake_begin(MPIOPT_Request *request) {
           // the Ssend was successful, meaning the other process has NOT matched
           // with a persistent operation
           request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
-#ifdef STATISTIC_PRINTING
-          int rank;
-          MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-          printf("Rank %d: SEND: No RDMA connection, use normal MPI\n", rank);
+#ifndef NDEBUG
+          add_operation_to_trace(
+              request, "Handshake failed: no response in time, use fallback");
 #endif
         }
       }
@@ -157,6 +157,9 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 
   assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED ||
          request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
+#ifndef NDEBUG
+  add_operation_to_trace(request, "Initialize handshake");
+#endif
 
   uint64_t flag_ptr = &request->flag;
   uint64_t data_ptr = request->buf;
@@ -256,15 +259,8 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 LINKAGE_TYPE void begin_handshake_response(MPIOPT_Request *request) {
   assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
          request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
-
-#ifdef STATISTIC_PRINTING
-  int stat_rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &stat_rank);
-  if (is_sending_type(request)) {
-    printf("Rank %d: SENDING: begin handshake\n", stat_rank);
-  } else {
-    printf("Rank %d: RECV: begin handshake \n", stat_rank);
-  }
+#ifndef NDEBUG
+  add_operation_to_trace(request, "Handshake response");
 #endif
 
   MPI_Comm comm_to_use = request->communicators->handshake_communicator;
@@ -324,15 +320,8 @@ LINKAGE_TYPE void complete_handshake(MPIOPT_Request *request) {
   int flag;
   MPI_Test(&request->rdma_exchange_request_send, &flag, MPI_STATUS_IGNORE);
   if (flag) {
-#ifdef STATISTIC_PRINTING
-
-    int rank = 0;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (is_sending_type(request)) {
-      printf("Rank %d: SENDING: handshake completed\n", rank);
-    } else {
-      printf("Rank %d: RECV: handshake completed \n", rank);
-    }
+#ifndef NDEBUG
+    add_operation_to_trace(request, "completed Handshake");
 #endif
     assert(request->operation_number == 1);
     assert(request->flag == 2);

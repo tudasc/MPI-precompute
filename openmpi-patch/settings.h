@@ -4,8 +4,6 @@
 // config :
 #define RDMA_SPIN_WAIT_THRESHOLD 32
 
-// print what is going on
-#define STATISTIC_PRINTING
 // print a summary on the amount of crosstalk at the end
 #define SUMMARY_STATISTIC_PRINTING
 // check the contents of the buffers send around to detect race conditions
@@ -24,11 +22,11 @@
 
 // print warning that deadlocks/left over resources are possible when freeing
 // unused requests
-#define WARN_ON_REQUEST_FREE
+//#define WARN_ON_REQUEST_FREE
 
 // necessary, if one uses MPI_testsome:
 // adds a small overhead to distinguish active from inactive requests
-#define DISTINGUISH_ACTIVE_REQUESTS
+//#define DISTINGUISH_ACTIVE_REQUESTS
 
 //#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 
@@ -38,7 +36,7 @@
 #define WAIT_ON_STARTALL_TO_PREVENT_CROSSTALK
 #define WAIT_ON_STARTALL_WAIT_TIME 0
 // this should be based on latency
-//TODO Implementation should automatically adjust this time in necesssary
+// TODO Implementation should automatically adjust this time in necesssary
 
 // linkage type of all internal functions
 #ifndef LINKAGE_TYPE

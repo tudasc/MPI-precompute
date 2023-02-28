@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <ucp/api/ucp.h>
 
+#include "debug.h"
 #include "mpi-internals.h"
 
 #include <stdlib.h>
@@ -24,8 +25,8 @@ LINKAGE_TYPE void b_send(MPIOPT_Request *request) {
     // no possibility of data-race, the remote will wait for us to put the data
     assert(request->flag == request->operation_number * 2 + 2);
     // start rdma data transfer
-#ifdef STATISTIC_PRINTING
-    printf("send pushes data\n");
+#ifndef NDEBUG
+    add_operation_to_trace(request, "send pushes data");
 #endif
     request->flag_buffer = request->operation_number * 2 + 2;
     ucs_status_t status =
@@ -64,8 +65,8 @@ LINKAGE_TYPE void b_recv(MPIOPT_Request *request) {
     // no possibility of data race, WE will advance the comm
     assert(request->flag == request->operation_number * 2 + 2);
     // start rdma data transfer
-#ifdef STATISTIC_PRINTING
-    printf("recv fetches data\n");
+#ifndef NDEBUG
+    add_operation_to_trace(request, "recv fetches data");
 #endif
     ucs_status_t status =
         ucp_get_nbi(request->ep, (void *)request->buf, request->size,
@@ -219,7 +220,9 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 }
 
 LINKAGE_TYPE int MPIOPT_Start_internal(MPIOPT_Request *request) {
-
+#ifndef NDEBUG
+  add_operation_to_trace(request, "MPI_Start");
+#endif
   if (is_sending_type(request)) {
     return MPIOPT_Start_send_internal(request);
   } else {

@@ -54,7 +54,7 @@ void init_debug_data(MPIOPT_Request *request) {
   struct trace_list_elem *head_elem = malloc(sizeof(struct trace_list_elem));
   head_elem->next = NULL;
   head_elem->elem =
-      strdup("Trace"); // TODO one could write some info about the request here
+      strdup("Begin Trace: Init Request"); // TODO one could write some info about the request here
   request->debug_data->trace_list_head = head_elem;
   request->debug_data->trace_list_tail = head_elem;
 }

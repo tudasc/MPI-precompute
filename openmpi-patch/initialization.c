@@ -32,9 +32,6 @@ void MPIOPT_INIT() {
   crosstalk_counter = 0;
 #endif
   MPIOPT_Register_Communicator(MPI_COMM_WORLD);
-#ifdef STATISTIC_PRINTING
-  printf("Init MPIOPT\n");
-#endif
 }
 
 struct communicator_info *find_comm(MPI_Comm comm) {
@@ -169,12 +166,6 @@ LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
                                            MPI_Datatype datatype, int source,
                                            int tag, MPI_Comm comm,
                                            MPIOPT_Request *request) {
-#ifdef STATISTIC_PRINTING
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  printf("Rank %d: Init RECV from %d\n", rank, source);
-#endif
-
   memset(request, 0, sizeof(MPIOPT_Request));
   request->type = RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED;
   return init_request(buf, count, datatype, source, tag, comm, request);
@@ -184,11 +175,6 @@ LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
                                            MPI_Datatype datatype, int source,
                                            int tag, MPI_Comm comm,
                                            MPIOPT_Request *request) {
-#ifdef STATISTIC_PRINTING
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  printf("Rank %d: Init SEND to %d with msg size %d\n", rank, source, count);
-#endif
   memset(request, 0, sizeof(MPIOPT_Request));
   request->type = SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED;
   return init_request(buf, count, datatype, source, tag, comm, request);

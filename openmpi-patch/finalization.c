@@ -14,12 +14,6 @@ void MPIOPT_FINALIZE() {
   assert(request_list_head->next == NULL); // list should be empty
   free(request_list_head);
 
-#ifdef STATISTIC_PRINTING
-  int rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  printf("Rank %d: Finalize\n", rank);
-#endif
-
   ucp_context_h context = mca_osc_ucx_component.ucp_context;
 
   struct list_elem *elem = to_free_list_head;
@@ -65,6 +59,7 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
   assert(request->active == 0);
 #endif
 #ifndef NDEBUG
+  add_operation_to_trace(request, "MPI_Request_Free");
   dump_trace_to_file(request);
   free_debug_data(request);
 #endif
@@ -88,15 +83,6 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
     }
   }
 
-#ifdef STATISTIC_PRINTING
-  int rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (is_sending_type(request)) {
-    printf("Rank %d: SENDING: Request Free\n", rank);
-  } else {
-    printf("Rank %d: RECV: Request Free \n", rank);
-  }
-#endif
   remove_request_from_list(request);
 
   // defer free of memory until finalize, as the other process may start an RDMA
