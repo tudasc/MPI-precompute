@@ -148,10 +148,10 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
   if (use_fallback || rank == dest || rank == MPI_PROC_NULL || conflicts) {
     // use the default implementation for communication with self / no-op
-    if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
+    if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
       request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
     } else {
-      assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
+      assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
       request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
     }
   }
