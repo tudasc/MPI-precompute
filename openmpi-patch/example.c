@@ -173,11 +173,12 @@ void use_self_implemented_comm() {
       printf("Send %d\n", n);
       MPIOPT_Start(&req);
       dummy_workload(work_buffer);
-      // MPIOPT_Wait(&req,MPI_STATUS_IGNORE);
-      int flag = 0;
+      MPIOPT_Wait(&req, MPI_STATUS_IGNORE);
+      /*int flag = 0;
       while (!flag) {
         MPIOPT_Test(&req, &flag, MPI_STATUS_IGNORE);
       }
+      */
     }
   } else {
 

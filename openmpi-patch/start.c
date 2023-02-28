@@ -176,6 +176,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
 
     // Pack data into cont. buffer
     if(!(request->is_cont)){
+      printf("packing...\n");
       int position = 0;
 
       MPI_Pack(request->buf, request->count, 
