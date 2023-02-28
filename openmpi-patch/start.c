@@ -29,9 +29,20 @@ LINKAGE_TYPE void b_send(MPIOPT_Request *request) {
     add_operation_to_trace(request, "send pushes data");
 #endif
     request->flag_buffer = request->operation_number * 2 + 2;
-    ucs_status_t status =
-        ucp_put_nbi(request->ep, request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+
+    ucs_status_t status;
+    if(request->is_cont){
+      status =
+          ucp_put_nbi(request->ep, request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      status =
+          ucp_put_nbi(request->ep, request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    }
+
+    
     // ensure order:
     status = ucp_worker_fence(mca_osc_ucx_component.ucp_worker);
     status = ucp_put_nbi(request->ep, &request->flag_buffer, sizeof(int),
@@ -68,9 +79,18 @@ LINKAGE_TYPE void b_recv(MPIOPT_Request *request) {
 #ifndef NDEBUG
     add_operation_to_trace(request, "recv fetches data");
 #endif
-    ucs_status_t status =
-        ucp_get_nbi(request->ep, (void *)request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+    ucs_status_t status;
+
+    if(request->is_cont){
+      status =
+          ucp_get_nbi(request->ep, (void *)request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      status =
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);
     /*
@@ -118,7 +138,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
-  MPI_Issend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
+  MPI_Issend(request->buf, request->count, request->dtype, request->dest, request->tag,
              request->communicators->original_communicator,
              &request->backup_request);
   // and listen for rdma handshake
@@ -127,6 +147,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
 
 LINKAGE_TYPE void
 start_recv_when_searching_for_connection(MPIOPT_Request *request) {
+
   assert(request->operation_number == 1);
 
   send_rdma_info(request); // begin handshake
@@ -152,6 +173,14 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
          request->ucx_request_flag_transfer == NULL);
 
   if (__builtin_expect(request->type == SEND_REQUEST_TYPE, 1)) {
+
+    // Pack data into cont. buffer
+    if(!(request->is_cont)){
+      int position = 0;
+
+      MPI_Pack(request->buf, request->count, 
+        request->dtype, request->packed_buf, request->pack_size, &position, request->communicators->original_communicator);
+    }
     b_send(request);
 
   } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
@@ -159,7 +188,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
     start_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
-    MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest,
+    MPI_Isend(request->buf, request->count, request->dtype, request->dest,
               request->tag, request->communicators->original_communicator,
               &request->backup_request);
 
@@ -171,7 +200,7 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   }
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request == MPI_REQUEST_NULL);
-  MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
+  MPI_Isend(request->buf, request->count, request->dtype, request->dest, request->tag,
             request->communicators->checking_communicator,
             &request->chekcking_request);
 
@@ -201,7 +230,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 
   } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
-    MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
+    MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
               request->tag, request->communicators->original_communicator,
               &request->backup_request);
   } else {
@@ -212,7 +241,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request == MPI_REQUEST_NULL);
-  MPI_Irecv(request->checking_buf, request->size, MPI_BYTE, request->dest,
+  MPI_Irecv(request->checking_buf, request->count, request->dtype, request->dest,
             request->tag, request->communicators->checking_communicator,
             &request->chekcking_request);
 

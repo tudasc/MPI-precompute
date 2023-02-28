@@ -83,16 +83,17 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm,
                               MPIOPT_Request *request) {
 
-  MPI_Count type_size, type_extend, lb;
+  MPI_Count type_size, type_extent, lb;
   MPI_Type_size_x(datatype, &type_size);
+  MPI_Type_get_extent_x(datatype, &lb, &type_extent);
 #ifndef NDEBUG
   // only if assertion checking is on
-  MPI_Type_get_extent_x(datatype, &lb, &type_extend);
 #endif
   // is contigous
-  assert(type_size == type_extend && lb == 0 &&
-         "Only contigous datatypes are supported yet");
+  //assert(type_size == type_extent && lb == 0 &&
+  //       "Only contigous datatypes are supported yet");
   assert(type_size != MPI_UNDEFINED);
+
 
   int rank, numtasks;
   // Welchen rang habe ich?
@@ -107,12 +108,24 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   ucp_ep_h ep = OSC_UCX_GET_EP(module->comm, dest);
 
   request->ep = ep;
-  request->buf = buf;
-  request->dest = dest;
+  request->is_cont = (type_size == type_extent);
   request->size = type_size * count;
+
+  request->buf = buf;
+
+  if(!(request->is_cont)){
+    MPI_Pack_size(count, datatype, comm, &request->pack_size);
+    request->packed_buf = malloc(request->pack_size);
+  }
+
+  request->dest = dest;
+  request->dtype_size = type_size;
+  request->count = count;
+  request->dtype_extent = type_extent;
   request->tag = tag;
   request->backup_request = MPI_REQUEST_NULL;
   request->remote_data_addr = NULL;
+  request->dtype = datatype;
 
   request->communicators = find_comm(comm);
   assert(request->communicators != NULL);
