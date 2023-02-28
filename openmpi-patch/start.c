@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <ucp/api/ucp.h>
 
+#include "debug.h"
 #include "mpi-internals.h"
 
 #include <stdlib.h>
@@ -24,8 +25,8 @@ LINKAGE_TYPE void b_send(MPIOPT_Request *request) {
     // no possibility of data-race, the remote will wait for us to put the data
     assert(request->flag == request->operation_number * 2 + 2);
     // start rdma data transfer
-#ifdef STATISTIC_PRINTING
-    printf("send pushes data\n");
+#ifndef NDEBUG
+    add_operation_to_trace(request, "send pushes data");
 #endif
     request->flag_buffer = request->operation_number * 2 + 2;
 
@@ -75,8 +76,8 @@ LINKAGE_TYPE void b_recv(MPIOPT_Request *request) {
     // no possibility of data race, WE will advance the comm
     assert(request->flag == request->operation_number * 2 + 2);
     // start rdma data transfer
-#ifdef STATISTIC_PRINTING
-    printf("recv fetches data\n");
+#ifndef NDEBUG
+    add_operation_to_trace(request, "recv fetches data");
 #endif
 
     ucs_status_t status;
@@ -133,6 +134,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
 
+  send_rdma_info(request); // begin handshake
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
@@ -148,37 +150,10 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
 
   assert(request->operation_number == 1);
 
+  send_rdma_info(request); // begin handshake
+
   progress_recv_request_waiting_for_rdma(request);
-
-  // meaning no RDMA connection is presnt
-  if (request->remote_data_addr == NULL) {
-
-    int flag;
-    MPI_Iprobe(request->dest, request->tag,
-               request->communicators->original_communicator, &flag,
-               MPI_STATUS_IGNORE);
-    if (flag) {
-      // if probed for matching msg failed, but this msg arrived, we can be
-      // shure that no matching msg will be sent in the future
-      // as msg order is defined
-      assert(request->backup_request == MPI_REQUEST_NULL);
-      // post the matching recv
-      printf("Post RECV, Fallback in start\n");
-      MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
-                request->tag, request->communicators->original_communicator,
-                &request->backup_request);
-    }
-  } else {
-    // RDMA handshake complete, we can post the matching recv
-    if (request->backup_request == MPI_REQUEST_NULL) {
-      MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
-                request->tag, request->communicators->original_communicator,
-                &request->backup_request);
-    }
-  }
-
-  // ordering guarantees, that the probe for matching msg will return true
-  // before probe of the payload does
+  // the recv will be posted, after a check for the handshake was done
 }
 
 LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
@@ -188,8 +163,11 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
+  assert(is_sending_type(request));
+
   // TODO atomic increment for multi threading
   request->operation_number++;
+
   assert(request->flag >= request->operation_number * 2);
   assert(request->ucx_request_data_transfer == NULL &&
          request->ucx_request_flag_transfer == NULL);
@@ -205,7 +183,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
     }
     b_send(request);
 
-  } else if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
+
     start_send_when_searching_for_connection(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     assert(request->backup_request == MPI_REQUEST_NULL);
@@ -214,6 +193,9 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
               &request->backup_request);
 
   } else {
+
+    assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
+    assert(request->type != SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
   }
 #ifdef BUFFER_CONTENT_CHECKING
@@ -232,6 +214,8 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
+  assert(is_recv_type(request));
+
   // TODO atomic increment for multi threading
   request->operation_number++;
   assert(request->flag >= request->operation_number * 2);
@@ -241,7 +225,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   if (__builtin_expect(request->type == RECV_REQUEST_TYPE, 1)) {
     b_recv(request);
 
-  } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
     start_recv_when_searching_for_connection(request);
 
   } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
@@ -250,6 +234,8 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
               request->tag, request->communicators->original_communicator,
               &request->backup_request);
   } else {
+    assert(request->type != RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
+    assert(request->type != RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
     assert(false && "Error: uninitialized Request");
   }
 
@@ -263,10 +249,10 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 }
 
 LINKAGE_TYPE int MPIOPT_Start_internal(MPIOPT_Request *request) {
-
-  if (request->type == SEND_REQUEST_TYPE ||
-      request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
+#ifndef NDEBUG
+  add_operation_to_trace(request, "MPI_Start");
+#endif
+  if (is_sending_type(request)) {
     return MPIOPT_Start_send_internal(request);
   } else {
     return MPIOPT_Start_recv_internal(request);

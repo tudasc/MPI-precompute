@@ -9,6 +9,7 @@
 #endif
 
 OMPI_DECLSPEC int MPIOPT_Start(MPI_Request *request);
+OMPI_DECLSPEC int MPIOPT_Startall(int count, MPI_Request array_of_requests[]);
 OMPI_DECLSPEC int MPIOPT_Wait(MPI_Request *request, MPI_Status *status);
 OMPI_DECLSPEC int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
                                  MPI_Status array_of_statuses[]);

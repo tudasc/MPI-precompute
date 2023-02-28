@@ -39,6 +39,20 @@ int MPIOPT_Start(MPI_Request *request) {
   return MPIOPT_Start_internal((MPIOPT_Request *)*request);
 }
 
+int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
+  for (int i = 0; i < count; ++i) {
+    MPIOPT_Start(&array_of_requests[i]);
+  }
+#ifdef WAIT_ON_STARTALL_TO_PREVENT_CROSSTALK
+  usleep(WAIT_ON_STARTALL_WAIT_TIME);
+  int flag = 0;
+  for (int i = 0; i < count; ++i) {
+    MPIOPT_Test(&array_of_requests[i], &flag, MPI_STATUS_IGNORE);
+  }
+#endif
+  return 0;
+}
+
 int MPIOPT_Start_send(MPI_Request *request) {
   return MPIOPT_Start_send_internal((MPIOPT_Request *)*request);
 }
@@ -95,18 +109,6 @@ int MPIOPT_Testany(int count, MPI_Request array_of_requests[], int *index,
   return 0;
 }
 
-int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
-                   MPI_Status array_of_statuses[]) {
-  for (int i = 0; i < count; ++i) {
-    if (array_of_statuses == MPI_STATUSES_IGNORE) {
-      MPIOPT_Wait(&array_of_requests[i], MPI_STATUS_IGNORE);
-    } else {
-      MPIOPT_Wait(&array_of_requests[i], &array_of_statuses[i]);
-    }
-  }
-  return 0;
-}
-
 int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
                    MPI_Status array_of_statuses[]) {
   for (int i = 0; i < count; ++i) {
@@ -115,8 +117,17 @@ int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
     } else {
       MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
     }
-    if (!flag)
+    if (!*flag)
       return 0; // found one request not complete
+  }
+  return 0;
+}
+
+int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
+                   MPI_Status array_of_statuses[]) {
+  int flag = 0;
+  while (!flag) {
+    MPIOPT_Testall(count, array_of_requests, &flag, array_of_statuses);
   }
   return 0;
 }

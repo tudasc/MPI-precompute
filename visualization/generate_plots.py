@@ -8,13 +8,11 @@ import numpy as np
 import argparse
 import pandas as pd
 
-import seaborn as sns
-
 DATA_DIR = "/work/scratch/tj75qeje/mpi-comp-match/output/"
 
 
 CACHE_FILE = "cache.csv"
-PLTSIZE = (15, 8)
+PLTSIZE = (12, 8)
 PLTSIZE_BAR_PLT = (12, 4)
 PLTSIZE_VIOLIN_PLT = (15, 8)
 
@@ -185,7 +183,8 @@ def get_violin_plot(data, buffer_sizes, comp_time, plot_name, scaling=True, fill
             buf_size = buffer_sizes[i]
             i += 1
             x_tics.append(num_violins / 2 + current_bar * 2)
-            if eager:
+            # only plot eager for smaller message sizes
+            if eager and ax == axs[0]:
                 label, max_y = add_violin(ax, current_bar, data, EAGER, buf_size, comp_time, show_in_legend)
                 current_bar += 1
                 if show_in_legend:
@@ -309,6 +308,8 @@ def get_scaling_plot(data, buffer_sizes, comp_time,plot_name, scaling=True, fill
 
 
     ax.legend(loc='upper right',ncol=4)
+    max_y=8000/ 1e6
+
 
     if scaling:
         ax.set_ylim(0, max_y * 1.05)
@@ -472,9 +473,10 @@ def main():
 
     print("generating plots ...")
 
-    get_scaling_plot(data,buffer_sizes_scaling,comptime_for_barplots,"overhead_scaling",scaling=False)
+    get_scaling_plot(data,buffer_sizes_scaling,comptime_for_barplots,"overhead_scaling_full",scaling=False,eager=False,rendevouz1=False)
+    get_scaling_plot(data, buffer_sizes_scaling, comptime_for_barplots, "overhead_scaling", scaling=True,eager=False,rendevouz1=False)
     get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins",scaling=False)
-    get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins_scaled", scaling=True)
+    get_violin_plot(data, buffer_sizes, comptime_for_barplots, "overhead_violins_scaled", scaling=True,eager=False,rendevouz1=False)
 
     print("done")
 

@@ -18,8 +18,12 @@ job.out
 IMB-ASYNC/err/
 IMB-ASYNC/output/
 
+# backupo data from older measurements
+visualization/mearurement_2022_05_16.tar.gz
+
 
 #IDE specific
 .project
 .cproject
 .settings
+.idea

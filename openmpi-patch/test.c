@@ -5,6 +5,7 @@
 #include "handshake.h"
 #include "wait.h"
 
+#include "debug.h"
 #include "mpi-internals.h"
 
 #include <stdlib.h>
@@ -50,9 +51,9 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
     request->flag++; // recv is done at our side
     // no possibility of data race, WE will advance the comm
     assert(request->flag == request->operation_number * 2 + 2);
-#ifdef STATISTIC_PRINTING
-    printf("crosstalk detected\n");
-    printf("recv fetches data\n");
+#ifndef NDEBUG
+    add_operation_to_trace(request, "CROSSTALK DETECTED");
+    add_operation_to_trace(request, "recv fetches data");
 #endif
     ucs_status_t status;
     if(request->is_cont){
@@ -113,13 +114,18 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
 }
 
 LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
+#ifndef NDEBUG
+  add_operation_to_trace(request, "Progress_Request");
+#endif
   if (request->type == SEND_REQUEST_TYPE) {
     progress_send_request(request);
   } else if (request->type == RECV_REQUEST_TYPE) {
     progress_recv_request(request);
-  } else if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+             request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     progress_send_request_waiting_for_rdma(request);
-  } else if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
+  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+             request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
     progress_recv_request_waiting_for_rdma(request);
   } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
     int flag;
@@ -153,6 +159,9 @@ LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
 
 LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
                                       MPI_Status *status) {
+#ifndef NDEBUG
+  add_operation_to_trace(request, "MPI_Test");
+#endif
 
   if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
     status->MPI_TAG = request->tag;
@@ -191,6 +200,14 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
     } else
       *flag = 0;
   }
+
+  if (*flag) {
+    assert(request->type == SEND_REQUEST_TYPE ||
+           request->type == RECV_REQUEST_TYPE ||
+           request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
+           request->type == RECV_REQUEST_TYPE_USE_FALLBACK);
+  }
+
 #ifdef BUFFER_CONTENT_CHECKING
   if (*flag == 1) {
     // TODO buffer checking will break if the user tests a finished request

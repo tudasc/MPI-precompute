@@ -7,16 +7,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "debug.h"
+
 void MPIOPT_FINALIZE() {
   MPI_Win_free(&global_comm_win);
   assert(request_list_head->next == NULL); // list should be empty
   free(request_list_head);
-
-#ifdef STATISTIC_PRINTING
-  int rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  printf("Rank %d: Finalize\n", rank);
-#endif
 
   ucp_context_h context = mca_osc_ucx_component.ucp_context;
 
@@ -26,13 +22,13 @@ void MPIOPT_FINALIZE() {
 
     if (req != NULL) {
       free(req->rdma_info_buf);
-      // release all RDMA ressources
+      // release all RDMA resources
 
-      if (req->type == RECV_REQUEST_TYPE || req->type == SEND_REQUEST_TYPE) {
-        // otherwise all these resources where never acquired
+      if (req->type == RECV_REQUEST_TYPE || req->type == SEND_REQUEST_TYPE ||
+          req->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+          req->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
+        // otherwise this resource was never acquired
         ucp_mem_unmap(context, req->mem_handle_flag);
-        ucp_rkey_destroy(req->remote_flag_rkey);
-
         // ucp_mem_unmap(context, req->mem_handle_data); // was freed before
       }
 
@@ -68,43 +64,37 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
 #ifdef DISTINGUISH_ACTIVE_REQUESTS
   assert(request->active == 0);
 #endif
+#ifndef NDEBUG
+  add_operation_to_trace(request, "MPI_Request_Free");
+  dump_trace_to_file(request);
+  free_debug_data(request);
+#endif
 
   // cancel any search for RDMA connection, if necessary
   // completing the handshake, if necessary so that other rank will not deadlock
-  if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION) {
-
-    MPI_Comm comm_to_use =
-        request->communicators->handshake_response_communicator;
-    if (request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION)
-      comm_to_use = request->communicators->handshake_communicator;
-
-    int flag = 0;
-    MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
-               MPI_STATUS_IGNORE);
-    if (flag) {
-      // found matching counterpart
-      receive_rdma_info(request);
+  if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
+      request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
+#ifdef WARN_ON_REQUEST_FREE
+    printf("WARNING: Freeing a request before using it may lead to deadlock\n");
+#endif
+    // clean up all RDMA related resources anyway
+    ucp_context_h context = mca_osc_ucx_component.ucp_context;
+    // ucp_mem_unmap(context, request->mem_handle_flag);// deferred
+    ucp_mem_unmap(context, request->mem_handle_data);
+    if (request->remote_data_rkey != NULL) {
+      ucp_rkey_destroy(request->remote_data_rkey);
+    }
+    if (request->remote_flag_rkey != NULL) {
+      ucp_rkey_destroy(request->remote_flag_rkey);
     }
   }
 
-#ifdef STATISTIC_PRINTING
-  int rank = 0;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == SEND_REQUEST_TYPE ||
-      request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
-    printf("Rank %d: SENDING: Request Free\n", rank);
-  } else {
-    printf("Rank %d: RECV: Request Free \n", rank);
-  }
-#endif
   remove_request_from_list(request);
 
   // defer free of memory until finalize, as the other process may start an RDMA
   // communication ON THE FLAG, not on the data which may lead to error, if we
-  // free the mem beforehand but we can unmap the data part, as the oter process
-  // will not rdma to it
+  // free the mem beforehand. but we can unmap the data part, as the other
+  // process will not rdma to it
   if (request->type == RECV_REQUEST_TYPE ||
       request->type == SEND_REQUEST_TYPE) {
 
@@ -114,6 +104,7 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
     // ucp_mem_unmap(context, request->mem_handle_flag);// deferred
     ucp_mem_unmap(context, request->mem_handle_data);
     ucp_rkey_destroy(request->remote_data_rkey);
+    ucp_rkey_destroy(request->remote_flag_rkey);
   }
 
   struct list_elem *new_elem = malloc(sizeof(struct list_elem));

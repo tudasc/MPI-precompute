@@ -2,7 +2,9 @@
 
 #small helper, that submits all 4 job arrays one for each communication mode
 
-N_PARAM="-n 2 --tasks-per-node 1"
+#N_PARAM="-n 384 --tasks-per-node 96"
+N_PARAM="-n 192 --tasks-per-node 96"
+#N_PARAM="-n 2 --tasks-per-node 1 --exclusive"
 
 export MODE=normal
 # 0,1,2,3 for normal,rendevouz1,rendevouz2,eager
