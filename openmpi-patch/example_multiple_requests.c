@@ -25,7 +25,7 @@
 #define SEND 3
 #define RECEIVED 4
 
-#define NUM_REQUESTS 10
+#define NUM_REQUESTS 3
 
 #define DUMMY_WLOAD_TIME 10
 
@@ -40,7 +40,7 @@
 
 // 10KB
 #define BUFFER_SIZE 10000
-#define NUM_ITERS 100000
+#define NUM_ITERS 10
 
 //#define BUFFER_SIZE 10
 //#define NUM_ITERS 10
@@ -102,13 +102,13 @@ void use_self_implemented_comm() {
     for (int i = 0; i < N * NUM_REQUESTS; ++i) {
       buffer[i] = rank * i * n;
     }
-    for (int i = 0; i < NUM_REQUESTS; ++i) {
-      MPIOPT_Start(&reqs[i]);
-    }
+
+    MPIOPT_Startall(NUM_REQUESTS, reqs);
+
     dummy_workload(work_buffer);
-    for (int i = 0; i < NUM_REQUESTS; ++i) {
-      MPIOPT_Wait(&reqs[i], MPI_STATUS_IGNORE);
-    }
+
+    MPIOPT_Waitall(NUM_REQUESTS, reqs, MPI_STATUSES_IGNORE);
+
     /*int flag = 0;
     while (!flag) {
       MPIOPT_Test(&reqs, &flag, MPI_STATUS_IGNORE);
