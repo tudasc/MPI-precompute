@@ -1,5 +1,6 @@
 #include "test.h"
 #include "globals.h"
+#include "request_type.h"
 #include "settings.h"
 
 #include "handshake.h"

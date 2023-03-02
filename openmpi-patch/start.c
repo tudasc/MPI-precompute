@@ -17,7 +17,7 @@ static void empty_function_in_start_c(void *request, ucs_status_t status) {
   // callback if flush is completed
 }
 
-LINKAGE_TYPE void b_send(MPIOPT_Request *request) {
+LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
 
   if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 1)) {
     // increment: signal that WE finish the operation on the remote
@@ -58,7 +58,7 @@ LINKAGE_TYPE void b_send(MPIOPT_Request *request) {
   }
 }
 
-LINKAGE_TYPE void b_recv(MPIOPT_Request *request) {
+LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
   if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 0)) {
 
     request->flag++; // recv is done at our side
@@ -147,7 +147,8 @@ LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request) {
   // TODO atomic increment for multi threading
   request->operation_number++;
 
-  assert(request->flag >= request->operation_number * 2 || request->type==SEND_REQUEST_TYPE_USE_FALLBACK);
+  assert(request->flag >= request->operation_number * 2 ||
+         request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
   assert(request->ucx_request_data_transfer == NULL &&
          request->ucx_request_flag_transfer == NULL);
 
@@ -189,7 +190,8 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
 
   // TODO atomic increment for multi threading
   request->operation_number++;
-  assert(request->flag >= request->operation_number * 2 || request->type==RECV_REQUEST_TYPE_USE_FALLBACK);
+  assert(request->flag >= request->operation_number * 2 ||
+         request->type == RECV_REQUEST_TYPE_USE_FALLBACK);
   assert(request->ucx_request_data_transfer == NULL &&
          request->ucx_request_flag_transfer == NULL);
 

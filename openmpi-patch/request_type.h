@@ -21,9 +21,17 @@
 #define SEND_REQUEST_TYPE_NULL 11
 #define RECV_REQUEST_TYPE_NULL 12
 
+struct mpiopt_request; // forward declaration of struct type
+typedef struct mpiopt_request MPIOPT_Request;
+// BEFORE including other headers
+
 #include <mpi.h>
 
 #include "settings.h"
+
+#include "handshake.h"
+#include "start.h"
+#include "test.h"
 
 #include <stdbool.h>
 #include <ucp/api/ucp.h>
@@ -35,9 +43,15 @@
 struct debug_data;
 #endif
 
+typedef int (*mpiopt_request_start_fn_t)(MPIOPT_Request *request);
+typedef int (*mpiopt_request_test_fn_t)(MPIOPT_Request *request, int *flag,
+                                        MPI_Status *status);
+
 struct mpiopt_request {
   // this way the request ptr can be used as a normal request ptr as well
   struct ompi_request_t original_request;
+  mpiopt_request_start_fn_t start_fn;
+  mpiopt_request_test_fn_t test_fn;
   int flag;
   int flag_buffer;
   uint64_t remote_data_addr;
@@ -75,7 +89,6 @@ struct mpiopt_request {
   struct debug_data *debug_data;
 #endif
 };
-typedef struct mpiopt_request MPIOPT_Request;
 
 static inline bool is_sending_type(MPIOPT_Request *request) {
   // odd
@@ -99,6 +112,54 @@ static inline bool is_recv_type(MPIOPT_Request *request) {
   static_assert(RECV_REQUEST_TYPE % 2 == 0, "");
   static_assert(RECV_REQUEST_TYPE_USE_FALLBACK % 2 == 0, "");
   static_assert(RECV_REQUEST_TYPE_NULL % 2 == 0, "");
+}
+
+// inlining should remove the switch
+static inline void set_request_type(MPIOPT_Request *request, int new_type) {
+  switch (new_type) {
+  case SEND_REQUEST_TYPE:
+    request->start_fn = &b_send;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case RECV_REQUEST_TYPE:
+    request->start_fn = &b_recv;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case SEND_REQUEST_TYPE_USE_FALLBACK:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case RECV_REQUEST_TYPE_USE_FALLBACK:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case SEND_REQUEST_TYPE_HANDSHAKE_INITIATED:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case RECV_REQUEST_TYPE_HANDSHAKE_INITIATED:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  case RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS:
+    request->start_fn = &MPIOPT_Start_internal;
+    request->test_fn = &MPIOPT_Test_internal;
+    break;
+  default:
+    assert(false);
+  }
 }
 
 #endif // MPIOPT_REQUEST_TYPE_H

@@ -5,6 +5,9 @@
 #include "settings.h"
 #include <mpi.h>
 
+LINKAGE_TYPE int b_send(MPIOPT_Request *request);
+LINKAGE_TYPE int b_recv(MPIOPT_Request *request);
+
 LINKAGE_TYPE int MPIOPT_Start_send_internal(MPIOPT_Request *request);
 LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request);
 LINKAGE_TYPE int MPIOPT_Start_internal(MPIOPT_Request *request);
