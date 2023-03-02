@@ -90,13 +90,16 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
                status);
       MPI_Wait(&request->rdma_exchange_request_send, MPI_STATUS_IGNORE);
       // other rank must be active as we have received the payload
-      set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
+      set_request_type(request, RECV_REQUEST_TYPE);
+      // indicate that this request has finished
+      request->flag = 4;
     } else {
       // post the matching receive, blocking as we have probed
       MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest,
                request->tag, request->communicators->original_communicator,
                status);
       set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
+      request->flag = 4;
     }
     *flag = 1;
   } // end if payload arrived
