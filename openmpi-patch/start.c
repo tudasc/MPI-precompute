@@ -19,6 +19,8 @@ static void empty_function_in_start_c(void *request, ucs_status_t status) {
 
 LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
 
+  request->operation_number++;
+
   if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 1)) {
     // increment: signal that WE finish the operation on the remote
     request->flag++;
@@ -59,6 +61,8 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
 }
 
 LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
+
+  request->operation_number++;
   if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 0)) {
 
     request->flag++; // recv is done at our side
@@ -186,6 +190,7 @@ LINKAGE_TYPE int MPIOPT_Start_recv_internal(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
+  printf("Type:%d\n", request->type);
   assert(is_recv_type(request));
 
   // TODO atomic increment for multi threading

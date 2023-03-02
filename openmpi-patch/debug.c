@@ -2,10 +2,10 @@
 #ifndef NDEBUG
 
 #define _POSIX_C_SOURCE 200809L
+#include "request_type.h"
 
 #include "debug.h"
 #include "globals.h"
-#include "request_type.h"
 #include "settings.h"
 
 #include <assert.h>

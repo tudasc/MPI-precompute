@@ -197,9 +197,7 @@ LINKAGE_TYPE int MPIOPT_Wait_internal(MPIOPT_Request *request,
 #ifdef BUFFER_CONTENT_CHECKING
   assert(request->chekcking_request != MPI_REQUEST_NULL);
   MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
-  if (request->type == SEND_REQUEST_TYPE ||
-      request->type == SEND_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-      request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
+  if (is_recv_type(request)) {
     int buffer_has_expected_content =
         memcmp(request->checking_buf, request->buf, request->size);
     assert(buffer_has_expected_content == 0 &&

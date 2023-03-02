@@ -1,7 +1,8 @@
-#include "test.h"
-#include "globals.h"
 #include "request_type.h"
+
+#include "globals.h"
 #include "settings.h"
+#include "test.h"
 
 #include "handshake.h"
 #include "wait.h"
@@ -207,9 +208,7 @@ LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
     // TODO buffer checking will break if the user tests a finished request
     assert(request->chekcking_request != MPI_REQUEST_NULL);
     MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
-    if (request->type == RECV_REQUEST_TYPE ||
-        request->type == RECV_REQUEST_TYPE_SEARCH_FOR_RDMA_CONNECTION ||
-        request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
+    if (is_recv_type(request)) {
       int buffer_has_expected_content =
           memcmp(request->checking_buf, request->buf, request->size);
       assert(buffer_has_expected_content == 0 &&

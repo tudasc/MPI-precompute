@@ -36,7 +36,8 @@ int MPIOPT_Recv_init(void *buf, int count, MPI_Datatype datatype, int source,
 }
 
 int MPIOPT_Start(MPI_Request *request) {
-  return MPIOPT_Start_internal((MPIOPT_Request *)*request);
+  MPIOPT_Request *req = (MPIOPT_Request *)*request;
+  return req->start_fn(req);
 }
 
 int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
@@ -53,28 +54,19 @@ int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
   return 0;
 }
 
-int MPIOPT_Start_send(MPI_Request *request) {
-  return MPIOPT_Start_send_internal((MPIOPT_Request *)*request);
-}
-
-int MPIOPT_Start_recv(MPI_Request *request) {
-  return MPIOPT_Start_recv_internal((MPIOPT_Request *)*request);
-}
-
-int MPIOPT_Wait_send(MPI_Request *request, MPI_Status *status) {
-  return MPIOPT_Wait_send_internal((MPIOPT_Request *)*request, status);
-}
-
-int MPIOPT_Wait_recv(MPI_Request *request, MPI_Status *status) {
-  return MPIOPT_Wait_recv_internal((MPIOPT_Request *)*request, status);
-}
-
 int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
-  return MPIOPT_Wait_internal((MPIOPT_Request *)*request, status);
+  MPIOPT_Request *req = (MPIOPT_Request *)*request;
+  mpiopt_request_test_fn_t test_fn = req->test_fn; // hoist read out of loop
+  int flag;
+  while (!flag) {
+    test_fn(req, &flag, status);
+  }
+  return MPI_SUCCESS;
 }
 
 int MPIOPT_Test(MPI_Request *request, int *flag, MPI_Status *status) {
-  return MPIOPT_Test_internal((MPIOPT_Request *)*request, flag, status);
+  MPIOPT_Request *req = (MPIOPT_Request *)*request;
+  return req->test_fn(req, flag, status);
 }
 
 int MPIOPT_Waitany(int count, MPI_Request array_of_requests[], int *index,

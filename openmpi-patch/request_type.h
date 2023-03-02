@@ -29,11 +29,13 @@ typedef struct mpiopt_request MPIOPT_Request;
 
 #include "settings.h"
 
+#include "debug.h"
 #include "handshake.h"
 #include "start.h"
 #include "test.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <ucp/api/ucp.h>
 #include <unistd.h>
 
@@ -116,6 +118,7 @@ static inline bool is_recv_type(MPIOPT_Request *request) {
 
 // inlining should remove the switch
 static inline void set_request_type(MPIOPT_Request *request, int new_type) {
+  request->type = new_type;
   switch (new_type) {
   case SEND_REQUEST_TYPE:
     request->start_fn = &b_send;
@@ -160,6 +163,15 @@ static inline void set_request_type(MPIOPT_Request *request, int new_type) {
   default:
     assert(false);
   }
+
+#ifndef NDEBUG
+#define TRACE_MSG_SIZE 20
+  char *msg = (char *)malloc(TRACE_MSG_SIZE);
+  sprintf(msg, "Change Type to %d", new_type);
+  add_operation_to_trace(request, msg);
+  free(msg);
+#undef TRACE_MSG_SIZE
+#endif
 }
 
 #endif // MPIOPT_REQUEST_TYPE_H

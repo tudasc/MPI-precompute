@@ -39,7 +39,7 @@ progress_send_request_handshake_begin(MPIOPT_Request *request) {
     if (flag) {
       // found matching counterpart
       begin_handshake_response(request);
-      request->type = SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
+      set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
       progress_send_request_handshake_end(request);
     }
   }
@@ -56,7 +56,7 @@ progress_send_request_handshake_begin(MPIOPT_Request *request) {
         if (flag) {
           // found matching counterpart
           begin_handshake_response(request);
-          request->type = SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
+          set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
           progress_send_request_handshake_end(request);
         } else {
           // indicate that this request has finished
@@ -64,7 +64,7 @@ progress_send_request_handshake_begin(MPIOPT_Request *request) {
 
           // the Ssend was successful, meaning the other process has NOT matched
           // with a persistent operation
-          request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
+          set_request_type(request, SEND_REQUEST_TYPE_USE_FALLBACK);
 #ifndef NDEBUG
           add_operation_to_trace(
               request, "Handshake failed: no response in time, use fallback");
@@ -120,10 +120,10 @@ progress_recv_request_handshake_begin(MPIOPT_Request *request) {
       if (flag) {
         // found matching handshake
         begin_handshake_response(request);
-        request->type = RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
+        set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
         progress_recv_request_handshake_end(request);
       } else {
-        request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
+        set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
       }
       // post the matching receive
       assert(request->backup_request == MPI_REQUEST_NULL);
@@ -249,9 +249,9 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   ucp_rkey_buffer_release(rkey_buffer_data);
 
   if (is_recv_type(request)) {
-    request->type = RECV_REQUEST_TYPE_HANDSHAKE_INITIATED;
+    set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
   } else {
-    request->type = SEND_REQUEST_TYPE_HANDSHAKE_INITIATED;
+    set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
   }
 }
 
@@ -305,9 +305,11 @@ LINKAGE_TYPE void begin_handshake_response(MPIOPT_Request *request) {
   free(tmp_buf);
 
   if (is_sending_type(request)) {
-    request->type = SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
+
+    set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
+
   } else {
-    request->type = RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS;
+    set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
   }
 }
 
@@ -329,10 +331,10 @@ LINKAGE_TYPE void complete_handshake(MPIOPT_Request *request) {
                // operation by now therefore >= instead of ==
     request->flag = 4; // done with this communication
     if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
-      request->type = SEND_REQUEST_TYPE;
+      set_request_type(request, SEND_REQUEST_TYPE);
     } else {
       assert(request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-      request->type = RECV_REQUEST_TYPE;
+      set_request_type(request, RECV_REQUEST_TYPE);
     }
   }
 }
