@@ -17,8 +17,27 @@ static void empty_function_in_test_c(void *request, ucs_status_t status) {
   // callback if flush is completed
 }
 
-LINKAGE_TYPE void progress_send_request(MPIOPT_Request *request) {
+inline static void set_mpi_status(MPIOPT_Request *request, MPI_Status *status) {
+  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
+    status->MPI_TAG = request->tag;
+    status->MPI_SOURCE = request->dest;
+    status->MPI_ERROR = MPI_SUCCESS;
+  }
+}
+
+LINKAGE_TYPE int test_send_request(MPIOPT_Request *request, int *flag,
+                                   MPI_Status *status) {
   assert(request->type == SEND_REQUEST_TYPE);
+#ifndef NDEBUG
+  add_operation_to_trace(request, "Progress_Request");
+#endif
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  if (request->active == 0) {
+    *flag = 1;
+    return MPI_SUCCESS;
+  }
+#endif
+
   // progress
   ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
 
@@ -38,10 +57,35 @@ LINKAGE_TYPE void progress_send_request(MPIOPT_Request *request) {
       request->ucx_request_data_transfer = NULL;
     }
   }
+
+  if (__builtin_expect(request->flag >= request->operation_number * 2 + 2 &&
+                           request->ucx_request_flag_transfer == NULL &&
+                           request->ucx_request_data_transfer == NULL,
+                       1)) {
+    // request is finished
+    *flag = 1;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+    request->active = 0;
+#endif
+    set_mpi_status(request, status);
+  } else {
+    *flag = 0;
+  }
+  return MPI_SUCCESS;
 }
 
-LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
+LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
+                                   MPI_Status *status) {
   assert(request->type == RECV_REQUEST_TYPE);
+#ifndef NDEBUG
+  add_operation_to_trace(request, "Progress_Request");
+#endif
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  if (request->active == 0) {
+    *flag = 1;
+    return MPI_SUCCESS;
+  }
+#endif
   // check for crosstalk
   if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 0)) {
     assert(request->ucx_request_data_transfer == NULL);
@@ -106,35 +150,26 @@ LINKAGE_TYPE void progress_recv_request(MPIOPT_Request *request) {
       request->ucx_request_data_transfer = NULL;
     }
   }
+  if (__builtin_expect(request->flag >= request->operation_number * 2 + 2 &&
+                           request->ucx_request_flag_transfer == NULL &&
+                           request->ucx_request_data_transfer == NULL,
+                       1)) {
+    // request is finished
+    *flag = 1;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+    request->active = 0;
+#endif
+    set_mpi_status(request, status);
+  } else {
+    *flag = 0;
+  }
+  return MPI_SUCCESS;
 }
 
 LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
-#ifndef NDEBUG
-  add_operation_to_trace(request, "Progress_Request");
-#endif
-  if (request->type == SEND_REQUEST_TYPE) {
-    progress_send_request(request);
-  } else if (request->type == RECV_REQUEST_TYPE) {
-    progress_recv_request(request);
-  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
-             request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
-    progress_send_request_waiting_for_rdma(request);
-  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED ||
-             request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
-    progress_recv_request_waiting_for_rdma(request);
-  } else if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK) {
-    int flag;
-    // progress the fallback communication
-    MPI_Test(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
-  } else if (request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
-    int flag;
-    // progress the fallback communication
-    MPI_Test(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
-  } else {
-    assert((request->type != RECV_REQUEST_TYPE_NULL ||
-            request->type != SEND_REQUEST_TYPE_NULL) &&
-           "Error: uninitialized Request");
-  }
+  int flag;
+  // progress the fallback communication
+  request->test_fn(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
 }
 
 // call if one get stuck while waiting for a request to complete: progresses all
@@ -152,70 +187,13 @@ LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
   }
 }
 
-LINKAGE_TYPE int MPIOPT_Test_internal(MPIOPT_Request *request, int *flag,
-                                      MPI_Status *status) {
-#ifndef NDEBUG
-  add_operation_to_trace(request, "MPI_Test");
-#endif
+LINKAGE_TYPE int test_fallback(MPIOPT_Request *request, int *flag,
+                               MPI_Status *status) {
+  return MPI_Test(request->backup_request, flag, status);
+}
 
-  if (__builtin_expect(status != MPI_STATUS_IGNORE, 0)) {
-    status->MPI_TAG = request->tag;
-    status->MPI_SOURCE = request->dest;
-    status->MPI_ERROR = MPI_SUCCESS;
-  }
-
-#ifdef DISTINGUISH_ACTIVE_REQUESTS
-  if (request->active == 0) {
-    *flag = 1;
-    return MPI_SUCCESS;
-  }
-#endif
-
-  int ret_status = 0;
-  if (request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
-      request->type == RECV_REQUEST_TYPE_USE_FALLBACK) {
-    ret_status = MPI_Test(&request->backup_request, flag, status);
-#ifdef DISTINGUISH_ACTIVE_REQUESTS
-    if (*flag)
-      request->active = 0;
-#endif
-  } else {
-    progress_request(request);
-    // it is possible, that the other rank already started the next operation,
-    // therefore
-    // >=
-    if (request->flag >= request->operation_number * 2 + 2 &&
-        request->ucx_request_flag_transfer == NULL &&
-        request->ucx_request_data_transfer == NULL) {
-      // request is finished
-      *flag = 1;
-#ifdef DISTINGUISH_ACTIVE_REQUESTS
-      request->active = 0;
-#endif
-    } else
-      *flag = 0;
-  }
-
-  if (*flag) {
-    assert(request->type == SEND_REQUEST_TYPE ||
-           request->type == RECV_REQUEST_TYPE ||
-           request->type == SEND_REQUEST_TYPE_USE_FALLBACK ||
-           request->type == RECV_REQUEST_TYPE_USE_FALLBACK);
-  }
-
-#ifdef BUFFER_CONTENT_CHECKING
-  if (*flag == 1) {
-    // TODO buffer checking will break if the user tests a finished request
-    assert(request->chekcking_request != MPI_REQUEST_NULL);
-    MPI_Wait(&request->chekcking_request, MPI_STATUS_IGNORE);
-    if (is_recv_type(request)) {
-      int buffer_has_expected_content =
-          memcmp(request->checking_buf, request->buf, request->size);
-      assert(buffer_has_expected_content == 0 &&
-             "Error, The buffer has not the content of the message");
-    }
-  }
-#endif
-
-  return ret_status;
+// does nothing (for non-active requests)
+LINKAGE_TYPE int test_empty(MPIOPT_Request *request, int *flag,
+                            MPI_Status *status) {
+  *flag = 1;
 }

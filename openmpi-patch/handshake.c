@@ -1,6 +1,7 @@
-#include "handshake.h"
-#include "globals.h"
 #include "request_type.h"
+
+#include "globals.h"
+#include "handshake.h"
 #include "settings.h"
 #include "test.h"
 
@@ -10,146 +11,83 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-LINKAGE_TYPE void begin_handshake_response(MPIOPT_Request *request);
-
 LINKAGE_TYPE void complete_handshake(MPIOPT_Request *request);
 
-LINKAGE_TYPE void
-progress_send_request_handshake_begin(MPIOPT_Request *request);
-
-LINKAGE_TYPE void progress_send_request_handshake_end(MPIOPT_Request *request);
-
-LINKAGE_TYPE void
-progress_recv_request_handshake_begin(MPIOPT_Request *request);
-
-LINKAGE_TYPE void progress_recv_request_handshake_end(MPIOPT_Request *request);
-
-LINKAGE_TYPE void
-progress_send_request_handshake_begin(MPIOPT_Request *request) {
-
+LINKAGE_TYPE int progress_send_request_handshake_begin(MPIOPT_Request *request,
+                                                       int *flag,
+                                                       MPI_Status *status) {
+#ifndef NDEBUG
+  add_operation_to_trace(request, "Progress_Request");
+#endif
+  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
   MPI_Comm comm_to_use =
       request->communicators->handshake_response_communicator;
-  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
-  if (request->remote_data_addr == NULL) {
+  assert(request->remote_data_addr == NULL);
+  int local_flag = 0;
+  MPI_Test(&request->backup_request, &local_flag, status); // payload
 
-    int flag;
-
-    MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
+  if (local_flag) {
+    // check if handshake response arrived
+    local_flag = 0;
+    MPI_Iprobe(request->dest, request->tag, comm_to_use, &local_flag,
                MPI_STATUS_IGNORE);
-    if (flag) {
+    if (local_flag) {
       // found matching counterpart
-      begin_handshake_response(request);
-      set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-      progress_send_request_handshake_end(request);
-    }
-  }
-
-  if (request->backup_request != MPI_REQUEST_NULL &&
-      request->operation_number == 1) {
-    int flag = 0;
-    MPI_Test(&request->backup_request, &flag, MPI_STATUS_IGNORE); // payload
-    // try one last time to get the handshake
-    if (flag) {
-      if (request->remote_data_addr == NULL) {
-        MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
-                   MPI_STATUS_IGNORE);
-        if (flag) {
-          // found matching counterpart
-          begin_handshake_response(request);
-          set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-          progress_send_request_handshake_end(request);
-        } else {
-          // indicate that this request has finished
-          request->flag = 4;
-
-          // the Ssend was successful, meaning the other process has NOT matched
-          // with a persistent operation
-          set_request_type(request, SEND_REQUEST_TYPE_USE_FALLBACK);
-#ifndef NDEBUG
-          add_operation_to_trace(
-              request, "Handshake failed: no response in time, use fallback");
-#endif
-        }
-      }
-    }
-  }
-}
-
-LINKAGE_TYPE void progress_send_request_handshake_end(MPIOPT_Request *request) {
-  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-  assert(request->operation_number <= 1);
-  if (request->operation_number == 1) {
-    int flag = 0;
-    MPI_Test(&request->backup_request, &flag, MPI_STATUS_IGNORE); // payload
-    if (flag) {
-      // only end the handshake once the payload arrived
       complete_handshake(request);
+      set_request_type(request, SEND_REQUEST_TYPE);
+      request->flag = 4;
+    } else {
+      // indicate that this request has finished
+      request->flag = 4;
+      // the Ssend was successful, meaning the other process has NOT matched
+      // with a persistent operation
+      set_request_type(request, SEND_REQUEST_TYPE_USE_FALLBACK);
+#ifndef NDEBUG
+      add_operation_to_trace(
+          request, "Handshake failed: no response in time, use fallback");
+#endif
     }
-  }
+    // local op has finished regardless if handshake was successful or not
+    *flag = 1;
+
+  } // end if payload was received
 }
 
-LINKAGE_TYPE void
-progress_send_request_waiting_for_rdma(MPIOPT_Request *request) {
-  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
-         request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-
-  if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED) {
-    progress_send_request_handshake_begin(request);
-  } else if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
-    progress_send_request_handshake_end(request);
-  }
-}
-
-LINKAGE_TYPE void
-progress_recv_request_handshake_begin(MPIOPT_Request *request) {
-
+LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
+                                                       int *flag,
+                                                       MPI_Status *status) {
+#ifndef NDEBUG
+  add_operation_to_trace(request, "Progress_Request");
+#endif
   assert(request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
-  if (request->operation_number == 1) {
-    int flag = 0;
-    // check if the payload has arrived
-    MPI_Iprobe(request->dest, request->tag,
-               request->communicators->original_communicator, &flag,
-               MPI_STATUS_IGNORE);
 
-    if (flag) {
-      int flag = 0;
-      MPI_Comm comm_to_use = request->communicators->handshake_communicator;
+  int local_flag = 0;
+  // check if the payload has arrived
+  MPI_Iprobe(request->dest, request->tag,
+             request->communicators->original_communicator, &local_flag,
+             MPI_STATUS_IGNORE);
 
-      MPI_Iprobe(request->dest, request->tag, comm_to_use, &flag,
-                 MPI_STATUS_IGNORE);
-      if (flag) {
-        // found matching handshake
-        begin_handshake_response(request);
-        set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-        progress_recv_request_handshake_end(request);
-      } else {
-        set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
-      }
-      // post the matching receive
-      assert(request->backup_request == MPI_REQUEST_NULL);
-      // blocking, as we have probed before
-      MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest,
-               request->tag, request->communicators->original_communicator,
+  if (local_flag) {
+    local_flag = 0;
+    MPI_Comm comm_to_use = request->communicators->handshake_communicator;
+
+    // check for handshake
+    MPI_Iprobe(request->dest, request->tag, comm_to_use, &local_flag,
                MPI_STATUS_IGNORE);
+    if (local_flag) {
+      // found matching handshake
+      complete_handshake(request);
+      set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
+    } else {
+      set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
     }
-  }
-}
-
-LINKAGE_TYPE void progress_recv_request_handshake_end(MPIOPT_Request *request) {
-  assert(request->operation_number == 1);
-  // payload already arrived at this stage
-  complete_handshake(request);
-}
-
-LINKAGE_TYPE void
-progress_recv_request_waiting_for_rdma(MPIOPT_Request *request) {
-
-  if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED) {
-    progress_recv_request_handshake_begin(request);
-  } else if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
-    progress_recv_request_handshake_end(request);
-  }
-  // else: Handshake not started: nothing to do, operation is not active
+    // post the matching receive
+    assert(request->backup_request == MPI_REQUEST_NULL);
+    // blocking, as we have probed before
+    MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
+             request->communicators->original_communicator, status);
+    *flag = 1;
+  } // end if payload arrived
 }
 
 // exchanges the RDMA info and maps all mem for RDMA op
@@ -255,10 +193,8 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   }
 }
 
-// begins the handshake if we found that the other rank is participating
-LINKAGE_TYPE void begin_handshake_response(MPIOPT_Request *request) {
-  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED ||
-         request->type == RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
+LINKAGE_TYPE void complete_handshake(MPIOPT_Request *request) {
+
 #ifndef NDEBUG
   add_operation_to_trace(request, "Handshake response");
 #endif
@@ -304,37 +240,11 @@ LINKAGE_TYPE void begin_handshake_response(MPIOPT_Request *request) {
 
   free(tmp_buf);
 
-  if (is_sending_type(request)) {
-
-    set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-
-  } else {
-    set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-  }
-}
-
-LINKAGE_TYPE void complete_handshake(MPIOPT_Request *request) {
-
-  assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS ||
-         request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-
+  // TODO this may deadlock (?)
+  MPI_Wait(&request->rdma_exchange_request_send, MPI_STATUS_IGNORE);
   // the other process has to recv the matching handshake msg sometime
-  int flag;
-  MPI_Test(&request->rdma_exchange_request_send, &flag, MPI_STATUS_IGNORE);
-  if (flag) {
+
 #ifndef NDEBUG
-    add_operation_to_trace(request, "completed Handshake");
+  add_operation_to_trace(request, "completed Handshake");
 #endif
-    assert(request->operation_number == 1);
-    assert(request->flag >=
-           2); // other rank could have completed the handshake AND started nex
-               // operation by now therefore >= instead of ==
-    request->flag = 4; // done with this communication
-    if (request->type == SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS) {
-      set_request_type(request, SEND_REQUEST_TYPE);
-    } else {
-      assert(request->type == RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS);
-      set_request_type(request, RECV_REQUEST_TYPE);
-    }
-  }
 }

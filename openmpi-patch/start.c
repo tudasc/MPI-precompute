@@ -146,7 +146,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
-  send_rdma_info(request); // begin handshake
+  send_rdma_info(request); // begin handshake, changes request type
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
@@ -154,7 +154,6 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
              request->communicators->original_communicator,
              &request->backup_request);
   // and listen for rdma handshake
-  progress_send_request_waiting_for_rdma(request);
 }
 
 LINKAGE_TYPE int
@@ -170,10 +169,7 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
   request->active = 1;
 #endif
 
-  send_rdma_info(request); // begin handshake
-
-  progress_recv_request_waiting_for_rdma(request);
-  // the recv will be posted, after a check for the handshake was done
+  send_rdma_info(request); // begin handshake, changes request type
 }
 
 LINKAGE_TYPE int start_send_fallback(MPIOPT_Request *request) {

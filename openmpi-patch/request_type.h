@@ -122,47 +122,47 @@ static inline void set_request_type(MPIOPT_Request *request, int new_type) {
   switch (new_type) {
   case SEND_REQUEST_TYPE:
     request->start_fn = &b_send;
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &test_send_request;
     break;
   case RECV_REQUEST_TYPE:
     request->start_fn = &b_recv;
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &test_recv_request;
     break;
   case SEND_REQUEST_TYPE_USE_FALLBACK:
     request->start_fn = &start_send_fallback;
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &test_fallback;
     break;
   case RECV_REQUEST_TYPE_USE_FALLBACK:
     request->start_fn = &start_recv_fallback;
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &test_fallback;
     break;
   case SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED:
     request->start_fn = &start_send_when_searching_for_connection;
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &test_fallback;
     break;
   case RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED:
     request->start_fn = &start_recv_when_searching_for_connection;
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &test_fallback;
     break;
   case SEND_REQUEST_TYPE_HANDSHAKE_INITIATED:
     request->start_fn =
         NULL; // request is in progress and could not be started anyway
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &progress_send_request_handshake_begin;
     break;
   case RECV_REQUEST_TYPE_HANDSHAKE_INITIATED:
     request->start_fn =
         NULL; // request is in progress and could not be started anyway
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = &progress_recv_request_handshake_begin;
     break;
   case SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS:
     request->start_fn =
         NULL; // request is in progress and could not be started anyway
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = NULL; // TODO status is empty
     break;
   case RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS:
     request->start_fn =
         NULL; // request is in progress and could not be started anyway
-    request->test_fn = &MPIOPT_Test_internal;
+    request->test_fn = NULL; // TODO status is empty
     break;
   default:
     assert(false);
