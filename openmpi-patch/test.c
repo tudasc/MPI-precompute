@@ -169,7 +169,7 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
 LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
   int flag;
   // progress the fallback communication
-  request->test_fn(&request->backup_request, &flag, MPI_STATUSES_IGNORE);
+  request->test_fn(request, &flag, MPI_STATUSES_IGNORE);
 }
 
 // call if one get stuck while waiting for a request to complete: progresses all
@@ -189,11 +189,12 @@ LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
 
 LINKAGE_TYPE int test_fallback(MPIOPT_Request *request, int *flag,
                                MPI_Status *status) {
-  return MPI_Test(request->backup_request, flag, status);
+  return MPI_Test(&request->backup_request, flag, status);
 }
 
 // does nothing (for non-active requests)
 LINKAGE_TYPE int test_empty(MPIOPT_Request *request, int *flag,
                             MPI_Status *status) {
   *flag = 1;
+  return MPI_SUCCESS;
 }

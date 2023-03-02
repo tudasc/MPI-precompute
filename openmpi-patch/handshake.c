@@ -51,6 +51,7 @@ LINKAGE_TYPE int progress_send_request_handshake_begin(MPIOPT_Request *request,
     *flag = 1;
 
   } // end if payload was received
+  return MPI_SUCCESS;
 }
 
 LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
@@ -88,6 +89,7 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
              request->communicators->original_communicator, status);
     *flag = 1;
   } // end if payload arrived
+  return MPI_SUCCESS;
 }
 
 // exchanges the RDMA info and maps all mem for RDMA op

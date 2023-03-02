@@ -68,6 +68,7 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
     // TODO do I call progress here?
     ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
   }
+  return MPI_SUCCESS;
 }
 
 LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
@@ -131,6 +132,7 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
     // TODO do I call progress here?
     ucp_worker_progress(mca_osc_ucx_component.ucp_worker);
   }
+  return MPI_SUCCESS;
 }
 
 LINKAGE_TYPE int
@@ -150,10 +152,9 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
-  MPI_Issend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
-             request->communicators->original_communicator,
-             &request->backup_request);
-  // and listen for rdma handshake
+  return MPI_Issend(request->buf, request->size, MPI_BYTE, request->dest,
+                    request->tag, request->communicators->original_communicator,
+                    &request->backup_request);
 }
 
 LINKAGE_TYPE int
@@ -170,6 +171,7 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
 #endif
 
   send_rdma_info(request); // begin handshake, changes request type
+  return MPI_SUCCESS;
 }
 
 LINKAGE_TYPE int start_send_fallback(MPIOPT_Request *request) {
@@ -184,9 +186,9 @@ LINKAGE_TYPE int start_send_fallback(MPIOPT_Request *request) {
   request->operation_number++;
   assert(request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
   assert(request->backup_request == MPI_REQUEST_NULL);
-  MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
-            request->communicators->original_communicator,
-            &request->backup_request);
+  return MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest,
+                   request->tag, request->communicators->original_communicator,
+                   &request->backup_request);
 }
 
 LINKAGE_TYPE int start_recv_fallback(MPIOPT_Request *request) {
@@ -201,7 +203,7 @@ LINKAGE_TYPE int start_recv_fallback(MPIOPT_Request *request) {
   request->operation_number++;
   assert(request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
   assert(request->backup_request == MPI_REQUEST_NULL);
-  MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest, request->tag,
-            request->communicators->original_communicator,
-            &request->backup_request);
+  return MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
+                   request->tag, request->communicators->original_communicator,
+                   &request->backup_request);
 }
