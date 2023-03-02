@@ -147,7 +147,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   assert(request->active == 0);
   request->active = 1;
 #endif
-
+  set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
   send_rdma_info(request); // begin handshake, changes request type
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
@@ -169,8 +169,8 @@ start_recv_when_searching_for_connection(MPIOPT_Request *request) {
   assert(request->active == 0);
   request->active = 1;
 #endif
-
-  send_rdma_info(request); // begin handshake, changes request type
+  set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_INITIATED);
+  // we will just wait for the handshake and the payload
   return MPI_SUCCESS;
 }
 
