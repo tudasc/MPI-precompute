@@ -57,7 +57,7 @@ int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
 int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
   MPIOPT_Request *req = (MPIOPT_Request *)*request;
   mpiopt_request_test_fn_t test_fn = req->test_fn; // hoist read out of loop
-  int flag;
+  int flag = 0;
   while (!flag) {
     test_fn(req, &flag, status);
   }
