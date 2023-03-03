@@ -14,9 +14,6 @@
 #define SEND_REQUEST_TYPE_HANDSHAKE_INITIATED 7
 #define RECV_REQUEST_TYPE_HANDSHAKE_INITIATED 8
 
-#define SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS 9
-#define RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS 10
-
 // this request is stuck, so it should not be progressed
 #define SEND_REQUEST_TYPE_NULL 11
 #define RECV_REQUEST_TYPE_NULL 12
@@ -98,7 +95,6 @@ static inline bool is_sending_type(MPIOPT_Request *request) {
 
   static_assert(SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED % 2 == 1, "");
   static_assert(SEND_REQUEST_TYPE_HANDSHAKE_INITIATED % 2 == 1, "");
-  static_assert(SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS % 2 == 1, "");
   static_assert(SEND_REQUEST_TYPE % 2 == 1, "");
   static_assert(SEND_REQUEST_TYPE_USE_FALLBACK % 2 == 1, "");
   static_assert(SEND_REQUEST_TYPE_NULL % 2 == 1, "");
@@ -110,7 +106,6 @@ static inline bool is_recv_type(MPIOPT_Request *request) {
 
   static_assert(RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED % 2 == 0, "");
   static_assert(RECV_REQUEST_TYPE_HANDSHAKE_INITIATED % 2 == 0, "");
-  static_assert(RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS % 2 == 0, "");
   static_assert(RECV_REQUEST_TYPE % 2 == 0, "");
   static_assert(RECV_REQUEST_TYPE_USE_FALLBACK % 2 == 0, "");
   static_assert(RECV_REQUEST_TYPE_NULL % 2 == 0, "");
@@ -153,16 +148,6 @@ static inline void set_request_type(MPIOPT_Request *request, int new_type) {
     request->start_fn =
         NULL; // request is in progress and could not be started anyway
     request->test_fn = &progress_recv_request_handshake_begin;
-    break;
-  case SEND_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS:
-    request->start_fn =
-        NULL; // request is in progress and could not be started anyway
-    request->test_fn = NULL; // TODO status is empty
-    break;
-  case RECV_REQUEST_TYPE_HANDSHAKE_IN_PROGRESS:
-    request->start_fn =
-        NULL; // request is in progress and could not be started anyway
-    request->test_fn = NULL; // TODO status is empty
     break;
   default:
     assert(false);
