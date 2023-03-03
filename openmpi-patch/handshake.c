@@ -197,8 +197,8 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
     comm_to_use = request->communicators->handshake_response_communicator;
   }
 
-  MPI_Issend(request->rdma_info_buf, msg_size, MPI_BYTE, request->dest,
-             request->tag, comm_to_use, &request->rdma_exchange_request_send);
+  MPI_Isend(request->rdma_info_buf, msg_size, MPI_BYTE, request->dest,
+            request->tag, comm_to_use, &request->rdma_exchange_request_send);
 
   // free temp buf
   ucp_rkey_buffer_release(rkey_buffer_flag);
