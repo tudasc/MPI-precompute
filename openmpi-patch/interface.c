@@ -105,14 +105,16 @@ int MPIOPT_Testany(int count, MPI_Request array_of_requests[], int *index,
 
 int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
                    MPI_Status array_of_statuses[]) {
+  *flag = 1;
+  int local_flag = 0;
   for (int i = 0; i < count; ++i) {
     if (array_of_statuses == MPI_STATUSES_IGNORE) {
-      MPIOPT_Test(&array_of_requests[i], flag, MPI_STATUS_IGNORE);
+      MPIOPT_Test(&array_of_requests[i], &local_flag, MPI_STATUS_IGNORE);
     } else {
-      MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
+      MPIOPT_Test(&array_of_requests[i], &local_flag, &array_of_statuses[i]);
     }
-    if (!*flag)
-      return 0; // found one request not complete
+    if (!local_flag)
+      *flag = 0; // found one request not complete
   }
   return 0;
 }
