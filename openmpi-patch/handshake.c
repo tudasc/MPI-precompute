@@ -16,6 +16,7 @@ LINKAGE_TYPE void receive_handshake(MPIOPT_Request *request);
 LINKAGE_TYPE int progress_send_request_handshake_begin(MPIOPT_Request *request,
                                                        int *flag,
                                                        MPI_Status *status) {
+  *flag = 0;
 #ifndef NDEBUG
   add_operation_to_trace(request, "Progress_Request");
 #endif
@@ -61,6 +62,7 @@ LINKAGE_TYPE int progress_send_request_handshake_begin(MPIOPT_Request *request,
 LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
                                                        int *flag,
                                                        MPI_Status *status) {
+  *flag = 0;
 #ifndef NDEBUG
   add_operation_to_trace(request, "Progress_Request");
 #endif

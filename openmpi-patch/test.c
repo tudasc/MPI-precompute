@@ -27,6 +27,7 @@ inline static void set_mpi_status(MPIOPT_Request *request, MPI_Status *status) {
 
 LINKAGE_TYPE int test_send_request(MPIOPT_Request *request, int *flag,
                                    MPI_Status *status) {
+  *flag = 0;
   assert(request->type == SEND_REQUEST_TYPE);
 #ifndef NDEBUG
   add_operation_to_trace(request, "Progress_Request");
@@ -76,6 +77,7 @@ LINKAGE_TYPE int test_send_request(MPIOPT_Request *request, int *flag,
 
 LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
                                    MPI_Status *status) {
+  *flag = 0;
   assert(request->type == RECV_REQUEST_TYPE);
 #ifndef NDEBUG
   add_operation_to_trace(request, "Progress_Request");

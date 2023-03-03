@@ -37,7 +37,7 @@ int MPIOPT_Recv_init(void *buf, int count, MPI_Datatype datatype, int source,
 
 int MPIOPT_Start(MPI_Request *request) {
   MPIOPT_Request *req = (MPIOPT_Request *)*request;
-    assert(req->start_fn!=NULL);
+  assert(req->start_fn != NULL);
   return req->start_fn(req);
 }
 
@@ -67,7 +67,7 @@ int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
 
 int MPIOPT_Test(MPI_Request *request, int *flag, MPI_Status *status) {
   MPIOPT_Request *req = (MPIOPT_Request *)*request;
-  assert(req->test_fn!=NULL);
+  assert(req->test_fn != NULL);
   return req->test_fn(req, flag, status);
 }
 
