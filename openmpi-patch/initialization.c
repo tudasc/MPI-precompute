@@ -81,7 +81,7 @@ LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm,
-                              MPIOPT_Request *request) {
+                              MPIOPT_Request *request, bool is_send_request) {
 
   MPI_Count type_size, type_extent, lb;
   MPI_Type_size_x(datatype, &type_size);
@@ -161,11 +161,16 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
   if (use_fallback || rank == dest || rank == MPI_PROC_NULL || conflicts) {
     // use the default implementation for communication with self / no-op
-    if (request->type == RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED) {
-      request->type = RECV_REQUEST_TYPE_USE_FALLBACK;
+    if (!is_send_request) {
+      set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
     } else {
-      assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
-      request->type = SEND_REQUEST_TYPE_USE_FALLBACK;
+      set_request_type(request, SEND_REQUEST_TYPE_USE_FALLBACK);
+    }
+  } else {
+    if (!is_send_request) {
+      set_request_type(request, RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
+    } else {
+      set_request_type(request, SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED);
     }
   }
   // add request to list, so that it is progressed, if other requests have to
@@ -180,8 +185,7 @@ LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
                                            int tag, MPI_Comm comm,
                                            MPIOPT_Request *request) {
   memset(request, 0, sizeof(MPIOPT_Request));
-  request->type = RECV_REQUEST_TYPE_HANDSHAKE_NOT_STARTED;
-  return init_request(buf, count, datatype, source, tag, comm, request);
+  return init_request(buf, count, datatype, source, tag, comm, request, false);
 }
 
 LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
@@ -189,6 +193,5 @@ LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
                                            int tag, MPI_Comm comm,
                                            MPIOPT_Request *request) {
   memset(request, 0, sizeof(MPIOPT_Request));
-  request->type = SEND_REQUEST_TYPE_HANDSHAKE_NOT_STARTED;
-  return init_request(buf, count, datatype, source, tag, comm, request);
+  return init_request(buf, count, datatype, source, tag, comm, request, true);
 }

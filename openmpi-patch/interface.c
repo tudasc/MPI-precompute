@@ -36,7 +36,9 @@ int MPIOPT_Recv_init(void *buf, int count, MPI_Datatype datatype, int source,
 }
 
 int MPIOPT_Start(MPI_Request *request) {
-  return MPIOPT_Start_internal((MPIOPT_Request *)*request);
+  MPIOPT_Request *req = (MPIOPT_Request *)*request;
+  assert(req->start_fn != NULL);
+  return req->start_fn(req);
 }
 
 int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
@@ -53,28 +55,20 @@ int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
   return 0;
 }
 
-int MPIOPT_Start_send(MPI_Request *request) {
-  return MPIOPT_Start_send_internal((MPIOPT_Request *)*request);
-}
-
-int MPIOPT_Start_recv(MPI_Request *request) {
-  return MPIOPT_Start_recv_internal((MPIOPT_Request *)*request);
-}
-
-int MPIOPT_Wait_send(MPI_Request *request, MPI_Status *status) {
-  return MPIOPT_Wait_send_internal((MPIOPT_Request *)*request, status);
-}
-
-int MPIOPT_Wait_recv(MPI_Request *request, MPI_Status *status) {
-  return MPIOPT_Wait_recv_internal((MPIOPT_Request *)*request, status);
-}
-
 int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
-  return MPIOPT_Wait_internal((MPIOPT_Request *)*request, status);
+  MPIOPT_Request *req = (MPIOPT_Request *)*request;
+  mpiopt_request_test_fn_t test_fn = req->test_fn; // hoist read out of loop
+  int flag = 0;
+  while (!flag) {
+    test_fn(req, &flag, status);
+  }
+  return MPI_SUCCESS;
 }
 
 int MPIOPT_Test(MPI_Request *request, int *flag, MPI_Status *status) {
-  return MPIOPT_Test_internal((MPIOPT_Request *)*request, flag, status);
+  MPIOPT_Request *req = (MPIOPT_Request *)*request;
+  assert(req->test_fn != NULL);
+  return req->test_fn(req, flag, status);
 }
 
 int MPIOPT_Waitany(int count, MPI_Request array_of_requests[], int *index,
@@ -111,14 +105,16 @@ int MPIOPT_Testany(int count, MPI_Request array_of_requests[], int *index,
 
 int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
                    MPI_Status array_of_statuses[]) {
+  *flag = 1;
+  int local_flag = 0;
   for (int i = 0; i < count; ++i) {
     if (array_of_statuses == MPI_STATUSES_IGNORE) {
-      MPIOPT_Test(&array_of_requests[i], flag, MPI_STATUS_IGNORE);
+      MPIOPT_Test(&array_of_requests[i], &local_flag, MPI_STATUS_IGNORE);
     } else {
-      MPIOPT_Test(&array_of_requests[i], flag, &array_of_statuses[i]);
+      MPIOPT_Test(&array_of_requests[i], &local_flag, &array_of_statuses[i]);
     }
-    if (!*flag)
-      return 0; // found one request not complete
+    if (!local_flag)
+      *flag = 0; // found one request not complete
   }
   return 0;
 }
