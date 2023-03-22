@@ -119,10 +119,29 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 
   uint64_t flag_ptr = &request->flag;
   uint64_t data_ptr;
+
+  size_t buffer_size;
   if(!(request->is_cont) && request->nc_strategy == 0){
-    data_ptr = request->packed_buf;
+    switch (request->nc_strategy)
+    {
+    case 0:
+      // PACKING
+      data_ptr = request->packed_buf;
+      buffer_size = request->pack_size;
+      break;
+      
+    case 1:
+      // DIRECT SEND
+      data_ptr = request->buf;
+      buffer_size = request->dtype_extent;
+      break;
+
+    default:
+      break;
+    }
   } else {
     data_ptr = request->buf;
+    buffer_size = request->size;
   }
 
   ompi_osc_ucx_module_t *module =
@@ -139,7 +158,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 
   mem_params.address = data_ptr;
 
-  mem_params.length = request->size;
+  mem_params.length = buffer_size;
   // we need to tell ucx what fields are valid
   mem_params.field_mask =
       UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;

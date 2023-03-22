@@ -69,7 +69,7 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
         break;
       case 1:
         // DIRECT_SEND
-
+        break;
       default:
         break;
       }
@@ -145,7 +145,7 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
         break;
       case 1:
         // DIRECT_SEND
-
+        break;
       default:
         break;
       }

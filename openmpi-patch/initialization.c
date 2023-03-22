@@ -157,6 +157,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
         printf("(%d, %d), ", request->dtype_displacements[i], request->dtype_lengths[i]);
       }
       printf("\n");
+      break;
 
     default:
       break;
