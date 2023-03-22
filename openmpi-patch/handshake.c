@@ -118,7 +118,13 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 #endif
 
   uint64_t flag_ptr = &request->flag;
-  uint64_t data_ptr = request->buf;
+  uint64_t data_ptr;
+  if(request->is_cont){
+    data_ptr = request->buf;
+  } else {
+    data_ptr = request->packed_buf;
+  }
+  // TODO AENDERN
   // MPIOPT_Request info_to_send;
 
   ompi_osc_ucx_module_t *module =
@@ -133,7 +139,8 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   // init mem params
   memset(&mem_params, 0, sizeof(ucp_mem_map_params_t));
 
-  mem_params.address = request->buf;
+  mem_params.address = data_ptr;
+
   mem_params.length = request->size;
   // we need to tell ucx what fields are valid
   mem_params.field_mask =

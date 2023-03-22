@@ -41,9 +41,20 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
     add_operation_to_trace(request, "send pushes data");
 #endif
     request->flag_buffer = request->operation_number * 2 + 2;
-    ucs_status_t status =
-        ucp_put_nbi(request->ep, request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+
+    ucs_status_t status;
+    if(request->is_cont){
+      status =
+          ucp_put_nbi(request->ep, request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      status =
+          ucp_put_nbi(request->ep, request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    }
+
+    
     // ensure order:
     status = ucp_worker_fence(mca_osc_ucx_component.ucp_worker);
     status = ucp_put_nbi(request->ep, &request->flag_buffer, sizeof(int),
@@ -93,9 +104,18 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
 #ifndef NDEBUG
     add_operation_to_trace(request, "recv fetches data");
 #endif
-    ucs_status_t status =
-        ucp_get_nbi(request->ep, (void *)request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+    ucs_status_t status;
+
+    if(request->is_cont){
+      status =
+          ucp_get_nbi(request->ep, (void *)request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      status =
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);
     /*
