@@ -87,7 +87,7 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
       receive_handshake(request);
       send_rdma_info(request);
       // post the matching receive, blocking as we have probed
-      MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest,
+      MPI_Recv(request->buf, request->count, request->dtype, request->dest,
                request->tag, request->communicators->original_communicator,
                status);
       MPI_Wait(&request->rdma_exchange_request_send, MPI_STATUS_IGNORE);
@@ -97,7 +97,7 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
       request->flag = 4;
     } else {
       // post the matching receive, blocking as we have probed
-      MPI_Recv(request->buf, request->size, MPI_BYTE, request->dest,
+      MPI_Recv(request->buf, request->count, request->dtype, request->dest,
                request->tag, request->communicators->original_communicator,
                status);
       set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
@@ -124,8 +124,6 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   } else {
     data_ptr = request->packed_buf;
   }
-  // TODO AENDERN
-  // MPIOPT_Request info_to_send;
 
   ompi_osc_ucx_module_t *module =
       (ompi_osc_ucx_module_t *)global_comm_win->w_osc_module;

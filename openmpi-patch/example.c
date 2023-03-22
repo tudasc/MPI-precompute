@@ -155,7 +155,7 @@ void use_self_implemented_comm() {
 
   //MPI_Type_get_contents(nc_datatype, num_integers, num_adresses, num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
 #ifdef STATISTIC_PRINTING
-  printf("Typesize: %d, Type extent: %d\n", typesize, extent);
+  printf("Typesize: %lld, Type extent: %lld\n", typesize, extent);
 #endif
 
   MPI_Request req;
@@ -260,7 +260,7 @@ void use_standard_comm() {
   //MPI_Type_get_contents(nc_datatype, num_integers, num_adresses, num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
 
 #ifdef STATISTIC_PRINTING
-  printf("Typesize: %d, Type extent: %d\n", typesize, extent);
+  printf("Typesize: %lld, Type extent: %lld\n", typesize, extent);
 #endif
 
 

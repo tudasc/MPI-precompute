@@ -18,6 +18,16 @@ static void empty_function_in_start_c(void *request, ucs_status_t status) {
 }
 
 LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
+
+  if(!(request->is_cont)){
+    printf("packing...\n");
+    int position = 0;
+
+    MPI_Pack(request->buf, request->count, 
+      request->dtype, request->packed_buf, request->pack_size, 
+      &position, request->communicators->original_communicator);
+  }
+
 #ifndef NDEBUG
   add_operation_to_trace(request, "MPI_Start");
 #endif
@@ -172,7 +182,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
-  return MPI_Issend(request->buf, request->size, MPI_BYTE, request->dest,
+  return MPI_Issend(request->buf, request->count, request->dtype, request->dest,
                     request->tag, request->communicators->original_communicator,
                     &request->backup_request);
 }
@@ -206,7 +216,7 @@ LINKAGE_TYPE int start_send_fallback(MPIOPT_Request *request) {
   request->operation_number++;
   assert(request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
   assert(request->backup_request == MPI_REQUEST_NULL);
-  return MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest,
+  return MPI_Isend(request->buf, request->count, request->dtype, request->dest,
                    request->tag, request->communicators->original_communicator,
                    &request->backup_request);
 }
@@ -223,7 +233,7 @@ LINKAGE_TYPE int start_recv_fallback(MPIOPT_Request *request) {
   request->operation_number++;
   assert(request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
   assert(request->backup_request == MPI_REQUEST_NULL);
-  return MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
+  return MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
                    request->tag, request->communicators->original_communicator,
                    &request->backup_request);
 }

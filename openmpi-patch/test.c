@@ -164,6 +164,17 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
                            request->ucx_request_data_transfer == NULL,
                        1)) {
     // request is finished
+
+    if(!(request->is_cont)){
+      printf("unpacking...\n");
+      int position = 0;
+
+      MPI_Unpack(request->packed_buf, request->pack_size, &position,
+        request->buf, request->count, request->dtype, 
+        request->communicators->original_communicator);
+    }
+
+
     *flag = 1;
 #ifdef DISTINGUISH_ACTIVE_REQUESTS
     request->active = 0;
