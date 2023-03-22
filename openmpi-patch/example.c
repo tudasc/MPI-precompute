@@ -41,8 +41,8 @@
 #define NUM_ITERS 3
 
 // Count of blocks in non contiguous datatype
-#define BLOCK_COUNT 2
-#define BLOCK_SIZE 5
+#define BLOCK_COUNT 10
+#define BLOCK_SIZE 10
 
 //#define BUFFER_SIZE 10
 //#define NUM_ITERS 10

@@ -109,9 +109,19 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
           ucp_get_nbi(request->ep, (void *)request->buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
     } else {
-      status =
+      switch (request->nc_strategy)
+      {
+      case 0:
+      // PACKING
+        status =
           ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
+        break;
+      
+      default:
+        break;
+      }
+      
     }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);
@@ -165,8 +175,7 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
                        1)) {
     // request is finished
 
-    if(!(request->is_cont)){
-      printf("unpacking...\n");
+    if(!(request->is_cont) && request->nc_strategy == 0){
       int position = 0;
 
       MPI_Unpack(request->packed_buf, request->pack_size, &position,

@@ -7,6 +7,10 @@
 
 #include "debug.h"
 #include "mpi-internals.h"
+
+// datatype include
+#include "opal/datatype/opal_datatype_internal.h"
+
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -111,11 +115,52 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->is_cont = (type_size == type_extent);
   request->size = type_size * count;
 
+  request->dtype = datatype;
+
   request->buf = buf;
 
+
   if(!(request->is_cont)){
-    MPI_Pack_size(count, datatype, comm, &request->pack_size);
-    request->packed_buf = malloc(request->pack_size);
+    request->nc_strategy = NC_DTYPE_STRATEGY;
+
+    switch (request->nc_strategy)
+    {
+    case 0:
+      // PACKING
+
+      printf("using packing strategy\n");
+
+      MPI_Pack_size(count, datatype, comm, &request->pack_size);
+      request->packed_buf = malloc(request->pack_size);
+    
+      break;
+
+    case 1:
+      // DIRECT SEND
+      printf("using direct send strategy\n");
+
+      request->internal_dtype = &(request->dtype->super);
+
+      request->num_cont_blocks = request->internal_dtype->desc.used;
+
+      request->dtype_displacements = malloc(request->num_cont_blocks * sizeof(int));
+      request->dtype_lengths = malloc(request->num_cont_blocks * sizeof(int));
+
+      for(int i = 0; i < request->num_cont_blocks; ++i){
+        request->dtype_displacements[i] = request->internal_dtype->desc.desc[i].elem.disp;
+        request->dtype_lengths[i] = request->internal_dtype->desc.desc[i].elem.extent;
+      }
+
+      // prints
+      printf("internal dtype print: %d\n", request->num_cont_blocks);
+      for(int i = 0; i < request->num_cont_blocks; ++i){
+        printf("(%d, %d), ", request->dtype_displacements[i], request->dtype_lengths[i]);
+      }
+      printf("\n");
+
+    default:
+      break;
+    }
   }
 
   request->dest = dest;
@@ -125,7 +170,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->tag = tag;
   request->backup_request = MPI_REQUEST_NULL;
   request->remote_data_addr = NULL;
-  request->dtype = datatype;
 
   request->communicators = find_comm(comm);
   assert(request->communicators != NULL);

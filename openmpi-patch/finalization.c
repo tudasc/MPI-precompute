@@ -32,7 +32,7 @@ void MPIOPT_FINALIZE() {
         // ucp_mem_unmap(context, req->mem_handle_data); // was freed before
       }
 
-      if(!(req->is_cont)){
+      if(!(req->is_cont) && req->nc_strategy == 0){
         free(req->packed_buf);
       }
 

@@ -61,6 +61,7 @@ struct mpiopt_request {
   size_t size;
 
   //datatype metadata
+  char nc_strategy;
   char is_cont;
   void *packed_buf;
   size_t pack_size;
@@ -68,6 +69,10 @@ struct mpiopt_request {
   size_t dtype_extent;
   int count;
   MPI_Datatype dtype;
+  opal_datatype_t* internal_dtype;
+  int num_cont_blocks;
+  int* dtype_displacements;
+  int* dtype_lengths;
   
   // initialized locally
   void *ucx_request_data_transfer;

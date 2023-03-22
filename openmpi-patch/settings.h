@@ -45,4 +45,6 @@
 //#define LINKAGE_TYPE static
 #endif
 
+#define NC_DTYPE_STRATEGY 0
+
 #endif /* MPIOPT_SETTINGS_H_ */

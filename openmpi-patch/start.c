@@ -19,8 +19,7 @@ static void empty_function_in_start_c(void *request, ucs_status_t status) {
 
 LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
 
-  if(!(request->is_cont)){
-    printf("packing...\n");
+  if(!(request->is_cont) && request->nc_strategy == 0){
     int position = 0;
 
     MPI_Pack(request->buf, request->count, 
@@ -59,9 +58,22 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
           ucp_put_nbi(request->ep, request->buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
     } else {
-      status =
+
+      switch (request->nc_strategy)
+      {
+      case 0:
+        // PACKING
+        status =
           ucp_put_nbi(request->ep, request->packed_buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
+        break;
+      case 1:
+        // DIRECT_SEND
+
+      default:
+        break;
+      }
+      
     }
 
     
@@ -122,9 +134,22 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
           ucp_get_nbi(request->ep, (void *)request->buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
     } else {
-      status =
+
+      switch (request->nc_strategy)
+      {
+      case 0:
+        // PACKING
+        status =
           ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
+        break;
+      case 1:
+        // DIRECT_SEND
+
+      default:
+        break;
+      }
+      
     }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);

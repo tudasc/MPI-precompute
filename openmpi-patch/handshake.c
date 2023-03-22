@@ -119,10 +119,10 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
 
   uint64_t flag_ptr = &request->flag;
   uint64_t data_ptr;
-  if(request->is_cont){
-    data_ptr = request->buf;
-  } else {
+  if(!(request->is_cont) && request->nc_strategy == 0){
     data_ptr = request->packed_buf;
+  } else {
+    data_ptr = request->buf;
   }
 
   ompi_osc_ucx_module_t *module =
