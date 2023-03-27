@@ -121,7 +121,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   uint64_t data_ptr;
 
   size_t buffer_size;
-  if(!(request->is_cont) && request->nc_strategy == 0){
+  if(!request->is_cont){
     switch (request->nc_strategy)
     {
     case 0:
@@ -133,7 +133,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
     case 1:
       // DIRECT SEND
       data_ptr = request->buf;
-      buffer_size = request->dtype_extent;
+      buffer_size = request->dtype_extent * request->count;
       break;
 
     default:

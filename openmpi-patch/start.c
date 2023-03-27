@@ -69,6 +69,15 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
         break;
       case 1:
         // DIRECT_SEND
+
+        for(int k = 0; k < request->count; ++k){
+          for(int i = 0; i < request->num_cont_blocks; ++i) {
+            status = ucp_put_nbi(request->ep, request->buf + request->dtype_displacements[i] + k * request->dtype_extent, 
+              request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i] + k * request->dtype_extent,
+              request->remote_data_rkey);
+            assert(status == UCS_OK || status == UCS_INPROGRESS);
+          }
+        }
         break;
       default:
         break;
@@ -145,6 +154,14 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
         break;
       case 1:
         // DIRECT_SEND
+        for(int k = 0; k < request->count; ++k){
+          for(int i = 0; i < request->num_cont_blocks; ++i) {
+            status = ucp_get_nbi(request->ep, request->buf + request->dtype_displacements[i] + k * request->dtype_extent, 
+              request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i] + k * request->dtype_extent,
+              request->remote_data_rkey);
+            assert(status == UCS_OK || status == UCS_INPROGRESS);
+          }
+        }
         break;
       default:
         break;

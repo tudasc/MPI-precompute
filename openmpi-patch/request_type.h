@@ -69,7 +69,6 @@ struct mpiopt_request {
   size_t dtype_extent;
   int count;
   MPI_Datatype dtype;
-  opal_datatype_t* internal_dtype;
   int num_cont_blocks;
   int* dtype_displacements;
   int* dtype_lengths;

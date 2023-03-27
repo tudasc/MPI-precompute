@@ -32,8 +32,19 @@ void MPIOPT_FINALIZE() {
         // ucp_mem_unmap(context, req->mem_handle_data); // was freed before
       }
 
-      if(!(req->is_cont) && req->nc_strategy == 0){
-        free(req->packed_buf);
+      if(!req->is_cont){
+        switch(req->nc_strategy){
+        case 0:
+          // PACKING
+          free(req->packed_buf);
+          break;
+        case 1:
+          // DIRECT SEND
+          free(req->dtype_displacements);
+          free(req->dtype_lengths);
+          break;
+        }
+        
       }
 
 

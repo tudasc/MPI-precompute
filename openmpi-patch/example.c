@@ -48,7 +48,7 @@
 //#define NUM_ITERS 10
 
 //#define N BUFFER_SIZE
-#define N 2
+#define N 3
 
 void dummy_workload(double *buf) {
 
@@ -141,6 +141,17 @@ void use_self_implemented_comm() {
 
   MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE, &nc_datatype);
   MPI_Type_commit(&nc_datatype);
+
+  //MPI_Type_vector(BLOCK_COUNT, 2, BLOCK_SIZE, MPI_INT, &nc_datatype);
+  //MPI_Type_commit(&nc_datatype);
+
+  // testing different datatype
+  //MPI_Datatype nc_datatype3;
+  //MPI_Type_contiguous(2, nc_datatype, &nc_datatype3);
+  //MPI_Type_commit(&nc_datatype3);
+  //MPI_Datatype nc_datatype2;
+  //MPI_Type_contiguous(3, nc_datatype3, &nc_datatype2);
+  //MPI_Type_commit(&nc_datatype2);
 
   MPI_Count typesize, lb, extent;
   MPI_Type_size_x(nc_datatype, &typesize);

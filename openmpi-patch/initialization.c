@@ -83,6 +83,160 @@ LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
 }
 #endif
 
+int get_opal_element_type_size(uint16_t type){
+  // see opal/datatype/opal_datatype_internal.h for the definitions
+  switch (type)
+  {
+  case 4:
+  case 9:
+  case 22:
+    return 1;
+
+  case 5:
+  case 10:
+  case 14:
+    return 2;
+
+  case 6:
+  case 11:
+  case 15:
+  case 23:
+    return 4;
+
+  case 7:
+  case 12:
+  case 16:
+  case 19:
+    return 8;
+
+  case 17:
+    return 12;
+
+  case 8:
+  case 13:
+  case 18:
+  case 20:
+    return 16;
+
+  case 21:
+    return 32;
+
+  default:
+    printf("unrecognized type\n");
+    return -1;
+  }
+}
+
+void read_internal_opal_dtype(MPIOPT_Request *request){
+  opal_datatype_t* internal_dtype = &(request->dtype->super);
+
+  int num_elems = internal_dtype->desc.used;
+
+  int* unrolled_sizes = malloc(internal_dtype->nbElems);
+  int* unrolled_disps = malloc(internal_dtype->nbElems);
+
+  int* loop_stack = malloc(internal_dtype->loops / 2); // number of loops
+  int* loop_count_stack = malloc(internal_dtype->loops / 2);
+  int* loop_disp_stack = malloc(internal_dtype->loops / 2);
+  int stack_top = -1;
+
+  int current_element = 0;
+  int unrolled_index = 0;
+
+  while(current_element < num_elems){
+    uint16_t elem_type = internal_dtype->desc.desc[current_element].elem.common.type;
+    if(elem_type == 0) {
+      // element is a loop start
+      ddt_loop_desc_t* loop_start = &internal_dtype->desc.desc[current_element].loop;
+
+      stack_top++;
+      loop_stack[stack_top] = current_element;
+      loop_count_stack[stack_top] = loop_start->loops;
+      loop_disp_stack[stack_top] = 0;
+      current_element++;
+
+    } else if(elem_type == 1) {
+      // element is a loop end
+      ddt_endloop_desc_t* loop_end = &internal_dtype->desc.desc[current_element].end_loop;
+
+
+      if(loop_count_stack[stack_top] > 1){
+        // loop still going
+        loop_count_stack[stack_top]--;
+        current_element = loop_stack[stack_top] + 1;
+        loop_disp_stack[stack_top] += internal_dtype->desc.desc[current_element - 1].loop.extent;
+      } else {
+        stack_top--;
+        current_element++;
+      }
+
+    } else {
+      // element is an actual type
+      ddt_elem_desc_t* element = &internal_dtype->desc.desc[current_element].elem;
+      int element_size = get_opal_element_type_size(element->common.type);
+
+      for(int k = 0; k < element->count; ++k) {
+        
+        int loop_offset = 0;
+        for(int i = 0; i <= stack_top; ++i){
+          loop_offset += loop_disp_stack[i];
+        }
+
+        unrolled_sizes[unrolled_index] = element_size * element->blocklen;
+        unrolled_disps[unrolled_index] = element->disp + k * element->extent + loop_offset;
+        unrolled_index++;
+      }
+
+      current_element++;
+      
+    }
+  }
+
+  // print unoptimized typemap
+  /*for(int i = 0; i < unrolled_index; ++i) {
+    printf("(%d, %d), ", unrolled_disps[i], unrolled_sizes[i]);
+  }
+  printf("\n");*/
+
+  // optimize type map by merging contiguous blocks
+  request->num_cont_blocks = 1;
+  int current_opt_elem = 0;
+  for(int i = 1; i < unrolled_index; ++i){
+    if(unrolled_disps[current_opt_elem] + unrolled_sizes[current_opt_elem] == unrolled_disps[i]) {
+      // next element comes directly after current contiguous block
+      // increase size instead of creating new element
+      unrolled_sizes[current_opt_elem] += unrolled_sizes[i];
+    } else {
+      // next element is not directly after current block
+      // start new contiguous block
+      current_opt_elem++;
+      unrolled_disps[current_opt_elem] = unrolled_disps[i];
+      unrolled_sizes[current_opt_elem] = unrolled_sizes[i];
+      request->num_cont_blocks++;
+    }
+  }
+
+  request->dtype_displacements = malloc(request->num_cont_blocks * sizeof(int));
+  request->dtype_lengths = malloc(request->num_cont_blocks * sizeof(int));
+  for(int i = 0; i < request->num_cont_blocks; ++i) {
+    request->dtype_displacements[i] = unrolled_disps[i];
+    request->dtype_lengths[i] = unrolled_sizes[i];
+  }
+
+  //print typemap
+  /*printf("num_cont_blocks %d\n", request->num_cont_blocks);
+  for(int i = 0; i < request->num_cont_blocks; ++i) {
+    printf("(%d, %d), ", unrolled_disps[i], unrolled_sizes[i]);
+  }
+  printf("\n");*/
+
+  free(unrolled_disps);
+  free(unrolled_sizes);
+  free(loop_stack);
+  free(loop_count_stack);
+  free(loop_disp_stack);
+}
+
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm,
                               MPIOPT_Request *request, bool is_send_request) {
@@ -138,25 +292,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
     case 1:
       // DIRECT SEND
       printf("using direct send strategy\n");
+      read_internal_opal_dtype(request);
 
-      request->internal_dtype = &(request->dtype->super);
-
-      request->num_cont_blocks = request->internal_dtype->desc.used;
-
-      request->dtype_displacements = malloc(request->num_cont_blocks * sizeof(int));
-      request->dtype_lengths = malloc(request->num_cont_blocks * sizeof(int));
-
-      for(int i = 0; i < request->num_cont_blocks; ++i){
-        request->dtype_displacements[i] = request->internal_dtype->desc.desc[i].elem.disp;
-        request->dtype_lengths[i] = request->internal_dtype->desc.desc[i].elem.extent;
-      }
-
-      // prints
-      printf("internal dtype print: %d\n", request->num_cont_blocks);
-      for(int i = 0; i < request->num_cont_blocks; ++i){
-        printf("(%d, %d), ", request->dtype_displacements[i], request->dtype_lengths[i]);
-      }
-      printf("\n");
       break;
 
     default:
