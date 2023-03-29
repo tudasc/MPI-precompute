@@ -85,6 +85,20 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
     if (local_flag) {
       // found matching handshake
       receive_handshake(request);
+
+      if((!request->is_cont) && request->nc_strategy != request->remote_strategy) {
+        // strategies to handle non contiguous datatypes are not matching
+        printf("Strategies to handle non contiguous datatypes are not matching, using fall back\n");
+        // post the matching receive, blocking as we have probed
+        MPI_Recv(request->buf, request->count, request->dtype, request->dest,
+                request->tag, request->communicators->original_communicator,
+                status);
+        set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
+        request->flag = 4;
+        *flag = 1;
+        return MPI_SUCCESS;
+      }
+
       send_rdma_info(request);
       // post the matching receive, blocking as we have probed
       MPI_Recv(request->buf, request->count, request->dtype, request->dest,
@@ -194,7 +208,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   assert(ucp_status == UCS_OK && "Error in register mem for RDMA operation");
 
   size_t msg_size = sizeof(size_t) * 2 + sizeof(uint64_t) * 2 + rkey_size_data +
-                    rkey_size_flag + sizeof(uint64_t) * 2;
+                    rkey_size_flag + sizeof(uint64_t) * 2 + sizeof(char);
   request->rdma_info_buf = calloc(msg_size, 1);
 
   // populate the buffer
@@ -213,6 +227,8 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   memcpy(current_pos, rkey_buffer_flag, rkey_size_flag);
   current_pos += rkey_size_flag;
   current_pos += sizeof(u_int64_t); // null termination
+  memcpy(current_pos, &request->nc_strategy, sizeof(char));
+  current_pos += sizeof(char);
 
   assert(msg_size + request->rdma_info_buf == current_pos);
 
@@ -271,6 +287,8 @@ LINKAGE_TYPE void receive_handshake(MPIOPT_Request *request) {
   ucp_ep_rkey_unpack(request->ep, current_pos, &request->remote_flag_rkey);
   current_pos += rkey_size_flag;
   current_pos += sizeof(u_int64_t); // null termination
+  request->remote_strategy = *current_pos;
+  current_pos += sizeof(char);
 
   assert(count + tmp_buf == current_pos);
 

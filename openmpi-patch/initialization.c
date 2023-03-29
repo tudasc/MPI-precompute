@@ -13,6 +13,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
 // dummy int to create some mpi win on
 int dummy_int = 0;
@@ -239,7 +240,7 @@ void read_internal_opal_dtype(MPIOPT_Request *request){
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm,
-                              MPIOPT_Request *request, bool is_send_request) {
+                              MPIOPT_Request *request, bool is_send_request, MPI_Info info) {
 
   MPI_Count type_size, type_extent, lb;
   MPI_Type_size_x(datatype, &type_size);
@@ -275,7 +276,29 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
 
   if(!(request->is_cont)){
-    request->nc_strategy = NC_DTYPE_STRATEGY;
+    char* info_send_strategy[MPI_MAX_INFO_VAL];
+    int info_flag;
+
+    if(info != MPI_INFO_NULL){
+      MPI_Info_get(info, "nc_send_strategy", MPI_MAX_INFO_VAL, info_send_strategy, &info_flag);
+    } else {
+      info_flag = 0;
+    }
+    if(info_flag) {
+      if(strcmp(info_send_strategy, "PACK") == 0) {
+        request->nc_strategy = NC_PACKING;
+      } else if(strcmp(info_send_strategy, "DIRECT_SEND") == 0) {
+        request->nc_strategy = NC_DIRECT_SEND;
+      } else if(strcmp(info_send_strategy, "MIXED") == 0) {
+        request->nc_strategy = NC_MIXED;
+      } else {
+        printf("Unrecognized sending strategy. Using PACK as fallback.\n");
+        request->nc_strategy = NC_PACKING;
+      }
+    } else {
+      printf("No sending strategy provided. Using PACK as fallback\n");
+      request->nc_strategy = NC_PACKING;
+    }
 
     switch (request->nc_strategy)
     {
@@ -365,15 +388,15 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
                                            MPI_Datatype datatype, int source,
                                            int tag, MPI_Comm comm,
-                                           MPIOPT_Request *request) {
+                                           MPIOPT_Request *request, MPI_Info info) {
   memset(request, 0, sizeof(MPIOPT_Request));
-  return init_request(buf, count, datatype, source, tag, comm, request, false);
+  return init_request(buf, count, datatype, source, tag, comm, request, false, info);
 }
 
 LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
                                            MPI_Datatype datatype, int source,
                                            int tag, MPI_Comm comm,
-                                           MPIOPT_Request *request) {
+                                           MPIOPT_Request *request, MPI_Info info) {
   memset(request, 0, sizeof(MPIOPT_Request));
-  return init_request(buf, count, datatype, source, tag, comm, request, true);
+  return init_request(buf, count, datatype, source, tag, comm, request, true, info);
 }

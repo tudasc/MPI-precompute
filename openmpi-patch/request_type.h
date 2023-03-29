@@ -62,6 +62,7 @@ struct mpiopt_request {
 
   //datatype metadata
   char nc_strategy;
+  char remote_strategy;
   char is_cont;
   void *packed_buf;
   size_t pack_size;

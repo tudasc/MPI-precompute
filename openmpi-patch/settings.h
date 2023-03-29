@@ -45,6 +45,9 @@
 //#define LINKAGE_TYPE static
 #endif
 
-#define NC_DTYPE_STRATEGY 1
+// strategies to handle non contiguous datatypes
+#define NC_PACKING 0
+#define NC_DIRECT_SEND 1
+#define NC_MIXED 2
 
 #endif /* MPIOPT_SETTINGS_H_ */

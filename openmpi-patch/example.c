@@ -170,10 +170,15 @@ void use_self_implemented_comm() {
 #endif
 
   MPI_Request req;
+  MPI_Info info;
+  MPI_Info_create(&info);
+  
+  MPI_Info_set(info, "nc_send_strategy", "DIRECT_SEND");
 
   if (rank == 1) {
+    //MPI_Info_set(info, "nc_send_strategy", "PACK"); // not matching info for testing
 
-    MPIOPT_Send_init(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req);
+    MPIOPT_Send_init_x(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req, info);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
@@ -192,8 +197,9 @@ void use_self_implemented_comm() {
       */
     }
   } else {
+    // MPI_Info_set(info, "nc_send_strategy", "DIRECT_SEND"); // not matching info for testing
 
-    MPIOPT_Recv_init(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req);
+    MPIOPT_Recv_init_x(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req, info);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
