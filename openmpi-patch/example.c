@@ -38,7 +38,7 @@
 
 // 10KB
 #define BUFFER_SIZE 10000
-#define NUM_ITERS 3
+#define NUM_ITERS 10
 
 // Count of blocks in non contiguous datatype
 #define BLOCK_COUNT 10
@@ -197,7 +197,7 @@ void use_self_implemented_comm() {
       */
     }
   } else {
-    // MPI_Info_set(info, "nc_send_strategy", "DIRECT_SEND"); // not matching info for testing
+    //MPI_Info_set(info, "nc_send_strategy", "DIRECT_SEND"); // not matching info for testing
 
     MPIOPT_Recv_init_x(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req, info);
     for (int n = 0; n < NUM_ITERS; ++n) {

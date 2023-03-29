@@ -273,7 +273,7 @@ LINKAGE_TYPE int start_recv_fallback(MPIOPT_Request *request) {
 #endif
 
   request->operation_number++;
-  assert(request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
+  assert(request->type == RECV_REQUEST_TYPE_USE_FALLBACK);
   assert(request->backup_request == MPI_REQUEST_NULL);
   return MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
                    request->tag, request->communicators->original_communicator,
