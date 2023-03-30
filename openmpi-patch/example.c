@@ -173,7 +173,7 @@ void use_self_implemented_comm() {
   MPI_Info info;
   MPI_Info_create(&info);
   
-  MPI_Info_set(info, "nc_send_strategy", "DIRECT_SEND");
+  MPI_Info_set(info, "nc_send_strategy", "OPT_PACKING");
 
   if (rank == 1) {
     //MPI_Info_set(info, "nc_send_strategy", "PACK"); // not matching info for testing

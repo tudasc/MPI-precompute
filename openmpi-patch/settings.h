@@ -48,6 +48,7 @@
 // strategies to handle non contiguous datatypes
 #define NC_PACKING 0
 #define NC_DIRECT_SEND 1
-#define NC_MIXED 2
+#define NC_OPT_PACKING 2
+#define NC_MIXED 3
 
 #endif /* MPIOPT_SETTINGS_H_ */

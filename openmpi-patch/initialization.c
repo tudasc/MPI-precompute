@@ -219,9 +219,11 @@ void read_internal_opal_dtype(MPIOPT_Request *request){
 
   request->dtype_displacements = malloc(request->num_cont_blocks * sizeof(int));
   request->dtype_lengths = malloc(request->num_cont_blocks * sizeof(int));
+  request->pack_size = 0;
   for(int i = 0; i < request->num_cont_blocks; ++i) {
     request->dtype_displacements[i] = unrolled_disps[i];
     request->dtype_lengths[i] = unrolled_sizes[i];
+    request->pack_size += unrolled_sizes[i];
   }
 
   //print typemap
@@ -291,6 +293,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
         request->nc_strategy = NC_DIRECT_SEND;
       } else if(strcmp(info_send_strategy, "MIXED") == 0) {
         request->nc_strategy = NC_MIXED;
+      } else if(strcmp(info_send_strategy, "OPT_PACKING") == 0) {
+        request->nc_strategy = NC_OPT_PACKING;
       } else {
         printf("Unrecognized sending strategy. Using PACK as fallback.\n");
         request->nc_strategy = NC_PACKING;
@@ -302,7 +306,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
     switch (request->nc_strategy)
     {
-    case 0:
+    case NC_PACKING:
       // PACKING
 
       printf("using packing strategy\n");
@@ -312,12 +316,18 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
     
       break;
 
-    case 1:
+    case NC_DIRECT_SEND:
       // DIRECT SEND
       printf("using direct send strategy\n");
       read_internal_opal_dtype(request);
 
       break;
+
+    case NC_OPT_PACKING:
+      printf("using optimized packing strategy\n");
+      read_internal_opal_dtype(request);
+      request->pack_size *= count; // read datatype function only sets pack size for one instance
+      request->packed_buf = malloc(request->pack_size);
 
     default:
       break;

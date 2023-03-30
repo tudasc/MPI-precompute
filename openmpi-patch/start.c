@@ -9,6 +9,7 @@
 
 #include "debug.h"
 #include "mpi-internals.h"
+#include "pack.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -19,12 +20,21 @@ static void empty_function_in_start_c(void *request, ucs_status_t status) {
 
 LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
 
-  if(!(request->is_cont) && request->nc_strategy == 0){
+  if(!(request->is_cont)) {
     int position = 0;
+    switch(request->nc_strategy) {
+    case NC_PACKING:
 
-    MPI_Pack(request->buf, request->count, 
-      request->dtype, request->packed_buf, request->pack_size, 
-      &position, request->communicators->original_communicator);
+      MPI_Pack(request->buf, request->count, 
+        request->dtype, request->packed_buf, request->pack_size, 
+        &position, request->communicators->original_communicator);
+      break;
+    case NC_OPT_PACKING:
+      opt_pack(request);
+      break;
+    default:
+      break;
+    }
   }
 
 #ifndef NDEBUG
@@ -61,13 +71,13 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
 
       switch (request->nc_strategy)
       {
-      case 0:
+      case NC_PACKING:
         // PACKING
         status =
-          ucp_put_nbi(request->ep, request->packed_buf, request->size,
+          ucp_put_nbi(request->ep, request->packed_buf, request->pack_size,
                       request->remote_data_addr, request->remote_data_rkey);
         break;
-      case 1:
+      case NC_DIRECT_SEND:
         // DIRECT_SEND
 
         for(int k = 0; k < request->count; ++k){
@@ -78,6 +88,11 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
             assert(status == UCS_OK || status == UCS_INPROGRESS);
           }
         }
+        break;
+      case NC_OPT_PACKING:
+        status =
+          ucp_put_nbi(request->ep, request->packed_buf, request->pack_size,
+                      request->remote_data_addr, request->remote_data_rkey);
         break;
       default:
         break;
@@ -146,13 +161,13 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
 
       switch (request->nc_strategy)
       {
-      case 0:
+      case NC_PACKING:
         // PACKING
         status =
           ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
         break;
-      case 1:
+      case NC_DIRECT_SEND:
         // DIRECT_SEND
         for(int k = 0; k < request->count; ++k){
           for(int i = 0; i < request->num_cont_blocks; ++i) {
@@ -162,6 +177,11 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
             assert(status == UCS_OK || status == UCS_INPROGRESS);
           }
         }
+        break;
+      case NC_OPT_PACKING:
+        status =
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
         break;
       default:
         break;

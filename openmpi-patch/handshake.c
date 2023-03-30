@@ -138,16 +138,21 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   if(!request->is_cont){
     switch (request->nc_strategy)
     {
-    case 0:
+    case NC_PACKING:
       // PACKING
       data_ptr = request->packed_buf;
       buffer_size = request->pack_size;
       break;
       
-    case 1:
+    case NC_DIRECT_SEND:
       // DIRECT SEND
       data_ptr = request->buf;
       buffer_size = request->dtype_extent * request->count;
+      break;
+
+    case NC_OPT_PACKING:
+      data_ptr = request->packed_buf;
+      buffer_size = request->pack_size;
       break;
 
     default:

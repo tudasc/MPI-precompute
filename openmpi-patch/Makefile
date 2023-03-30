@@ -22,9 +22,9 @@ TGTS = example one-sided-persistent.c
 # if build from a single source file
 OBJS = example.o one-sided-persistent.o
 # if build from multiple obj files
-ALLOBJS = example.o globals.o interface.o finalization.o handshake.o initialization.o start.o test.o wait.o debug.o
-SOURCES = finalization.c globals.c interface.h handshake.c initialization.c start.c test.c wait.c debug.c
-HEADERS = one-sided-persistent.h settings.h request_type.h mpi-internals.h interface.h finalization.h handshake.h initialization.h start.h test.h wait.h debug.h
+ALLOBJS = example.o globals.o interface.o finalization.o handshake.o initialization.o start.o test.o wait.o debug.o pack.o
+SOURCES = finalization.c globals.c interface.h handshake.c initialization.c start.c test.c wait.c debug.c pack.c
+HEADERS = one-sided-persistent.h settings.h request_type.h mpi-internals.h interface.h finalization.h handshake.h initialization.h start.h test.h wait.h debug.h pack.h
 
 # default is example_debug
 all: one-sided-persistent.c example_debug

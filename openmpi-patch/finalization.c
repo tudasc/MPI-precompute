@@ -34,14 +34,17 @@ void MPIOPT_FINALIZE() {
 
       if(!req->is_cont){
         switch(req->nc_strategy){
-        case 0:
+        case NC_PACKING:
           // PACKING
           free(req->packed_buf);
           break;
-        case 1:
+        case NC_DIRECT_SEND:
           // DIRECT SEND
           free(req->dtype_displacements);
           free(req->dtype_lengths);
+          break;
+        case NC_OPT_PACKING:
+          free(req->packed_buf);
           break;
         }
         

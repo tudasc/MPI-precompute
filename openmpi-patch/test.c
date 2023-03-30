@@ -6,6 +6,7 @@
 
 #include "handshake.h"
 #include "wait.h"
+#include "pack.h"
 
 #include "debug.h"
 #include "mpi-internals.h"
@@ -111,13 +112,13 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
     } else {
       switch (request->nc_strategy)
       {
-      case 0:
+      case NC_PACKING:
       // PACKING
         status =
           ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
                       request->remote_data_addr, request->remote_data_rkey);
         break;
-      case 1:
+      case NC_DIRECT_SEND:
         // DIRECT_SEND
         for(int k = 0; k < request->count; ++k){
           for(int i = 0; i < request->num_cont_blocks; ++i) {
@@ -128,6 +129,11 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
             assert(status == UCS_OK || status == UCS_INPROGRESS);
           }
         }
+        break;
+      case NC_OPT_PACKING:
+        status =
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
         break;
       default:
         break;
@@ -186,12 +192,29 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
                        1)) {
     // request is finished
 
-    if(!(request->is_cont) && request->nc_strategy == 0){
+    if(!(request->is_cont) && request->nc_strategy == NC_PACKING){
       int position = 0;
 
       MPI_Unpack(request->packed_buf, request->pack_size, &position,
         request->buf, request->count, request->dtype, 
         request->communicators->original_communicator);
+    }
+
+    if(!(request->is_cont)) {
+      int position = 0;
+      switch(request->nc_strategy) {
+      case NC_PACKING:
+
+        MPI_Unpack(request->packed_buf, request->pack_size, &position,
+          request->buf, request->count, request->dtype, 
+          request->communicators->original_communicator);
+        break;
+      case NC_OPT_PACKING:
+        opt_unpack(request);
+        break;
+      default:
+        break;
+      }
     }
 
 
