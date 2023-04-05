@@ -55,8 +55,10 @@ struct mpiopt_request {
   int flag_buffer;
   uint64_t remote_data_addr;
   uint64_t remote_flag_addr;
+  uint64_t remote_packed_addr;
   ucp_rkey_h remote_data_rkey;
   ucp_rkey_h remote_flag_rkey;
+  ucp_rkey_h remote_packed_data_rkey;
   void *buf;
   size_t size;
 
@@ -73,6 +75,7 @@ struct mpiopt_request {
   int num_cont_blocks;
   int* dtype_displacements;
   int* dtype_lengths;
+  int threshold; // packing threshold for mixed sending
   
   // initialized locally
   void *ucx_request_data_transfer;
@@ -81,6 +84,7 @@ struct mpiopt_request {
   int type;
   ucp_mem_h mem_handle_data;
   ucp_mem_h mem_handle_flag;
+  ucp_mem_h mem_handle_packed_data;
   ucp_ep_h
       ep; // save used endpoint, so we dont have to look it up over and over
   struct communicator_info *communicators;

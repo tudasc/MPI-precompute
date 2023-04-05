@@ -9,4 +9,7 @@
 LINKAGE_TYPE int opt_pack(MPIOPT_Request* request);
 LINKAGE_TYPE int opt_unpack(MPIOPT_Request* request);
 
+LINKAGE_TYPE int opt_pack_threshold(MPIOPT_Request* request);
+LINKAGE_TYPE int opt_unpack_threshold(MPIOPT_Request* request);
+
 #endif /*MPIOPT_PACK_H*/

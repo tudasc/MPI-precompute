@@ -293,6 +293,18 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
         request->nc_strategy = NC_DIRECT_SEND;
       } else if(strcmp(info_send_strategy, "MIXED") == 0) {
         request->nc_strategy = NC_MIXED;
+        int threshold_flag = 0;
+        char* info_threshold[MPI_MAX_INFO_VAL];
+
+        MPI_Info_get(info, "nc_mixed_threshold", MPI_MAX_INFO_VAL, info_threshold, &threshold_flag);
+        if(threshold_flag) {
+          request->threshold = atoi(info_threshold);
+          if(request->threshold == 0) {
+            request->threshold = DEFAULT_THRESHOLD;
+          }
+        } else {
+          request->threshold = DEFAULT_THRESHOLD;
+        }
       } else if(strcmp(info_send_strategy, "OPT_PACKING") == 0) {
         request->nc_strategy = NC_OPT_PACKING;
       } else {
@@ -328,6 +340,20 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
       read_internal_opal_dtype(request);
       request->pack_size *= count; // read datatype function only sets pack size for one instance
       request->packed_buf = malloc(request->pack_size);
+      break;
+    
+    case NC_MIXED:
+      printf("using mixed strategy with threshold %d bytes\n", request->threshold);
+      read_internal_opal_dtype(request);
+      request->pack_size = 0;
+      for (int i = 0; i < request->num_cont_blocks; i++) {
+        if(request->dtype_lengths[i] <= request->threshold) {
+          request->pack_size += request->dtype_lengths[i];
+        }
+      }
+      request->pack_size *= count;
+      request->packed_buf = malloc(request->pack_size);
+      break;
 
     default:
       break;

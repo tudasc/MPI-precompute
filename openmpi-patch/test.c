@@ -115,7 +115,7 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
       case NC_PACKING:
       // PACKING
         status =
-          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->pack_size,
                       request->remote_data_addr, request->remote_data_rkey);
         break;
       case NC_DIRECT_SEND:
@@ -132,8 +132,25 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
         break;
       case NC_OPT_PACKING:
         status =
-          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->size,
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->pack_size,
                       request->remote_data_addr, request->remote_data_rkey);
+        break;
+
+      case NC_MIXED:
+        for(int k = 0; k < request->count; ++k){
+          for(int i = 0; i < request->num_cont_blocks; ++i) {
+            if(request->dtype_lengths[i] > request->threshold) {
+              status = ucp_get_nbi(request->ep, request->buf + request->dtype_displacements[i] + k * request->dtype_extent, 
+                request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i] + k * request->dtype_extent,
+                request->remote_data_rkey);
+              assert(status == UCS_OK || status == UCS_INPROGRESS);
+            }
+          }
+        }
+        status =
+          ucp_get_nbi(request->ep, (void *)request->packed_buf, request->pack_size,
+                      request->remote_packed_addr, request->remote_packed_data_rkey);
+
         break;
       default:
         break;
@@ -192,14 +209,6 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
                        1)) {
     // request is finished
 
-    if(!(request->is_cont) && request->nc_strategy == NC_PACKING){
-      int position = 0;
-
-      MPI_Unpack(request->packed_buf, request->pack_size, &position,
-        request->buf, request->count, request->dtype, 
-        request->communicators->original_communicator);
-    }
-
     if(!(request->is_cont)) {
       int position = 0;
       switch(request->nc_strategy) {
@@ -211,6 +220,10 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
         break;
       case NC_OPT_PACKING:
         opt_unpack(request);
+        break;
+
+      case NC_MIXED:
+        opt_unpack_threshold(request);
         break;
       default:
         break;

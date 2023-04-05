@@ -173,7 +173,8 @@ void use_self_implemented_comm() {
   MPI_Info info;
   MPI_Info_create(&info);
   
-  MPI_Info_set(info, "nc_send_strategy", "OPT_PACKING");
+  MPI_Info_set(info, "nc_send_strategy", "MIXED");
+  MPI_Info_set(info, "nc_mixed_threshold", "3");
 
   if (rank == 1) {
     //MPI_Info_set(info, "nc_send_strategy", "PACK"); // not matching info for testing
