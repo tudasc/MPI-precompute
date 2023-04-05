@@ -198,21 +198,31 @@ void read_internal_opal_dtype(MPIOPT_Request *request){
     printf("(%d, %d), ", unrolled_disps[i], unrolled_sizes[i]);
   }
   printf("\n");*/
+  //printf("extent %d\n", request->dtype_extent);
+
+  int* unrolled_count_sizes = malloc(unrolled_index * request->count * sizeof(int));
+  int* unrolled_count_disps = malloc(unrolled_index * request->count * sizeof(int));
+  for(int k = 0; k < request->count; ++k) {
+    for(int i = 0; i < unrolled_index; ++i) {
+      unrolled_count_disps[k * unrolled_index + i] = unrolled_disps[i] + k * request->dtype_extent;
+      unrolled_count_sizes[k * unrolled_index + i] = unrolled_sizes[i];
+    }
+  }
 
   // optimize type map by merging contiguous blocks
   request->num_cont_blocks = 1;
   int current_opt_elem = 0;
-  for(int i = 1; i < unrolled_index; ++i){
-    if(unrolled_disps[current_opt_elem] + unrolled_sizes[current_opt_elem] == unrolled_disps[i]) {
+  for(int i = 1; i < unrolled_index * request->count; ++i){
+    if(unrolled_count_disps[current_opt_elem] + unrolled_count_sizes[current_opt_elem] == unrolled_count_disps[i]) {
       // next element comes directly after current contiguous block
       // increase size instead of creating new element
-      unrolled_sizes[current_opt_elem] += unrolled_sizes[i];
+      unrolled_count_sizes[current_opt_elem] += unrolled_count_sizes[i];
     } else {
       // next element is not directly after current block
       // start new contiguous block
       current_opt_elem++;
-      unrolled_disps[current_opt_elem] = unrolled_disps[i];
-      unrolled_sizes[current_opt_elem] = unrolled_sizes[i];
+      unrolled_count_disps[current_opt_elem] = unrolled_count_disps[i];
+      unrolled_count_sizes[current_opt_elem] = unrolled_count_sizes[i];
       request->num_cont_blocks++;
     }
   }
@@ -221,15 +231,15 @@ void read_internal_opal_dtype(MPIOPT_Request *request){
   request->dtype_lengths = malloc(request->num_cont_blocks * sizeof(int));
   request->pack_size = 0;
   for(int i = 0; i < request->num_cont_blocks; ++i) {
-    request->dtype_displacements[i] = unrolled_disps[i];
-    request->dtype_lengths[i] = unrolled_sizes[i];
-    request->pack_size += unrolled_sizes[i];
+    request->dtype_displacements[i] = unrolled_count_disps[i];
+    request->dtype_lengths[i] = unrolled_count_sizes[i];
+    request->pack_size += unrolled_count_sizes[i];
   }
 
   //print typemap
   /*printf("num_cont_blocks %d\n", request->num_cont_blocks);
   for(int i = 0; i < request->num_cont_blocks; ++i) {
-    printf("(%d, %d), ", unrolled_disps[i], unrolled_sizes[i]);
+    printf("(%d, %d), ", request->dtype_displacements[i], request->dtype_lengths[i]);
   }
   printf("\n");*/
 
@@ -238,6 +248,8 @@ void read_internal_opal_dtype(MPIOPT_Request *request){
   free(loop_stack);
   free(loop_count_stack);
   free(loop_disp_stack);
+  free(unrolled_count_sizes);
+  free(unrolled_count_disps);
 }
 
 LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
@@ -271,6 +283,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->ep = ep;
   request->is_cont = (type_size == type_extent);
   request->size = type_size * count;
+  request->count = count;
+  request->dtype_extent = type_extent;
 
   request->dtype = datatype;
 
@@ -338,7 +352,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
     case NC_OPT_PACKING:
       printf("using optimized packing strategy\n");
       read_internal_opal_dtype(request);
-      request->pack_size *= count; // read datatype function only sets pack size for one instance
       request->packed_buf = malloc(request->pack_size);
       break;
     
@@ -351,7 +364,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
           request->pack_size += request->dtype_lengths[i];
         }
       }
-      request->pack_size *= count;
       request->packed_buf = malloc(request->pack_size);
       break;
 
@@ -362,8 +374,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
   request->dest = dest;
   request->dtype_size = type_size;
-  request->count = count;
-  request->dtype_extent = type_extent;
   request->tag = tag;
   request->backup_request = MPI_REQUEST_NULL;
   request->remote_data_addr = NULL;

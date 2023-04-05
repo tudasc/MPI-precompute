@@ -84,14 +84,13 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
       case NC_DIRECT_SEND:
         // DIRECT_SEND
 
-        for(int k = 0; k < request->count; ++k){
-          for(int i = 0; i < request->num_cont_blocks; ++i) {
-            status = ucp_put_nbi(request->ep, request->buf + request->dtype_displacements[i] + k * request->dtype_extent, 
-              request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i] + k * request->dtype_extent,
-              request->remote_data_rkey);
-            assert(status == UCS_OK || status == UCS_INPROGRESS);
-          }
+        for(int i = 0; i < request->num_cont_blocks; ++i) {
+          status = ucp_put_nbi(request->ep, request->buf + request->dtype_displacements[i], 
+            request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i],
+            request->remote_data_rkey);
+          assert(status == UCS_OK || status == UCS_INPROGRESS);
         }
+        
         break;
       case NC_OPT_PACKING:
         status =
@@ -100,16 +99,15 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
         break;
       
       case NC_MIXED:
-        for(int k = 0; k < request->count; ++k){
-          for(int i = 0; i < request->num_cont_blocks; ++i) {
-            if(request->dtype_lengths[i] > request->threshold) {
-              status = ucp_put_nbi(request->ep, request->buf + request->dtype_displacements[i] + k * request->dtype_extent, 
-                request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i] + k * request->dtype_extent,
-                request->remote_data_rkey);
-              assert(status == UCS_OK || status == UCS_INPROGRESS);
-            }
+        for(int i = 0; i < request->num_cont_blocks; ++i) {
+          if(request->dtype_lengths[i] > request->threshold) {
+            status = ucp_put_nbi(request->ep, request->buf + request->dtype_displacements[i], 
+              request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i],
+              request->remote_data_rkey);
+            assert(status == UCS_OK || status == UCS_INPROGRESS);
           }
         }
+        
         status =
           ucp_put_nbi(request->ep, request->packed_buf, request->pack_size,
                       request->remote_packed_addr, request->remote_packed_data_rkey);
@@ -191,14 +189,13 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
         break;
       case NC_DIRECT_SEND:
         // DIRECT_SEND
-        for(int k = 0; k < request->count; ++k){
-          for(int i = 0; i < request->num_cont_blocks; ++i) {
-            status = ucp_get_nbi(request->ep, request->buf + request->dtype_displacements[i] + k * request->dtype_extent, 
-              request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i] + k * request->dtype_extent,
-              request->remote_data_rkey);
-            assert(status == UCS_OK || status == UCS_INPROGRESS);
-          }
+        for(int i = 0; i < request->num_cont_blocks; ++i) {
+          status = ucp_get_nbi(request->ep, request->buf + request->dtype_displacements[i], 
+            request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i],
+            request->remote_data_rkey);
+          assert(status == UCS_OK || status == UCS_INPROGRESS);
         }
+        
         break;
       case NC_OPT_PACKING:
         status =
@@ -207,16 +204,15 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
         break;
 
       case NC_MIXED:
-        for(int k = 0; k < request->count; ++k){
-          for(int i = 0; i < request->num_cont_blocks; ++i) {
-            if(request->dtype_lengths[i] > request->threshold) {
-              status = ucp_get_nbi(request->ep, request->buf + request->dtype_displacements[i] + k * request->dtype_extent, 
-                request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i] + k * request->dtype_extent,
-                request->remote_data_rkey);
-              assert(status == UCS_OK || status == UCS_INPROGRESS);
-            }
+        for(int i = 0; i < request->num_cont_blocks; ++i) {
+          if(request->dtype_lengths[i] > request->threshold) {
+            status = ucp_get_nbi(request->ep, request->buf + request->dtype_displacements[i], 
+              request->dtype_lengths[i], request->remote_data_addr + request->dtype_displacements[i],
+              request->remote_data_rkey);
+            assert(status == UCS_OK || status == UCS_INPROGRESS);
           }
         }
+        
         status =
           ucp_get_nbi(request->ep, (void *)request->packed_buf, request->pack_size,
                       request->remote_packed_addr, request->remote_packed_data_rkey);
