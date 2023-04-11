@@ -292,7 +292,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
 
   if(!(request->is_cont)){
-    char* info_send_strategy[MPI_MAX_INFO_VAL];
+    char info_send_strategy[MPI_MAX_INFO_VAL];
     int info_flag;
 
     if(info != MPI_INFO_NULL){
@@ -308,7 +308,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
       } else if(strcmp(info_send_strategy, "MIXED") == 0) {
         request->nc_strategy = NC_MIXED;
         int threshold_flag = 0;
-        char* info_threshold[MPI_MAX_INFO_VAL];
+        char info_threshold[MPI_MAX_INFO_VAL];
 
         MPI_Info_get(info, "nc_mixed_threshold", MPI_MAX_INFO_VAL, info_threshold, &threshold_flag);
         if(threshold_flag) {
@@ -371,6 +371,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
       break;
     }
   }
+
 
   request->dest = dest;
   request->dtype_size = type_size;
@@ -439,7 +440,7 @@ LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
   return init_request(buf, count, datatype, source, tag, comm, request, false, info);
 }
 
-LINKAGE_TYPE int MPIOPT_Send_init_internal(void *buf, int count,
+LINKAGE_TYPE int MPIOPT_Send_init_internal(const void *buf, int count,
                                            MPI_Datatype datatype, int source,
                                            int tag, MPI_Comm comm,
                                            MPIOPT_Request *request, MPI_Info info) {
