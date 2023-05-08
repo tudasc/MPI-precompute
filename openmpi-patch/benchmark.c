@@ -87,7 +87,7 @@ void use_one_sided_persistent(MPI_Datatype* dtype, int count, int size, int num_
             for (int i = 0; i < size; ++i) {
                 buffer[i] = 2 * (n + 1);
             }
-            MPIOPT_Start(&req);
+            MPIOPT_Start(&req); 
             dummy_workload(work_buffer);
             MPIOPT_Wait(&req, MPI_STATUS_IGNORE);
         }
@@ -298,7 +298,7 @@ int main(int argc, char **argv) {
     sprintf(threshold_str, "%d", threshold);
     MPI_Info_set(info, "nc_mixed_threshold", threshold_str);
 
-    gettimeofday(&start_time, NULL);
+    gettimeofday(&start_time, NULL); // TODO MPI_Wtime
     use_one_sided_persistent(&dtype, count, size * count, num_iters, &info);
     gettimeofday(&stop_time, NULL);
 

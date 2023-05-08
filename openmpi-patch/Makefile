@@ -1,6 +1,6 @@
 # Common definitions
-#CC = clang
-#CC = gcc
+CC = clang
+CC = gcc
 #MPICC = mpicc
 #MPICC = scorep mpicc
 
@@ -8,7 +8,7 @@
 
 # Compiler flags, paths and libraries
 # Include path showing to openmpi internals
-MPI_SRC_PATH=/home/td37cari/openmpi-4.1.1
+MPI_SRC_PATH=/home/td37cari/openmpi_repo/openmpi-4.1.1
 #MPI_SRC_PATH=/home/tj75qeje/openmpi-4.1.1
 
 INCLUDE=-I$(MPI_SRC_PATH) -I$(MPI_SRC_PATH)/opal/include -I$(MPI_SRC_PATH)/ompi/include/ -I$(MPI_SRC_PATH)/orte/include
