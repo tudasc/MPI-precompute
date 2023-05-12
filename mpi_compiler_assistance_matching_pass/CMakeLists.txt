@@ -21,7 +21,7 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
 #target_link_libraries(mpi_assertion_checker PRIVATE MPI::MPI_C)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Og -DDEBUG_MACH_PASS=1")
-# swith off one Warning for release build: some variables are only used for assertions
+# switch off one Warning for release build: some variables are only used for assertions
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DDEBUG_MACH_PASS=0 -Wno-unused-but-set-variable")
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
