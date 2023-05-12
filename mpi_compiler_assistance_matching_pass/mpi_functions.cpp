@@ -207,6 +207,7 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
             .getCallee()
             ->stripPointerCasts());
   }
+
   if (result->mpi_recv_init) {
     result->optimized.mpi_recv_init = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Recv_init",
@@ -220,6 +221,37 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
                               result->mpi_request_free->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
+  }
+
+  if (result->mpi_send_init) {
+
+    auto orig_fn_type = result->mpi_send_init->getFunctionType();
+    std::vector<Type *> params;
+    std::copy(orig_fn_type->param_begin(), orig_fn_type->param_end(),
+              std::back_inserter(params));
+    params.push_back(mpi_implementation_specifics->mpi_info);
+
+    auto new_fntype =
+        FunctionType::get(orig_fn_type->getReturnType(), params, false);
+    result->optimized.mpi_send_init_info =
+        cast<Function>(M.getOrInsertFunction("MPIOPT_Send_init_x", new_fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_recv_init) {
+
+    auto orig_fn_type = result->mpi_recv_init->getFunctionType();
+    std::vector<Type *> params;
+    std::copy(orig_fn_type->param_begin(), orig_fn_type->param_end(),
+              std::back_inserter(params));
+    params.push_back(mpi_implementation_specifics->mpi_info);
+
+    auto new_fntype =
+        FunctionType::get(orig_fn_type->getReturnType(), params, false);
+    result->optimized.mpi_recv_init_info =
+        cast<Function>(M.getOrInsertFunction("MPIOPT_Recv_init_x", new_fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
   }
 
   // construct the init and finish functions, if necessary:
