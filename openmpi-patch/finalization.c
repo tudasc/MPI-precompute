@@ -31,6 +31,12 @@ void MPIOPT_FINALIZE() {
         ucp_mem_unmap(context, req->mem_handle_flag);
         // ucp_mem_unmap(context, req->mem_handle_data); // was freed before
       }
+
+      if(!(req->is_cont)){
+        free(req->packed_buf);
+      }
+
+
       free(req);
     }
     struct list_elem *nxt_elem = elem->next;

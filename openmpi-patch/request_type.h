@@ -59,6 +59,16 @@ struct mpiopt_request {
   ucp_rkey_h remote_flag_rkey;
   void *buf;
   size_t size;
+
+  //datatype metadata
+  char is_cont;
+  void *packed_buf;
+  size_t pack_size;
+  size_t dtype_size;
+  size_t dtype_extent;
+  int count;
+  MPI_Datatype dtype;
+  
   // initialized locally
   void *ucx_request_data_transfer;
   void *ucx_request_flag_transfer;
