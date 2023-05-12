@@ -476,8 +476,8 @@ namespace async_suite {
                         total_tover_comm += local_tover_comm;
                         total_tover_calc += local_tover_calc;
                     }
-                    MPI_Wait(&request_s, MPI_STATUS_IGNORE);
                     MPI_Wait(&request_r, MPI_STATUS_IGNORE);
+                    MPI_Wait(&request_s, MPI_STATUS_IGNORE);
 
 
                 }
@@ -486,8 +486,9 @@ namespace async_suite {
                 ctime = total_ctime / ncycles;
                 tover_comm = total_tover_comm / ncycles;
                 tover_calc = total_tover_calc / ncycles;
-                MPI_Request_free(&request_s);
                 MPI_Request_free(&request_r);
+                MPI_Request_free(&request_s);
+
             } else {
                 pair = rank - stride;
                 MPI_Send_init((char*)sbuf  , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
@@ -502,8 +503,9 @@ namespace async_suite {
                         total_tover_comm += local_tover_comm;
                         total_tover_calc += local_tover_calc;
                     }
-                    MPI_Wait(&request_s, MPI_STATUSES_IGNORE);
                     MPI_Wait(&request_r, MPI_STATUSES_IGNORE);
+                    MPI_Wait(&request_s, MPI_STATUSES_IGNORE);
+
 
                 }
                 t2 = MPI_Wtime();
