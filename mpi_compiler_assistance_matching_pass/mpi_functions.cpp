@@ -177,8 +177,8 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
                                      Type::getInt8PtrTy(M.getContext())},
                                     false);
 
-    result->mpi_info_free =
-        cast<Function>(M.getOrInsertFunction("MPI_Info_Set", fntype)
+    result->mpi_info_set =
+        cast<Function>(M.getOrInsertFunction("MPI_Info_set", fntype)
                            .getCallee()
                            ->stripPointerCasts());
   }
