@@ -1,5 +1,6 @@
 # objis
 *.o
+*.out
 #
 build/*
 

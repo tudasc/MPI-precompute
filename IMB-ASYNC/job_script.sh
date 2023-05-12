@@ -8,22 +8,24 @@
 ###SBATCH --time 00:30:00
 # approx half a minute per benchmark, 4 benchmarks * 28 parameters
 # approx 2h
-#SBATCH --time 2:00:00
+#SBATCH --time 0:03:00
 
 #SBATCH --tasks-per-node 1
 # one node per process
 
 
-###SBATCH --array 0-1
-#SBATCH --array 1-100
+#SBATCH --array 0-1
+###SBATCH --array 1-100
 ###SBATCH --array 0-10
 
 #same as -j
 #SBATCH --job-name MPI-ASYNC-BENCHMARK
 #same as -o
-#SBATCH --output output/job_%a.out
+#SBATCH --output job_%a.out
 ## The real output will be saved into yml files
-#SBATCH --output /dev/null
+###SBATCH --output /dev/null
+
+#SBATCH --error job_%a.err
 
 
 
@@ -33,7 +35,7 @@ MOD=${MOD-0}
 
 
 # config
-OUTPATH=/work/scratch/tj75qeje/mpi-comp-match/output/$SLURM_NPROCS
+OUTPATH=/home/td37cari/benchmark/output/$SLURM_NPROCS
 mkdir -p $OUTPATH
 
 
@@ -43,33 +45,35 @@ TIMEOUT_CMD="/usr/bin/timeout -k 60 60"
 
 ml purge
 ml gcc/8.3.1
-ml hwloc/2.5.0 clang/11.1.0
+ml hwloc/2.5.0 llvm/11.0.0
 ml openucx/1.12.0
+ml openmpi/test
 
-if [[ "$MO" -eq 0 ]]; then
-ml openmpi/normal
-elif [[ "$MOD" -eq 1 ]]; then
-ml openmpi/rendevouz1
-elif [[ "$MOD" -eq 2 ]]; then
-ml openmpi/rendevouz2
-else
-ml openmpi/eager
-fi
 
-#export OMPI_MCA_opal_warn_on_missing_libcuda=0
-#export OMPI_MCA_opal_common_ucx_opal_mem_hooks=1
+#if [[ "$MO" -eq 0 ]]; then
+#ml openmpi/normal
+#elif [[ "$MOD" -eq 1 ]]; then
+#ml openmpi/rendevouz1
+#elif [[ "$MOD" -eq 2 ]]; then
+#ml openmpi/rendevouz2
+#else
+#ml openmpi/eager
+#fi
+
+export OMPI_MCA_opal_warn_on_missing_libcuda=0
+export OMPI_MCA_opal_common_ucx_opal_mem_hooks=1
 export OMPI_MCA_osc=ucx
 export OMPI_MCA_pml=ucx
 export UCX_WARN_UNUSED_ENV_VARS=n
 export UCX_UNIFIED_MODE=y
 
 I=0
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/tj75qeje/mpi-comp-match/IMB-ASYNC/src_cpp/ASYNC/thirdparty/lib/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/td37cari/ucx-testing/IMB-ASYNC/src_cpp/ASYNC/thirdparty/lib/
 
 mkdir -p $OUTPATH
 
 # random parameterorder, to add random disturbance (e.g. the slurm controler will interrupt quite regularly)
-RAND_PARAMS=$(shuf /home/tj75qeje/mpi-comp-match/IMB-ASYNC/parameters.txt)
+RAND_PARAMS=$(shuf /home/td37cari/ucx-testing/IMB-ASYNC/parameters.txt)
 # change delimiter (IFS) to new line.
 IFS_BAK=$IFS
 IFS=$'\n'
@@ -84,9 +88,13 @@ IFS_BAK=
 # get calctime out of param, as calctime will not be included inside the yml, we need to include it in the filename
 CALCTIME=$(echo $PARAM | cut -d' ' -f2)
 
-for CYCLES in $(seq 2 2 64); do
+#for CYCLES in $(seq 2 2 64); do
+for CYCLES in $(seq 10 10 50); do
 
-$TIMEOUT_CMD srun --cpu-bind=cores ./IMB-ASYNC_orig async_persistentpt2pt -cper10usec 64 -workload calc -thread_level single -datatype char -ncycles $CYCLES -nwarmup 8 $PARAM -output $OUTPATH/${MODE}_calctime_${CALCTIME}_cycles_${CYCLES}.$SLURM_JOB_ID.$SLURM_ARRAY_TASK_ID.$I.yaml >& /dev/null
+#$TIMEOUT_CMD srun --cpu-bind=cores ./IMB-ASYNC_orig async_persistentpt2pt -cper10usec 64 -workload calc -thread_level single -datatype char -ncycles $CYCLES -nwarmup 8 $PARAM -output $OUTPATH/ORIG_calctime_${CALCTIME}_cycles_${CYCLES}.$SLURM_JOB_ID.$SLURM_ARRAY_TASK_ID.$I.yaml
+
+$TIMEOUT_CMD srun --cpu-bind=cores ./IMB-ASYNC async_persistentpt2pt -cper10usec 64 -workload calc -thread_level single -datatype char -ncycles $CYCLES -nwarmup 8 $PARAM -output $OUTPATH/PATCHED_calctime_${CALCTIME}_cycles_${CYCLES}.$SLURM_JOB_ID.$SLURM_ARRAY_TASK_ID.$I.yaml
+
 
 done # done for CYCLEs
 
