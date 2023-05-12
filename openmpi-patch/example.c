@@ -57,7 +57,7 @@ void dummy_workload(double *buf) {
   }
 }
 
-void check_buffer_content(char *buf, int n, int* block_sizes) {
+void check_buffer_content(char *buf, int n, int *block_sizes) {
   int not_correct = 0;
   char sent_item = 0;
   int sent_item_count = 0;
@@ -65,37 +65,38 @@ void check_buffer_content(char *buf, int n, int* block_sizes) {
 
   for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
 
-    if(sent_item && sent_item_count == block_sizes[block]) {
+    if (sent_item && sent_item_count == block_sizes[block]) {
       sent_item = 0;
       sent_item_count = 0;
     }
 
-    if(i % BLOCK_SIZE == 0){
+    if (i % BLOCK_SIZE == 0) {
       sent_item = 1;
       block++;
       block %= BLOCK_COUNT;
     }
 
-    if(sent_item){
+    if (sent_item) {
       sent_item_count++;
-      
-      if(buf[i] != 2 * (n + 1)){
+
+      if (buf[i] != 2 * (n + 1)) {
         not_correct++;
-        printf("position %d: %d exptected %d\n", i, buf[i], 2 * (n+1));
+        printf("position %d: %d exptected %d\n", i, buf[i], 2 * (n + 1));
       }
     } else {
-      if(buf[i] != n + 1) {
+      if (buf[i] != n + 1) {
         not_correct++;
-        printf("position %d: %d exptected %d\n", i, buf[i], n+1);
+        printf("position %d: %d exptected %d\n", i, buf[i], n + 1);
       }
     }
   }
 
   if (not_correct != 0) {
-    printf("ERROR: %d: buffer has unexpected content (counted %d wrong values)\n", n, not_correct);
+    printf(
+        "ERROR: %d: buffer has unexpected content (counted %d wrong values)\n",
+        n, not_correct);
     // exit(-1);
   }
-
 }
 
 #define tag_entry 42
@@ -117,54 +118,60 @@ void use_self_implemented_comm() {
 
   // create non contiguous datatype
   // blocklengths cycle through 1 ... 5
-  // displacements is BLOCK_SIZE * blockindex at all times (could use another datatype constructer in this case)
-  // -> [a, b, b, ..., a, a, b, b, ..., a, a, a, b, ...] where a is a sent entry and b is a not sent entry.
-  // full array has size BLOCK_COUNT * 10
+  // displacements is BLOCK_SIZE * blockindex at all times (could use another
+  // datatype constructer in this case)
+  // -> [a, b, b, ..., a, a, b, b, ..., a, a, a, b, ...] where a is a sent entry
+  // and b is a not sent entry. full array has size BLOCK_COUNT * 10
 
   // size = size of all sent elements
   // extent = size of sent and unsent elements
 
-  // MPI represents any created type as a map with {(type0, displ0), (type1, displ1), ..., (typeN-1, displN-1)}
+  // MPI represents any created type as a map with {(type0, displ0), (type1,
+  // displ1), ..., (typeN-1, displN-1)}
 
   int *block_lenghts = malloc(BLOCK_COUNT * sizeof(int));
   int *displacements = malloc(BLOCK_COUNT * sizeof(int));
 
-  for(int i = 0; i < BLOCK_COUNT; ++i){
+  for (int i = 0; i < BLOCK_COUNT; ++i) {
     block_lenghts[i] = (i % 5) + 1;
-    //block_lenghts[i] = 2;
-    displacements[i] = BLOCK_SIZE*i;
+    // block_lenghts[i] = 2;
+    displacements[i] = BLOCK_SIZE * i;
   }
 
   block_lenghts[BLOCK_COUNT - 1] = BLOCK_SIZE;
 
   MPI_Datatype nc_datatype;
 
-  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE, &nc_datatype);
+  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE,
+                   &nc_datatype);
   MPI_Type_commit(&nc_datatype);
 
-  //MPI_Type_vector(BLOCK_COUNT, 2, BLOCK_SIZE, MPI_INT, &nc_datatype);
-  //MPI_Type_commit(&nc_datatype);
+  // MPI_Type_vector(BLOCK_COUNT, 2, BLOCK_SIZE, MPI_INT, &nc_datatype);
+  // MPI_Type_commit(&nc_datatype);
 
   // testing different datatype
-  //MPI_Datatype nc_datatype3;
-  //MPI_Type_contiguous(2, nc_datatype, &nc_datatype3);
-  //MPI_Type_commit(&nc_datatype3);
-  //MPI_Datatype nc_datatype2;
-  //MPI_Type_contiguous(3, nc_datatype3, &nc_datatype2);
-  //MPI_Type_commit(&nc_datatype2);
+  // MPI_Datatype nc_datatype3;
+  // MPI_Type_contiguous(2, nc_datatype, &nc_datatype3);
+  // MPI_Type_commit(&nc_datatype3);
+  // MPI_Datatype nc_datatype2;
+  // MPI_Type_contiguous(3, nc_datatype3, &nc_datatype2);
+  // MPI_Type_commit(&nc_datatype2);
 
   MPI_Count typesize, lb, extent;
   MPI_Type_size_x(nc_datatype, &typesize);
   MPI_Type_get_extent_x(nc_datatype, &lb, &extent);
 
-  //int num_integers, num_adresses, num_datatypes, combiner;
-  //MPI_Type_get_envelope(nc_datatype, &num_integers, &num_adresses, &num_datatypes, &combiner);
+  // int num_integers, num_adresses, num_datatypes, combiner;
+  // MPI_Type_get_envelope(nc_datatype, &num_integers, &num_adresses,
+  // &num_datatypes, &combiner);
 
-  //int *array_of_ints = malloc(num_integers * sizeof(int));
-  //MPI_Aint *array_of_addresses = malloc(num_adresses * sizeof(MPI_Aint));
-  //MPI_Datatype *array_of_datatypes = malloc(num_datatypes * sizeof(MPI_Datatype));
+  // int *array_of_ints = malloc(num_integers * sizeof(int));
+  // MPI_Aint *array_of_addresses = malloc(num_adresses * sizeof(MPI_Aint));
+  // MPI_Datatype *array_of_datatypes = malloc(num_datatypes *
+  // sizeof(MPI_Datatype));
 
-  //MPI_Type_get_contents(nc_datatype, num_integers, num_adresses, num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
+  // MPI_Type_get_contents(nc_datatype, num_integers, num_adresses,
+  // num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
 #ifdef STATISTIC_PRINTING
   printf("Typesize: %lld, Type extent: %lld\n", typesize, extent);
 #endif
@@ -172,18 +179,22 @@ void use_self_implemented_comm() {
   MPI_Request req;
   MPI_Info info;
   MPI_Info_create(&info);
-  
-  MPI_Info_set(info, "nc_send_strategy", "MIXED"); // possible: PACK, DIRECT_SEND, OPT_PACKING, MIXED (needs nc_mixed_threshold)
+
+  MPI_Info_set(info, "nc_send_strategy",
+               "MIXED"); // possible: PACK, DIRECT_SEND, OPT_PACKING, MIXED
+                         // (needs nc_mixed_threshold)
   MPI_Info_set(info, "nc_mixed_threshold", "3");
 
   if (rank == 1) {
-    //MPI_Info_set(info, "nc_send_strategy", "PACK"); // not matching info for testing
+    // MPI_Info_set(info, "nc_send_strategy", "PACK"); // not matching info for
+    // testing
 
-    MPIOPT_Send_init_x(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req, info);
+    MPIOPT_Send_init_x(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req,
+                       info);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-        //buffer[i] = rank * i * n;
+        // buffer[i] = rank * i * n;
         buffer[i] = 2 * (n + 1);
       }
 
@@ -198,13 +209,15 @@ void use_self_implemented_comm() {
       */
     }
   } else {
-    //MPI_Info_set(info, "nc_send_strategy", "DIRECT_SEND"); // not matching info for testing
+    // MPI_Info_set(info, "nc_send_strategy", "DIRECT_SEND"); // not matching
+    // info for testing
 
-    MPIOPT_Recv_init_x(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req, info);
+    MPIOPT_Recv_init_x(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req,
+                       info);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-        //buffer[i] = rank * i * n;
+        // buffer[i] = rank * i * n;
         buffer[i] = (n + 1);
       }
 
@@ -251,17 +264,18 @@ void use_standard_comm() {
   int *block_lenghts = malloc(BLOCK_COUNT * sizeof(int));
   int *displacements = malloc(BLOCK_COUNT * sizeof(int));
 
-  for(int i = 0; i < BLOCK_COUNT; ++i){
+  for (int i = 0; i < BLOCK_COUNT; ++i) {
     block_lenghts[i] = (i % 5) + 1;
-    //block_lenghts[i] = 2;
-    displacements[i] = BLOCK_SIZE*i;
+    // block_lenghts[i] = 2;
+    displacements[i] = BLOCK_SIZE * i;
   }
 
   block_lenghts[BLOCK_COUNT - 1] = BLOCK_SIZE;
 
   MPI_Datatype nc_datatype;
 
-  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE, &nc_datatype);
+  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE,
+                   &nc_datatype);
   MPI_Type_commit(&nc_datatype);
 
   MPI_Count typesize, lb, extent;
@@ -272,14 +286,13 @@ void use_standard_comm() {
   printf("Typesize: %lld, Type extent: %lld\n", typesize, extent);
 #endif
 
-
   MPI_Request req;
 
   if (rank == 1) {
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-        //buffer[i] = rank * i * n;
+        // buffer[i] = rank * i * n;
         buffer[i] = 2 * (n + 1);
       }
 
@@ -290,7 +303,7 @@ void use_standard_comm() {
   } else {
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-        //buffer[i] = rank * i * n;
+        // buffer[i] = rank * i * n;
         buffer[i] = n + 1;
       }
 
@@ -328,17 +341,18 @@ void use_persistent_comm() {
   int *block_lenghts = malloc(BLOCK_COUNT * sizeof(int));
   int *displacements = malloc(BLOCK_COUNT * sizeof(int));
 
-  for(int i = 0; i < BLOCK_COUNT; ++i){
+  for (int i = 0; i < BLOCK_COUNT; ++i) {
     block_lenghts[i] = (i % 5) + 1;
-    //block_lenghts[i] = 2;
-    displacements[i] = BLOCK_SIZE*i;
+    // block_lenghts[i] = 2;
+    displacements[i] = BLOCK_SIZE * i;
   }
 
   block_lenghts[BLOCK_COUNT - 1] = BLOCK_SIZE;
 
   MPI_Datatype nc_datatype;
 
-  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE, &nc_datatype);
+  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE,
+                   &nc_datatype);
   MPI_Type_commit(&nc_datatype);
 
   MPI_Count typesize, lb, extent;
@@ -357,7 +371,7 @@ void use_persistent_comm() {
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-        //buffer[i] = rank * i * n;
+        // buffer[i] = rank * i * n;
         buffer[i] = 2 * (n + 1);
       }
 
@@ -371,7 +385,7 @@ void use_persistent_comm() {
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-        //buffer[i] = rank * i * n;
+        // buffer[i] = rank * i * n;
         buffer[i] = (n + 1);
       }
 
