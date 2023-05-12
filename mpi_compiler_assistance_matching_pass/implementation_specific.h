@@ -28,6 +28,9 @@ public:
   llvm::Constant *ANY_SOURCE;
   llvm::Constant *ANY_TAG;
 
+  llvm::Constant *INFO_NULL;
+  llvm::Type *mpi_info;
+
   int get_size_of_mpi_type(llvm::Constant *type);
 };
 

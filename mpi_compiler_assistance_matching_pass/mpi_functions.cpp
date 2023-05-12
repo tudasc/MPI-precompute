@@ -15,6 +15,7 @@
  */
 
 #include "mpi_functions.h"
+#include "implementation_specific.h"
 #include <assert.h>
 
 #include "llvm/IR/InstrTypes.h"
@@ -140,7 +141,46 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 
     } else if (f->getName().equals("MPI_Request_free")) {
       result->mpi_request_free = f;
+    } else if (f->getName().equals("MPI_Info_create")) {
+      result->mpi_info_create = f;
+    } else if (f->getName().equals("MPI_Info_set")) {
+      result->mpi_info_set = f;
+    } else if (f->getName().equals("MPI_Info_free")) {
+      result->mpi_info_free = f;
     }
+  }
+
+  if (result->mpi_info_create == nullptr) {
+    auto fntype = FunctionType::get(
+        Type::getInt32Ty(M.getContext()),
+        {mpi_implementation_specifics->mpi_info->getPointerTo()}, false);
+
+    result->mpi_info_create =
+        cast<Function>(M.getOrInsertFunction("MPI_Info_create", fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_info_free == nullptr) {
+    auto fntype = FunctionType::get(
+        Type::getInt32Ty(M.getContext()),
+        {mpi_implementation_specifics->mpi_info->getPointerTo()}, false);
+
+    result->mpi_info_free =
+        cast<Function>(M.getOrInsertFunction("MPI_Info_free", fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_info_set == nullptr) {
+    auto fntype = FunctionType::get(Type::getInt32Ty(M.getContext()),
+                                    {mpi_implementation_specifics->mpi_info,
+                                     Type::getInt8PtrTy(M.getContext()),
+                                     Type::getInt8PtrTy(M.getContext())},
+                                    false);
+
+    result->mpi_info_free =
+        cast<Function>(M.getOrInsertFunction("MPI_Info_Set", fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
   }
 
   // construct the optimized version of functions, if original functions where
