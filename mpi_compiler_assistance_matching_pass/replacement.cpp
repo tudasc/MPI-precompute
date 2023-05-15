@@ -25,6 +25,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "debug.h"
+#include "nc_settings.h"
 
 using namespace llvm;
 
@@ -121,9 +122,14 @@ void replace_with_info(CallBase *call, Function *func) {
   std::vector<Value *> args;
 
   // set a key value pair to the info object:
-  auto key = builder.CreateGlobalStringPtr("KEY");
-  auto value = builder.CreateGlobalStringPtr("VALUE");
+  auto key = builder.CreateGlobalStringPtr("nc_send_strategy");
+  auto value = builder.CreateGlobalStringPtr(STRATEGY);
+  builder.CreateCall(mpi_func->mpi_info_set, {info_obj, key, value});
 
+  key = builder.CreateGlobalStringPtr("nc_mixed_threshold");
+  char threshold_str[30];
+  sprintf(threshold_str, "%d", THRESHOLD);
+  value = builder.CreateGlobalStringPtr(threshold_str);
   builder.CreateCall(mpi_func->mpi_info_set, {info_obj, key, value});
 
   for (unsigned int i = 0; i < call->getNumArgOperands(); ++i) {
