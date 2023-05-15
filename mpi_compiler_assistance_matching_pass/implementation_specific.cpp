@@ -33,10 +33,27 @@ ImplementationSpecifics::ImplementationSpecifics(Module &M) {
   /*COMM_WORLD =
       ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_COMM_WORLD);
       */
+  COMM_WORLD = nullptr;
+  INFO_NULL = nullptr;
   ANY_TAG = ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_ANY_TAG);
   ANY_SOURCE =
       ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_ANY_SOURCE);
+
+  mpi_info = nullptr;
+  auto types = M.getIdentifiedStructTypes();
+  for (auto t : types) {
+    if (t->getName() == "struct.ompi_info_t") {
+      // in openmpi MPI_Info is defined as a ptr to this struct
+      mpi_info = t->getPointerTo();
+    }
+  }
+  // create if not included by mpi header (if not used)
+  if (mpi_info == nullptr) {
+    mpi_info = StructType::create(M.getContext(), "struct.ompi_info_t")
+                   ->getPointerTo();
+  }
 }
+
 ImplementationSpecifics::~ImplementationSpecifics() {
   // MPI_Finalize();
 }

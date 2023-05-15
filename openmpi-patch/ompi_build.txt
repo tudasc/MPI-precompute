@@ -9,7 +9,7 @@ include definitions from header interface.h in ompi/include/mpi.h.in
 beware that is is inside the #if defined(c_plusplus) || defined(__cplusplus) block that defines extern C for calling it from cpp
 and also include OMPI_DECLSPEC before each of them
 
-patch makefile.in:
+patch ompi/mca/usc/ucx/makefile.in:
 add line 1746:
 	one-sided-persistent.c
 (dont forget to add / in line 1745)

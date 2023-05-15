@@ -33,7 +33,9 @@ struct mpiopt_functions {
   llvm::Function *mpi_wait = nullptr;
   llvm::Function *mpi_start = nullptr;
   llvm::Function *mpi_send_init = nullptr;
+  llvm::Function *mpi_send_init_info = nullptr;
   llvm::Function *mpi_recv_init = nullptr;
+  llvm::Function *mpi_recv_init_info = nullptr;
   llvm::Function *mpi_request_free = nullptr;
   llvm::Function *init = nullptr;
   llvm::Function *finalize = nullptr;
@@ -73,6 +75,10 @@ struct mpi_functions {
   llvm::Function *mpi_recv_init = nullptr;
   llvm::Function *mpi_request_free = nullptr;
 
+  llvm::Function *mpi_info_create = nullptr;
+  llvm::Function *mpi_info_set = nullptr;
+  llvm::Function *mpi_info_free = nullptr;
+
   struct mpiopt_functions optimized;
 
   std::vector<llvm::CallBase *> send_calls; // all calls that send MPI messages
@@ -84,9 +90,11 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M);
 bool is_mpi_used(struct mpi_functions *mpi_func);
 
 bool is_mpi_call(llvm::CallBase *call);
+
 bool is_mpi_function(llvm::Function *f);
 
 bool is_send_function(llvm::Function *f);
+
 bool is_recv_function(llvm::Function *f);
 
 #endif /* MACH_MPI_FUNCTIONS_H_ */

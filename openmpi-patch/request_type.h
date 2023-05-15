@@ -62,7 +62,7 @@ struct mpiopt_request {
   void *buf;
   size_t size;
 
-  //datatype metadata
+  // datatype metadata
   char nc_strategy;
   char remote_strategy;
   char is_cont;
@@ -73,10 +73,10 @@ struct mpiopt_request {
   int count;
   MPI_Datatype dtype;
   int num_cont_blocks;
-  int* dtype_displacements;
-  int* dtype_lengths;
+  int *dtype_displacements;
+  int *dtype_lengths;
   int threshold; // packing threshold for mixed sending
-  
+
   // initialized locally
   void *ucx_request_data_transfer;
   void *ucx_request_flag_transfer;

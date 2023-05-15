@@ -34,11 +34,13 @@ OMPI_DECLSPEC int MPIOPT_Recv_init(void *buf, int count, MPI_Datatype datatype,
                                    int source, int tag, MPI_Comm comm,
                                    MPI_Request *request);
 OMPI_DECLSPEC int MPIOPT_Send_init_x(const void *buf, int count,
-                                   MPI_Datatype datatype, int dest, int tag,
-                                   MPI_Comm comm, MPI_Request *request, MPI_Info info);
-OMPI_DECLSPEC int MPIOPT_Recv_init_x(void *buf, int count, MPI_Datatype datatype,
-                                   int source, int tag, MPI_Comm comm,
-                                   MPI_Request *request, MPI_Info info);
+                                     MPI_Datatype datatype, int dest, int tag,
+                                     MPI_Comm comm, MPI_Request *request,
+                                     MPI_Info info);
+OMPI_DECLSPEC int MPIOPT_Recv_init_x(void *buf, int count,
+                                     MPI_Datatype datatype, int source, int tag,
+                                     MPI_Comm comm, MPI_Request *request,
+                                     MPI_Info info);
 OMPI_DECLSPEC int MPIOPT_Request_free(MPI_Request *request);
 
 OMPI_DECLSPEC void MPIOPT_INIT();

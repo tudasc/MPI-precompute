@@ -102,6 +102,44 @@ void replace_call(CallBase *call, Function *func) {
   // call->eraseFromParent();
 }
 
+void replace_with_info(CallBase *call, Function *func) {
+
+  // one could assert that the only addition is the info object
+  assert(call->getFunctionType() != func->getFunctionType());
+
+  IRBuilder<> builder(call->getContext());
+
+  // before the original call
+  builder.SetInsertPoint(call);
+
+  auto info_obj_ptr =
+      builder.CreateAlloca(mpi_implementation_specifics->mpi_info);
+
+  builder.CreateCall(mpi_func->mpi_info_create, {info_obj_ptr});
+
+  auto info_obj = builder.CreateLoad(info_obj_ptr);
+  std::vector<Value *> args;
+
+  // set a key value pair to the info object:
+  auto key = builder.CreateGlobalStringPtr("KEY");
+  auto value = builder.CreateGlobalStringPtr("VALUE");
+
+  builder.CreateCall(mpi_func->mpi_info_set, {info_obj, key, value});
+
+  for (unsigned int i = 0; i < call->getNumArgOperands(); ++i) {
+    args.push_back(call->getArgOperand(i));
+  }
+  args.push_back(info_obj);
+
+  auto new_call = builder.CreateCall(func, args);
+
+  // also free the info
+  builder.CreateCall(mpi_func->mpi_info_free, info_obj_ptr);
+
+  call->replaceAllUsesWith(new_call);
+  call->eraseFromParent();
+}
+
 bool check_if_all_usages_of_ptr_are_lifetime(Value *ptr) {
 
   for (auto *u : ptr->users()) {
@@ -193,9 +231,9 @@ void replace_communication_calls(std::vector<CallBase *> init_send_calls,
     } else if (call->getCalledFunction() == mpi_func->mpi_request_free) {
       replace_call(call, mpi_func->optimized.mpi_request_free);
     } else if (call->getCalledFunction() == mpi_func->mpi_send_init) {
-      replace_call(call, mpi_func->optimized.mpi_send_init);
+      replace_with_info(call, mpi_func->optimized.mpi_send_init_info);
     } else if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
-      replace_call(call, mpi_func->optimized.mpi_recv_init);
+      replace_with_info(call, mpi_func->optimized.mpi_recv_init_info);
     } else {
 
       errs() << "This MPI call is currently NOT supported\n";

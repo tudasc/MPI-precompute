@@ -92,6 +92,8 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
 
     // Debug(M.dump(););
 
+    mpi_implementation_specifics = new ImplementationSpecifics(M);
+
     mpi_func = get_used_mpi_functions(M);
     // TODO is_mpi_used only checks for MPI init, but we want to use this on
     // apps with muliple translation units
@@ -104,8 +106,6 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
     analysis_results = new RequiredAnalysisResults(this, M);
 
     function_metadata = new FunctionMetadata(analysis_results->getTLI(), M);
-
-    mpi_implementation_specifics = new ImplementationSpecifics(M);
 
     // collect all Persistent Comm Operations
     std::vector<llvm::CallBase *> send_init_list;

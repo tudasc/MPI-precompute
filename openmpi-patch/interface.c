@@ -28,8 +28,9 @@ int MPIOPT_Send_init(const void *buf, int count, MPI_Datatype datatype,
                                    (MPIOPT_Request *)*request, MPI_INFO_NULL);
 }
 
-int MPIOPT_Send_init_x(const void *buf, int count, MPI_Datatype datatype, 
-                        int dest, int tag, MPI_Comm comm, MPI_Request *request, MPI_Info info) {                       
+int MPIOPT_Send_init_x(const void *buf, int count, MPI_Datatype datatype,
+                       int dest, int tag, MPI_Comm comm, MPI_Request *request,
+                       MPI_Info info) {
 
   *request = malloc(sizeof(MPIOPT_Request));
 
@@ -45,7 +46,8 @@ int MPIOPT_Recv_init(void *buf, int count, MPI_Datatype datatype, int source,
 }
 
 int MPIOPT_Recv_init_x(void *buf, int count, MPI_Datatype datatype, int source,
-                     int tag, MPI_Comm comm, MPI_Request *request, MPI_Info info) {
+                       int tag, MPI_Comm comm, MPI_Request *request,
+                       MPI_Info info) {
   *request = malloc(sizeof(MPIOPT_Request));
 
   return MPIOPT_Recv_init_internal(buf, count, datatype, source, tag, comm,

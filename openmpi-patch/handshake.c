@@ -86,13 +86,15 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
       // found matching handshake
       receive_handshake(request);
 
-      if((!request->is_cont) && request->nc_strategy != request->remote_strategy) {
+      if ((!request->is_cont) &&
+          request->nc_strategy != request->remote_strategy) {
         // strategies to handle non contiguous datatypes are not matching
-        printf("Strategies to handle non contiguous datatypes are not matching, using fall back\n");
+        printf("Strategies to handle non contiguous datatypes are not "
+               "matching, using fall back\n");
         // post the matching receive, blocking as we have probed
         MPI_Recv(request->buf, request->count, request->dtype, request->dest,
-                request->tag, request->communicators->original_communicator,
-                status);
+                 request->tag, request->communicators->original_communicator,
+                 status);
         set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
         request->flag = 4;
         *flag = 1;
@@ -135,15 +137,14 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   uint64_t data_ptr;
 
   size_t buffer_size;
-  if(!request->is_cont){
-    switch (request->nc_strategy)
-    {
+  if (!request->is_cont) {
+    switch (request->nc_strategy) {
     case NC_PACKING:
       // PACKING
       data_ptr = request->packed_buf;
       buffer_size = request->pack_size;
       break;
-      
+
     case NC_DIRECT_SEND:
       // DIRECT SEND
       data_ptr = request->buf;
@@ -219,7 +220,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   // pack pack_buf key
   void *rkey_packed_buffer;
   size_t rkey_size_packed_buf;
-  if(request->nc_strategy == NC_MIXED && request->pack_size != 0) {
+  if (request->nc_strategy == NC_MIXED && request->pack_size != 0) {
     memset(&mem_params, 0, sizeof(ucp_mem_map_params_t));
 
     mem_params.address = request->packed_buf;
@@ -228,21 +229,22 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
     mem_params.field_mask =
         UCP_MEM_MAP_PARAM_FIELD_ADDRESS | UCP_MEM_MAP_PARAM_FIELD_LENGTH;
 
-    ucp_status = ucp_mem_map(context, &mem_params, &request->mem_handle_packed_data);
+    ucp_status =
+        ucp_mem_map(context, &mem_params, &request->mem_handle_packed_data);
     assert(ucp_status == UCS_OK && "Error in register mem for RDMA operation");
-
 
     // pack a remote pack buffer key
     ucp_status = ucp_rkey_pack(context, request->mem_handle_packed_data,
-                              &rkey_packed_buffer, &rkey_size_packed_buf);
+                               &rkey_packed_buffer, &rkey_size_packed_buf);
     assert(ucp_status == UCS_OK && "Error in register mem for RDMA operation");
   }
 
   size_t msg_size = sizeof(size_t) * 2 + sizeof(uint64_t) * 2 + rkey_size_data +
                     rkey_size_flag + sizeof(uint64_t) * 2 + sizeof(char);
 
-  if(request->nc_strategy == NC_MIXED && request->pack_size != 0) {
-    msg_size += rkey_size_packed_buf + sizeof(uint64_t) + sizeof(size_t) + sizeof(uint64_t);
+  if (request->nc_strategy == NC_MIXED && request->pack_size != 0) {
+    msg_size += rkey_size_packed_buf + sizeof(uint64_t) + sizeof(size_t) +
+                sizeof(uint64_t);
   }
   request->rdma_info_buf = calloc(msg_size, 1);
 
@@ -265,7 +267,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   memcpy(current_pos, &request->nc_strategy, sizeof(char));
   current_pos += sizeof(char);
 
-  if(request->nc_strategy == NC_MIXED && request->pack_size != 0) {
+  if (request->nc_strategy == NC_MIXED && request->pack_size != 0) {
     *(size_t *)current_pos = rkey_size_packed_buf;
     current_pos += sizeof(size_t);
     *(u_int64_t *)current_pos = request->packed_buf;
@@ -336,12 +338,13 @@ LINKAGE_TYPE void receive_handshake(MPIOPT_Request *request) {
   request->remote_strategy = *current_pos;
   current_pos += sizeof(char);
 
-  if(request->nc_strategy == NC_MIXED && request->pack_size != 0) {
+  if (request->nc_strategy == NC_MIXED && request->pack_size != 0) {
     rkey_size_packed_buf = *(size_t *)current_pos;
     current_pos += sizeof(size_t);
     request->remote_packed_addr = *(u_int64_t *)current_pos;
     current_pos += sizeof(u_int64_t);
-    ucp_ep_rkey_unpack(request->ep, current_pos, &request->remote_packed_data_rkey);
+    ucp_ep_rkey_unpack(request->ep, current_pos,
+                       &request->remote_packed_data_rkey);
     current_pos += rkey_size_packed_buf;
     current_pos += sizeof(u_int64_t); // null termination
   }
