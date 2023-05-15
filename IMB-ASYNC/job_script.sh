@@ -91,7 +91,7 @@ CALCTIME=$(echo $PARAM | cut -d' ' -f2)
 #for CYCLES in $(seq 2 2 64); do
 for CYCLES in $(seq 10 10 50); do
 
-#$TIMEOUT_CMD srun --cpu-bind=cores ./IMB-ASYNC_orig async_persistentpt2pt -cper10usec 64 -workload calc -thread_level single -datatype char -ncycles $CYCLES -nwarmup 8 $PARAM -output $OUTPATH/ORIG_calctime_${CALCTIME}_cycles_${CYCLES}.$SLURM_JOB_ID.$SLURM_ARRAY_TASK_ID.$I.yaml
+$TIMEOUT_CMD srun --cpu-bind=cores ./IMB-ASYNC_orig async_persistentpt2pt -cper10usec 64 -workload calc -thread_level single -datatype char -ncycles $CYCLES -nwarmup 8 $PARAM -output $OUTPATH/ORIG_calctime_${CALCTIME}_cycles_${CYCLES}.$SLURM_JOB_ID.$SLURM_ARRAY_TASK_ID.$I.yaml
 
 $TIMEOUT_CMD srun --cpu-bind=cores ./IMB-ASYNC async_persistentpt2pt -cper10usec 64 -workload calc -thread_level single -datatype char -ncycles $CYCLES -nwarmup 8 $PARAM -output $OUTPATH/PATCHED_calctime_${CALCTIME}_cycles_${CYCLES}.$SLURM_JOB_ID.$SLURM_ARRAY_TASK_ID.$I.yaml
 

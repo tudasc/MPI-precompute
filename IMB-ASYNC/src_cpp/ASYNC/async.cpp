@@ -119,7 +119,9 @@ namespace async_suite {
         GET_PARAMETER(std::vector<int>, len);
         GET_PARAMETER(MPI_Datatype, datatype);
         scope = std::make_shared<VarLenScope>(len);
-        MPI_Type_size(datatype, &dtsize);
+        MPI_Aint lb, extent;
+        MPI_Type_get_extent(datatype, &lb, &extent);
+        dtsize = (int)extent;
         size_t size_to_alloc = (size_t)scope->get_max_len() * (size_t)dtsize * buf_size_multiplier();
         if (size_to_alloc <= ASSUMED_CACHE_SIZE * 3)
             size_to_alloc = ASSUMED_CACHE_SIZE * 3;
@@ -438,17 +440,14 @@ namespace async_suite {
             calc.init();
         }
 
-        bool AsyncBenchmark_persistentpt2pt::benchmark(int orig_count, MPI_Datatype orig_datatype, int nwarmup, int ncycles, double &time, double &tover_comm, double &tover_calc) {
+        bool AsyncBenchmark_persistentpt2pt::benchmark(int count, MPI_Datatype datatype, int nwarmup, int ncycles, double &time, double &tover_comm, double &tover_calc) {
             if (!is_rank_active) {
                 MPI_Barrier(MPI_COMM_WORLD);
                 double ctime=0;
                 MPI_Allreduce(MPI_IN_PLACE, &ctime, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
                 return false;
             }
-            size_t b = (size_t)orig_count * (size_t)dtsize;
-            int count =b;
-            datatype=MPI_BYTE;
-            size_t n = allocated_size / b;
+            
             double t1 = 0, t2 = 0, ctime = 0, total_ctime = 0, total_tover_comm = 0, total_tover_calc = 0,
                                               local_ctime = 0, local_tover_comm = 0, local_tover_calc = 0;
             const int tag = 1;
@@ -461,7 +460,7 @@ namespace async_suite {
             if (group % 2 == 0) {
                 pair = rank + stride;
 
-                MPI_Send_init((char*)sbuf  , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
+                MPI_Send_init((char*)sbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
                 MPI_Recv_init((char*)rbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_r);
                 for (int i = 0; i < ncycles + nwarmup; i++) {
 
@@ -476,8 +475,8 @@ namespace async_suite {
                         total_tover_comm += local_tover_comm;
                         total_tover_calc += local_tover_calc;
                     }
-                    MPI_Wait(&request_s, MPI_STATUS_IGNORE);
                     MPI_Wait(&request_r, MPI_STATUS_IGNORE);
+                    MPI_Wait(&request_s, MPI_STATUS_IGNORE);
 
 
                 }
@@ -486,11 +485,11 @@ namespace async_suite {
                 ctime = total_ctime / ncycles;
                 tover_comm = total_tover_comm / ncycles;
                 tover_calc = total_tover_calc / ncycles;
-                MPI_Request_free(&request_s);
                 MPI_Request_free(&request_r);
+                MPI_Request_free(&request_s);
             } else {
                 pair = rank - stride;
-                MPI_Send_init((char*)sbuf  , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
+                MPI_Send_init((char*)sbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
                 MPI_Recv_init((char*)rbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_r);
                 for (int i = 0; i < ncycles + nwarmup; i++) {
                     if (i == nwarmup) t1 = MPI_Wtime();
@@ -502,8 +501,8 @@ namespace async_suite {
                         total_tover_comm += local_tover_comm;
                         total_tover_calc += local_tover_calc;
                     }
-                    MPI_Wait(&request_s, MPI_STATUSES_IGNORE);
                     MPI_Wait(&request_r, MPI_STATUSES_IGNORE);
+                    MPI_Wait(&request_s, MPI_STATUSES_IGNORE);
 
                 }
                 t2 = MPI_Wtime();

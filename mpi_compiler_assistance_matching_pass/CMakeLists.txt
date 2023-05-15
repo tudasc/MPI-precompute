@@ -14,6 +14,7 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
     analysis_results.cpp
     replacement.h
     replacement.cpp
+    nc_settings.h
 )
 
 # if one wants to use mpi
