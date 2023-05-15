@@ -49,6 +49,7 @@ int MPIOPT_Recv_init_x(void *buf, int count, MPI_Datatype datatype, int source,
                        int tag, MPI_Comm comm, MPI_Request *request,
                        MPI_Info info) {
   *request = malloc(sizeof(MPIOPT_Request));
+
   return MPIOPT_Recv_init_internal(buf, count, datatype, source, tag, comm,
                                    (MPIOPT_Request *)*request, info);
 }

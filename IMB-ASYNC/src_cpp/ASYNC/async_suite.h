@@ -62,6 +62,11 @@ goods and services.
 #include "utils.h"
 #include "argsparser.h"
 
+#define VEC_FILL_RATIO 0.5
+#define VEC_NUM_BLOCKS 10
+
+#define INDEXED_NUM_BLOCKS 10
+
 namespace async_suite {
 
     #include "benchmark_suite.h"
@@ -75,7 +80,8 @@ namespace async_suite {
         parser.add_vector<int>("len", "4,128,2048,32768,524288").
                      set_mode(args_parser::option::APPLY_DEFAULTS_ONLY_WHEN_MISSING).
                      set_caption("INT,INT,...");
-        parser.add<std::string>("datatype", "double").set_caption("double|float|int|char");
+        parser.add<std::string>("datatype", "double").set_caption("double|float|int|char|vec|indexed");
+        parser.add<int>("vecsize", 100).set_caption("INT, size of nc vectors");
         parser.add_vector<int>("ncycles", "1000");
         parser.add<int>("nwarmup", 0).set_caption("INT -- number of warmup cycles [default: 0]");
         parser.add_vector<int>("calctime", "10,10,50,500,10000").
@@ -99,6 +105,7 @@ namespace async_suite {
     int cper10usec;
     int estcycles;
     int spinperiod;
+    int vec_size;
     enum workload_t {
         NONE, CALC, CALC_AND_PROGRESS, CALC_AND_MPICH_PROGRESS
     } workload;
@@ -113,6 +120,7 @@ namespace async_suite {
         }
         parser.get<int>("len", len);
         parser.get<int>("calctime", calctime);
+        vec_size = parser.get<int>("vecsize");
         cper10usec = parser.get<int>("cper10usec");
         std::string str_workload = parser.get<std::string>("workload");
         if (str_workload == "none") {
@@ -132,8 +140,15 @@ namespace async_suite {
         std::string dt = parser.get<std::string>("datatype");
         if (dt == "int") datatype = MPI_INT;
         else if (dt == "double") datatype = MPI_DOUBLE;
-	else if (dt == "float") datatype = MPI_FLOAT;
+	    else if (dt == "float") datatype = MPI_FLOAT;
         else if (dt == "char") datatype = MPI_CHAR;
+        else if (dt == "vec") {
+            int stride = vec_size / VEC_NUM_BLOCKS;
+            int blocklength = (int)((double)stride * VEC_FILL_RATIO);
+            
+            MPI_Type_vector(VEC_NUM_BLOCKS, blocklength, stride, MPI_BYTE, &datatype);
+            MPI_Type_commit(&datatype);
+        }
         else {
             output << get_name() << ": " << "Unknown data type in 'datatype' option. Use -help for help." << std::endl;
             return false;
