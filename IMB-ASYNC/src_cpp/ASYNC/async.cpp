@@ -452,12 +452,13 @@ namespace async_suite {
                                               local_ctime = 0, local_tover_comm = 0, local_tover_calc = 0;
             const int tag = 1;
             int pair = -1;
-            MPI_Request request_s;
-            MPI_Request request_r;
 
             calc.reqs = nullptr;
             calc.num_requests = 0;
             if (group % 2 == 0) {
+                MPI_Request request_s;
+                MPI_Request request_r;
+
                 pair = rank + stride;
 
                 MPI_Send_init((char*)sbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
@@ -488,6 +489,9 @@ namespace async_suite {
                 MPI_Request_free(&request_r);
                 MPI_Request_free(&request_s);
             } else {
+                MPI_Request request_s;
+                MPI_Request request_r;
+
                 pair = rank - stride;
                 MPI_Send_init((char*)sbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_s);
                 MPI_Recv_init((char*)rbuf , count, datatype, pair, tag, MPI_COMM_WORLD, &request_r);
