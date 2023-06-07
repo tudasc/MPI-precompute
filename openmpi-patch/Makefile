@@ -48,7 +48,7 @@ benchmark_debug: $(BENCHMARKOBJS_DEBUG)
 
 	
 one-sided-persistent.c: $(SOURCES) $(HEADERS)
-	$(MPICC) -E $(CFLAGS) -DLINKAGE_TYPE=static one-sided-persistent.h -o $@
+	$(CC) -E $(CFLAGS) -DLINKAGE_TYPE=static one-sided-persistent.h -o $@
 
 %.o: %.c
 	$(MPICC) -c $(CFLAGS) $<
