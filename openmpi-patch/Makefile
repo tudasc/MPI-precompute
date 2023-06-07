@@ -1,6 +1,6 @@
 # Common definitions
 CC = clang
-CC = gcc
+#CC = gcc
 #MPICC = mpicc
 #MPICC = scorep mpicc
 
@@ -8,13 +8,13 @@ CC = gcc
 
 # Compiler flags, paths and libraries
 # Include path showing to openmpi internals
-MPI_SRC_PATH=/home/td37cari/openmpi_repo/openmpi_patched
-#MPI_SRC_PATH=/home/tj75qeje/openmpi-4.1.1
+#MPI_SRC_PATH?=/home/td37cari/openmpi_repo/openmpi_patched
+MPI_SRC_PATH?=/home/tj75qeje/openmpi-4.1.1
 
 INCLUDE=-I$(MPI_SRC_PATH) -I$(MPI_SRC_PATH)/opal/include -I$(MPI_SRC_PATH)/ompi/include/ -I$(MPI_SRC_PATH)/orte/include
 
-#CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
-CFLAGS = -std=c11 -O3 -march=native -mtune=native -DNDEBUG $(INCLUDE)
+CFLAGS = -std=c11 -Og -g $(INCLUDE) -Wall -Wextra -Wno-unused-parameter
+#CFLAGS = -std=c11 -O3 -march=native -mtune=native -DNDEBUG $(INCLUDE)
 LFLAGS = $(CFLAGS)
 LIBS   = -lopen-pal -lucp -lm
 

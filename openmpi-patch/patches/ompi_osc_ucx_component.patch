@@ -1,0 +1,11 @@
+--- ompi/mca/osc/ucx/osc_ucx_component.c	2021-04-24 19:28:07.000000000 +0200
++++ ompi/mca/osc/ucx/osc_ucx_component.c	2022-07-07 14:18:31.812261278 +0200
+@@ -348,7 +348,7 @@
+                                     UCP_PARAM_FIELD_ESTIMATED_NUM_EPS |
+                                     UCP_PARAM_FIELD_REQUEST_INIT |
+                                     UCP_PARAM_FIELD_REQUEST_SIZE;
+-        context_params.features = UCP_FEATURE_RMA | UCP_FEATURE_AMO32 | UCP_FEATURE_AMO64;
++        context_params.features = UCP_FEATURE_RMA | UCP_FEATURE_AMO32 | UCP_FEATURE_AMO64 | UCP_FEATURE_AM;
+         context_params.mt_workers_shared = 0;
+         context_params.estimated_num_eps = ompi_proc_world_size();
+         context_params.request_init = internal_req_init;

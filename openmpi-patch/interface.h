@@ -8,6 +8,10 @@
 #define OMPI_DECLSPEC
 #endif
 
+// this comment serves as the marker for the build_patched_openmpi.sh script:
+// do not change!
+// START INTERFACE MPIOPT
+
 OMPI_DECLSPEC int MPIOPT_Start(MPI_Request *request);
 OMPI_DECLSPEC int MPIOPT_Startall(int count, MPI_Request array_of_requests[]);
 OMPI_DECLSPEC int MPIOPT_Wait(MPI_Request *request, MPI_Status *status);
@@ -47,4 +51,5 @@ OMPI_DECLSPEC void MPIOPT_INIT();
 OMPI_DECLSPEC void MPIOPT_FINALIZE();
 OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm);
 
+// END INTERFACE MPIOPT
 #endif /* MPIOPT_IFACE_H_ */
