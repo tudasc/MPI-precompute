@@ -8,7 +8,7 @@
 // print a summary on the amount of crosstalk at the end
 #define SUMMARY_STATISTIC_PRINTING
 // check the contents of the buffers send around to detect race conditions
-//#define BUFFER_CONTENT_CHECKING
+// #define BUFFER_CONTENT_CHECKING
 // check that no matching conflicts exist to double check that the compiler
 // analysis made no mistake
 #define CHECK_FOR_MATCHING_CONFLICTS
@@ -23,16 +23,16 @@
 
 // print warning that deadlocks/left over resources are possible when freeing
 // unused requests
-//#define WARN_ON_REQUEST_FREE
+// #define WARN_ON_REQUEST_FREE
 
 // necessary, if one uses MPI_testsome:
 // adds a small overhead to distinguish active from inactive requests
-//#define DISTINGUISH_ACTIVE_REQUESTS
+// #define DISTINGUISH_ACTIVE_REQUESTS
 
-//#define DISTORT_PROCESS_ORDER_ON_CROSSTALK
+// #define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 
-//#define USE_FALLBACK_UNTIL_THRESHOLD
-//#define FALLBACK_THRESHOLD 1000
+// #define USE_FALLBACK_UNTIL_THRESHOLD
+// #define FALLBACK_THRESHOLD 1000
 
 #define WAIT_ON_STARTALL_TO_PREVENT_CROSSTALK
 #define WAIT_ON_STARTALL_WAIT_TIME 0
@@ -42,7 +42,7 @@
 // linkage type of all internal functions
 #ifndef LINKAGE_TYPE
 #define LINKAGE_TYPE
-//#define LINKAGE_TYPE static
+// #define LINKAGE_TYPE static
 #endif
 
 #define DEFAULT_THRESHOLD 20 // default threshold for mixed sending in bytes

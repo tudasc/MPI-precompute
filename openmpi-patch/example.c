@@ -18,7 +18,7 @@
 /*  main                                                                    */
 /* ************************************************************************ */
 
-//#define STATISTIC_PRINTING
+// #define STATISTIC_PRINTING
 #define READY_TO_RECEIVE 1
 #define READY_TO_SEND 2
 
@@ -32,9 +32,9 @@
 // bufsize and num iter have to be large to get performance benefit, otherwise
 // slowdown occur
 // KB
-//#define BUFFER_SIZE 1000
+// #define BUFFER_SIZE 1000
 // MB
-//#define BUFFER_SIZE 1000000
+// #define BUFFER_SIZE 1000000
 
 // 10KB
 #define BUFFER_SIZE 10000
@@ -44,10 +44,10 @@
 #define BLOCK_COUNT 10
 #define BLOCK_SIZE 10
 
-//#define BUFFER_SIZE 10
-//#define NUM_ITERS 10
+// #define BUFFER_SIZE 10
+// #define NUM_ITERS 10
 
-//#define N BUFFER_SIZE
+// #define N BUFFER_SIZE
 #define N 3
 
 void dummy_workload(double *buf) {
