@@ -84,20 +84,9 @@ make install
 
 cd $MPI_SRC_PATH
 
-make -j
+make -j && make install
 
-# we need to re-confugure and rebuild again as some mpi-internal macro definitions can vause problems otherwise
-
-cd $OMPI_PATCH_DIR
-make clean
-make install
-
-cd $MPI_SRC_PATH
-
-./configure CC=clang CXX=clang++ CFLAGS="-g -Og -fno-eliminate-unused-debug-symbols" LDFLAGS="-g" CXX_FLAGS="-g -Og -fno-eliminate-unused-debug-symbols" --prefix=$configure_prefix --enable-debug --enable-mpi-cxx --enable-cxx-exceptions --enable-heterogeneous --enable-mpi1-compatibility --enable-static --with-hwloc=${HWLOC_ROOT} --with-slurm=/opt/slurm/current --with-pmi=/opt/slurm/current --with-ucx --enable-mca-no-build=btl-uct  --without-verbs --enable-mpi-fortran=no
-
-make install
-
+# back to the current dir
 cd $OMPI_PATCH_DIR
 
 
