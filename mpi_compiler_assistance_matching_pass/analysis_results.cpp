@@ -16,6 +16,7 @@
 
 #include "mpi_functions.h"
 
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Pass.h"
 
 #include "analysis_results.h"

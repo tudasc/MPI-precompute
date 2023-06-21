@@ -91,7 +91,7 @@ void replace_call(CallBase *call, Function *func) {
 
   std::vector<Value *> args;
 
-  for (unsigned int i = 0; i < call->getNumArgOperands(); ++i) {
+  for (unsigned int i = 0; i < call->arg_size(); ++i) {
     args.push_back(call->getArgOperand(i));
   }
 
@@ -121,6 +121,8 @@ void replace_with_info(CallBase *call, Function *func) {
   auto info_obj = builder.CreateLoad(info_obj_ptr);
   std::vector<Value *> args;
 
+  // TODO port this to llvm 16
+
   // set a key value pair to the info object:
   auto key = builder.CreateGlobalStringPtr("nc_send_strategy");
   auto value = builder.CreateGlobalStringPtr(STRATEGY);
@@ -132,7 +134,7 @@ void replace_with_info(CallBase *call, Function *func) {
   value = builder.CreateGlobalStringPtr(threshold_str);
   builder.CreateCall(mpi_func->mpi_info_set, {info_obj, key, value});
 
-  for (unsigned int i = 0; i < call->getNumArgOperands(); ++i) {
+  for (unsigned int i = 0; i < call->arg_size(); ++i) {
     args.push_back(call->getArgOperand(i));
   }
   args.push_back(info_obj);
@@ -168,7 +170,7 @@ std::vector<CallBase *> get_usage_of_request(CallBase *call) {
 
   assert(call->getCalledFunction() == mpi_func->mpi_send_init ||
          call->getCalledFunction() == mpi_func->mpi_recv_init);
-  assert(call->getNumArgOperands() == 7);
+  assert(call->arg_size() == 7);
 
   Value *req = call->getArgOperand(req_arg_pos);
 

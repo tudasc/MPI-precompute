@@ -19,6 +19,7 @@
 #include "function_coverage.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
+#include "llvm/IR/Constants.h"
 
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/CFG.h"
@@ -599,7 +600,7 @@ bool is_waitall_matching(ConstantInt *begin_index, ConstantInt *match_index,
                          CallBase *call) {
   assert(begin_index->getType() == match_index->getType());
   assert(call->getCalledFunction() == mpi_func->mpi_waitall);
-  assert(call->getNumArgOperands() == 3);
+  assert(call->arg_size() == 3);
 
   Debug(call->dump(); errs() << "Is this waitall matching?";);
 
@@ -677,7 +678,7 @@ std::vector<CallBase *> get_corresponding_wait(CallBase *call) {
   std::vector<CallBase *> result;
   unsigned int req_arg_pos = 6;
   if (call->getCalledFunction() == mpi_func->mpi_Ibarrier) {
-    assert(call->getNumArgOperands() == 2);
+    assert(call->arg_size() == 2);
     req_arg_pos = 1;
   } else {
     assert(call->getCalledFunction() == mpi_func->mpi_Isend ||
@@ -686,7 +687,7 @@ std::vector<CallBase *> get_corresponding_wait(CallBase *call) {
            call->getCalledFunction() == mpi_func->mpi_Irsend ||
            call->getCalledFunction() == mpi_func->mpi_Irecv ||
            call->getCalledFunction() == mpi_func->mpi_Iallreduce);
-    assert(call->getNumArgOperands() == 7);
+    assert(call->arg_size() == 7);
   }
 
   Value *req = call->getArgOperand(req_arg_pos);
@@ -696,7 +697,7 @@ std::vector<CallBase *> get_corresponding_wait(CallBase *call) {
     for (auto *user : alloc->users()) {
       if (auto *other_call = dyn_cast<CallBase>(user)) {
         if (other_call->getCalledFunction() == mpi_func->mpi_wait) {
-          assert(other_call->getNumArgOperands() == 2);
+          assert(other_call->arg_size() == 2);
           assert(other_call->getArgOperand(0) == req &&
                  "First arg of MPi wait is MPI_Request");
           // found end of scope
@@ -769,7 +770,7 @@ std::vector<CallBase *> get_corresponding_free(CallBase *call) {
 
   assert(call->getCalledFunction() == mpi_func->mpi_send_init ||
          call->getCalledFunction() == mpi_func->mpi_recv_init);
-  assert(call->getNumArgOperands() == 7);
+  assert(call->arg_size() == 7);
 
   Value *req = call->getArgOperand(req_arg_pos);
 
@@ -778,7 +779,7 @@ std::vector<CallBase *> get_corresponding_free(CallBase *call) {
     for (auto *user : alloc->users()) {
       if (auto *other_call = dyn_cast<CallBase>(user)) {
         if (other_call->getCalledFunction() == mpi_func->mpi_request_free) {
-          assert(other_call->getNumArgOperands() == 1);
+          assert(other_call->arg_size() == 1);
           assert(other_call->getArgOperand(0) == req);
           // found end of scope
           // errs() << "possible ending of scope here \n";
@@ -838,7 +839,7 @@ Value *get_communicator(CallBase *mpi_call) {
     assert(false);
   }
 
-  assert(mpi_call->getNumArgOperands() == total_num_args);
+  assert(mpi_call->arg_size() == total_num_args);
 
   return mpi_call->getArgOperand(communicator_arg_pos);
 }
@@ -876,7 +877,7 @@ Value *get_src(CallBase *mpi_call, bool is_send) {
     assert(false);
   }
 
-  assert(mpi_call->getNumArgOperands() == total_num_args);
+  assert(mpi_call->arg_size() == total_num_args);
 
   return mpi_call->getArgOperand(src_arg_pos);
 }
@@ -914,7 +915,7 @@ Value *get_tag(CallBase *mpi_call, bool is_send) {
     assert(false);
   }
 
-  assert(mpi_call->getNumArgOperands() == total_num_args);
+  assert(mpi_call->arg_size() == total_num_args);
 
   return mpi_call->getArgOperand(tag_arg_pos);
 }

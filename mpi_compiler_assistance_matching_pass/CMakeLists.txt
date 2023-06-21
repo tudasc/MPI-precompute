@@ -25,8 +25,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Og -DDEBUG_MACH_PASS=1")
 # switch off one Warning for release build: some variables are only used for assertions
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DDEBUG_MACH_PASS=0 -Wno-unused-but-set-variable")
 
-# Use C++11 to compile our pass (i.e., supply -std=c++11).
-target_compile_features(mpi_compiler_assistance_matching_pass PRIVATE cxx_range_for cxx_auto_type)
+# Use C++17 to compile our pass (i.e., supply -std=c++11).
+target_compile_features(mpi_compiler_assistance_matching_pass PRIVATE cxx_std_17)
 
 # LLVM is (typically) built with no C++ RTTI. We need to match that;
 # otherwise, we'll get linker errors about missing RTTI data.

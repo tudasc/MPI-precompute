@@ -38,7 +38,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 
 #include <assert.h>
-//#include <mpi.h>
+// #include <mpi.h>
 #include <cstring>
 #include <utility>
 #include <vector>
@@ -172,6 +172,10 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
 
 char MPICompilerAssistanceMatchingPass::ID = 42;
 
+static RegisterPass<MPICompilerAssistanceMatchingPass>
+    X("mpi-matching", "MPI Compiler Assisted Matching Pass",
+      false /* Only looks at CFG */, false /* Analysis Pass */);
+/*
 // Automatically enable the pass.
 // http://adriansampson.net/blog/clangpass.html
 static void registerExperimentPass(const PassManagerBuilder &,
@@ -190,3 +194,4 @@ static RegisterStandardPasses
 static RegisterStandardPasses
     RegisterMyPass0(PassManagerBuilder::EP_EnabledOnOptLevel0,
                     registerExperimentPass);
+*/
