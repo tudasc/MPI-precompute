@@ -11,13 +11,13 @@ LIBS="-lopen-pal -lucp -lm"
 #
 if [ ${1: -2} == ".c" ]; then
 
-OMPI_CC=clang $MPICC $CFLAGS -Xclang -load -Xclang build/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so  $1 $LIBS
+OMPI_CC=clang $MPICC $CFLAGS -fpass-plugin=build/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so  $1 $LIBS
 #OMPI_CC=clang $MPICC $CFLAGS $1 $LIBS
 #$MPICC -cc=clang -O2 -fopenmp -Xclang -load -Xclang build/mpi_compiler_assistance_matching_pass/mpi_compiler_assistance_matching_pass.so  -ftime-report $1
 OMPI_CC=clang $MPICC $CFLAGS -o a.out_original $1 $LIBS
 
 elif [ ${1: -4} == ".cpp" ]; then
-OMPI_CXX=clang++ $MPICXX $CFLAGS -Xclang -load -Xclang build/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so  $1 $LIBS
+OMPI_CXX=clang++ $MPICXX $CFLAGS -fpass-plugin=build/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so  $1 $LIBS
 else
 echo "Unknown file suffix, use this script with .c or .cpp files"
 fi

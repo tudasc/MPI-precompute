@@ -313,8 +313,8 @@ bool can_prove_val_different_respecting_loops(Value *val_a, Value *val_b) {
 
   assert(inst_a);
 
-  LoopInfo *linfo = analysis_results->getLoopInfo(inst_a->getFunction());
-  ScalarEvolution *se = analysis_results->getSE(inst_a->getFunction());
+  LoopInfo *linfo = analysis_results->getLoopInfo(*inst_a->getFunction());
+  ScalarEvolution *se = analysis_results->getSE(*inst_a->getFunction());
   assert(linfo != nullptr && se != nullptr);
 
   // Debug(errs() << "try to prove difference within loop\n";)
@@ -355,8 +355,8 @@ bool can_prove_val_different_for_different_loop_iters(Value *val_a,
   assert(inst_a && "This should be an Instruction");
   assert(inst_a->getType()->isIntegerTy());
 
-  LoopInfo *linfo = analysis_results->getLoopInfo(inst_a->getFunction());
-  ScalarEvolution *se = analysis_results->getSE(inst_a->getFunction());
+  LoopInfo *linfo = analysis_results->getLoopInfo(*inst_a->getFunction());
+  ScalarEvolution *se = analysis_results->getSE(*inst_a->getFunction());
   assert(linfo != nullptr && se != nullptr);
   Loop *loop = linfo->getLoopFor(inst_a->getParent());
 
@@ -483,7 +483,7 @@ bool are_calls_in_different_loop_iters(CallBase *orig_call,
     return false;
   }
 
-  LoopInfo *linfo = analysis_results->getLoopInfo(orig_call->getFunction());
+  LoopInfo *linfo = analysis_results->getLoopInfo(*orig_call->getFunction());
   assert(linfo != nullptr);
 
   Loop *loop = linfo->getLoopFor(orig_call->getParent());

@@ -37,6 +37,9 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
+
 #include <assert.h>
 // #include <mpi.h>
 #include <cstring>
@@ -63,10 +66,8 @@ ImplementationSpecifics *mpi_implementation_specifics;
 FunctionMetadata *function_metadata;
 
 namespace {
-struct MPICompilerAssistanceMatchingPass : public ModulePass {
-  static char ID;
-
-  MPICompilerAssistanceMatchingPass() : ModulePass(ID) {}
+struct MPICompilerAssistanceMatchingPass
+    : public PassInfoMixin<MPICompilerAssistanceMatchingPass> {
 
   // register that we require this analysis
 
@@ -76,19 +77,11 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
     AU.addRequired<LoopInfoWrapperPass>();
     AU.addRequired<ScalarEvolutionWrapperPass>();
   }
-  /*
-   void getAnalysisUsage(AnalysisUsage &AU) const {
-   AU.addRequiredTransitive<TargetLibraryInfoWrapperPass>();
-   AU.addRequiredTransitive<AAResultsWrapperPass>();
-   AU.addRequiredTransitive<LoopInfoWrapperPass>();
-   AU.addRequiredTransitive<ScalarEvolutionWrapperPass>();
-   }
-   */
 
   StringRef getPassName() const { return "MPI Assertion Analysis"; }
 
   // Pass starts here
-  virtual bool runOnModule(Module &M) {
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
 
     // Debug(M.dump(););
 
@@ -103,7 +96,7 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
       return false;
     }*/
 
-    analysis_results = new RequiredAnalysisResults(this, M);
+    analysis_results = new RequiredAnalysisResults(AM, M);
 
     function_metadata = new FunctionMetadata(analysis_results->getTLI(), M);
 
@@ -153,7 +146,7 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
       replace_communication_calls(send_init_list, recv_init_list);
     }
 
-    // Beware with operator | the functions will be executed with || they wont
+    // Beware: with operator | the functions will be executed with || they wont
     replacement = replacement | add_init(M);
     replacement = replacement | add_finalize(M);
 
@@ -164,17 +157,32 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
 
     delete function_metadata;
 
-    return replacement;
+    if (replacement) {
+      return PreservedAnalyses::none();
+    } else {
+      return PreservedAnalyses::all();
+    }
   }
 };
 // class MSGOrderRelaxCheckerPass
 } // namespace
 
-char MPICompilerAssistanceMatchingPass::ID = 42;
+PassPluginLibraryInfo getPassPluginInfo() {
+  const auto callback = [](PassBuilder &PB) {
+    PB.registerPipelineEarlySimplificationEPCallback(
+        [&](ModulePassManager &MPM, auto) {
+          MPM.addPass(MPICompilerAssistanceMatchingPass());
+          return true;
+        });
+  };
 
-static RegisterPass<MPICompilerAssistanceMatchingPass>
-    X("mpi-matching", "MPI Compiler Assisted Matching Pass",
-      false /* Only looks at CFG */, false /* Analysis Pass */);
+  return {LLVM_PLUGIN_API_VERSION, "mpi-matching", "1.0.0", callback};
+};
+
+extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
+  return getPassPluginInfo();
+}
+
 /*
 // Automatically enable the pass.
 // http://adriansampson.net/blog/clangpass.html
