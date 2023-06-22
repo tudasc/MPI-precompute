@@ -182,24 +182,3 @@ PassPluginLibraryInfo getPassPluginInfo() {
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
   return getPassPluginInfo();
 }
-
-/*
-// Automatically enable the pass.
-// http://adriansampson.net/blog/clangpass.html
-static void registerExperimentPass(const PassManagerBuilder &,
-                                   legacy::PassManagerBase &PM) {
-  PM.add(new MPICompilerAssistanceMatchingPass());
-}
-
-// static RegisterStandardPasses
-//    RegisterMyPass(PassManagerBuilder::EP_ModuleOptimizerEarly,
-//                   registerExperimentPass);
-
-static RegisterStandardPasses
-    RegisterMyPass(PassManagerBuilder::EP_OptimizerLast,
-                   registerExperimentPass);
-
-static RegisterStandardPasses
-    RegisterMyPass0(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                    registerExperimentPass);
-*/
