@@ -95,7 +95,7 @@ void replace_call(CallBase *call, Function *func) {
     args.push_back(call->getArgOperand(i));
   }
 
-  auto *new_call = builder.CreateCall(func, args);
+  auto *new_call = builder.CreateCall(func->getFunctionType(), func, args);
 
   ReplaceInstWithInst(call, new_call);
 
@@ -116,33 +116,36 @@ void replace_with_info(CallBase *call, Function *func) {
   auto info_obj_ptr =
       builder.CreateAlloca(mpi_implementation_specifics->mpi_info);
 
-  builder.CreateCall(mpi_func->mpi_info_create, {info_obj_ptr});
+  builder.CreateCall(mpi_func->mpi_info_create->getFunctionType(),
+                     mpi_func->mpi_info_create, {info_obj_ptr});
 
-  auto info_obj = builder.CreateLoad(info_obj_ptr);
+  auto info_obj =
+      builder.CreateLoad(mpi_implementation_specifics->mpi_info, info_obj_ptr);
   std::vector<Value *> args;
-
-  // TODO port this to llvm 16
 
   // set a key value pair to the info object:
   auto key = builder.CreateGlobalStringPtr("nc_send_strategy");
   auto value = builder.CreateGlobalStringPtr(STRATEGY);
-  builder.CreateCall(mpi_func->mpi_info_set, {info_obj, key, value});
+  builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
+                     mpi_func->mpi_info_set, {info_obj, key, value});
 
   key = builder.CreateGlobalStringPtr("nc_mixed_threshold");
   char threshold_str[30];
   sprintf(threshold_str, "%d", THRESHOLD);
   value = builder.CreateGlobalStringPtr(threshold_str);
-  builder.CreateCall(mpi_func->mpi_info_set, {info_obj, key, value});
+  builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
+                     mpi_func->mpi_info_set, {info_obj, key, value});
 
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
     args.push_back(call->getArgOperand(i));
   }
   args.push_back(info_obj);
 
-  auto new_call = builder.CreateCall(func, args);
+  auto new_call = builder.CreateCall(func->getFunctionType(), func, args);
 
   // also free the info
-  builder.CreateCall(mpi_func->mpi_info_free, info_obj_ptr);
+  builder.CreateCall(mpi_func->mpi_info_free->getFunctionType(),
+                     mpi_func->mpi_info_free, info_obj_ptr);
 
   call->replaceAllUsesWith(new_call);
   call->eraseFromParent();
