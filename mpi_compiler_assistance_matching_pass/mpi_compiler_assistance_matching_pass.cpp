@@ -49,6 +49,7 @@
 #include "analysis_results.h"
 #include "conflict_detection.h"
 #include "debug.h"
+#include "frontend_plugin_data.h"
 #include "function_coverage.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
@@ -99,6 +100,8 @@ struct MPICompilerAssistanceMatchingPass
     analysis_results = new RequiredAnalysisResults(AM, M);
 
     function_metadata = new FunctionMetadata(analysis_results->getTLI(), M);
+
+    FrontendPluginData::create_instance(M);
 
     // collect all Persistent Comm Operations
     std::vector<llvm::CallBase *> send_init_list;
@@ -153,6 +156,8 @@ struct MPICompilerAssistanceMatchingPass
     errs() << "Successfully executed the pass\n\n";
     delete mpi_func;
     ImplementationSpecifics::delete_instance();
+    FrontendPluginData::delete_instance();
+
     delete analysis_results;
 
     delete function_metadata;

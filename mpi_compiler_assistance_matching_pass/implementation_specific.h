@@ -18,6 +18,8 @@
 #define MACH_IMPLEMENTATION_SPECIFIC_H_
 
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/Module.h"
+#include <cassert>
 
 class ImplementationSpecifics {
 

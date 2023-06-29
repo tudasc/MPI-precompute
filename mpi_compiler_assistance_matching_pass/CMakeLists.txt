@@ -15,7 +15,9 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
     replacement.h
     replacement.cpp
     nc_settings.h
-)
+        json.hpp
+        frontend_plugin_data.h
+        frontend_plugin_data.cpp)
 
 # if one wants to use mpi
 #find_package(MPI REQUIRED)
