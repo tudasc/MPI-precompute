@@ -23,7 +23,7 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
   auto file_content = file.get()->getBuffer();
   auto plugin_data = nlohmann::json::parse(file_content);
 
-  std::unordered_map<std::string, FunctionCallMetadata> location_to_metadata;
+  std::unordered_map<std::string, FunctionCallMetadata *> location_to_metadata;
 
   // parse json to struct
   for (const auto &functionCallJson : plugin_data["FunctionCalls"]) {
@@ -35,10 +35,13 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
       functionCall.conflicts.push_back(conflict);
     }
     functionCall.call = nullptr;
-    if (location_to_metadata.find(functionCall.sourceLocation) ==
+    functionCalls.push_back(std::move(functionCall));
+    // get the address
+    auto this_call = &functionCalls.back();
+
+    if (location_to_metadata.find(this_call->sourceLocation) ==
         location_to_metadata.end()) {
-      location_to_metadata[functionCall.sourceLocation] =
-          std::move(functionCall);
+      location_to_metadata[this_call->sourceLocation] = this_call;
     } else {
       assert(false && "Multiple metadata entries for same call found!");
     }
@@ -47,7 +50,6 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
   // find corresponding IR instructions
 
   for (auto F = M.begin(); F != M.end(); ++F) {
-
     for (inst_iterator I = inst_begin(*F), E = inst_end(*F); I != E; ++I) {
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         if (auto debug_loc = call->getDebugLoc()) {
@@ -58,9 +60,9 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
           if (location_to_metadata.find(as_str) != location_to_metadata.end()) {
             errs() << "FOUND METADATA FOR\n";
             call->dump();
-            if (functionCalls.find(call) == functionCalls.end()) {
-              functionCalls[call] = std::move(location_to_metadata[as_str]);
-              functionCalls[call].call = call;
+            if (call_to_metadata_map.find(call) == call_to_metadata_map.end()) {
+              call_to_metadata_map[call] = location_to_metadata[as_str];
+              call_to_metadata_map[call]->call = call;
             } else {
               assert(false && "Multiple calls found for same metadata entry");
             }
@@ -71,6 +73,29 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
           call->dump();
         }
       }
+    }
+  }
+
+  unsigned int num_func_calls = plugin_data["Metadata"]["NumFunctionCalls"];
+  // everyting should have been read in correct order
+  assert(functionCalls.size() == num_func_calls);
+  for (unsigned int i = 0; i < functionCalls.size(); ++i) {
+    assert(functionCalls[i].id == i);
+  }
+
+  // read the adjacency matrix from json
+  orderMatrix =
+      std::vector(num_func_calls, std::vector<int>(num_func_calls, 0));
+  auto matrix_json = plugin_data["Metadata"]["OrderMatrix"];
+  assert(matrix_json.size() == num_func_calls);
+
+  // iterate through both the json and the result vector at the same time
+  for (auto i = std::make_pair(matrix_json.begin(), orderMatrix.begin());
+       i.first != matrix_json.end() && i.second != orderMatrix.end();
+       ++i.first, ++i.second) {
+    // read every element of row as int
+    for (auto val : *i.first) {
+      i.second->push_back(val);
     }
   }
 }

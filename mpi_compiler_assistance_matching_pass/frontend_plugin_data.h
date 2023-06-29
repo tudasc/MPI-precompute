@@ -53,7 +53,10 @@ public:
   get_possibly_conflicting_calls(llvm::CallBase *orig_call);
 
 private:
-  std::unordered_map<llvm::CallBase *, FunctionCallMetadata> functionCalls;
+  std::vector<FunctionCallMetadata> functionCalls;
+  std::unordered_map<llvm::CallBase *, FunctionCallMetadata *>
+      call_to_metadata_map;
+  std::vector<std::vector<int>> orderMatrix;
 };
 
 #endif // MPI_ASSERTION_CHECKING_FRONTEND_PLUGIN_DATA_H
