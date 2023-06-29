@@ -76,26 +76,15 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
     }
   }
 
+  // read the adjacency matrix from json
+  orderMatrix = plugin_data["Metadata"]["OrderMatrix"];
+
   unsigned int num_func_calls = plugin_data["Metadata"]["NumFunctionCalls"];
-  // everyting should have been read in correct order
+  // everything should have been read in correct order
   assert(functionCalls.size() == num_func_calls);
+  assert(orderMatrix.size() == num_func_calls);
   for (unsigned int i = 0; i < functionCalls.size(); ++i) {
     assert(functionCalls[i].id == i);
-  }
-
-  // read the adjacency matrix from json
-  orderMatrix =
-      std::vector(num_func_calls, std::vector<int>(num_func_calls, 0));
-  auto matrix_json = plugin_data["Metadata"]["OrderMatrix"];
-  assert(matrix_json.size() == num_func_calls);
-
-  // iterate through both the json and the result vector at the same time
-  for (auto i = std::make_pair(matrix_json.begin(), orderMatrix.begin());
-       i.first != matrix_json.end() && i.second != orderMatrix.end();
-       ++i.first, ++i.second) {
-    // read every element of row as int
-    for (auto val : *i.first) {
-      i.second->push_back(val);
-    }
+    assert(orderMatrix[i].size() == num_func_calls);
   }
 }
