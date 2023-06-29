@@ -150,6 +150,8 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
     }
   }
 
+  auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
+
   if (result->mpi_info_create == nullptr) {
     auto fntype = FunctionType::get(
         Type::getInt32Ty(M.getContext()),

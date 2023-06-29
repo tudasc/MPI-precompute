@@ -25,6 +25,8 @@
 
 using namespace llvm;
 
+ImplementationSpecifics *ImplementationSpecifics::instance = nullptr;
+
 ImplementationSpecifics::ImplementationSpecifics(Module &M) {
 
   // need it to use MPI_Type_size

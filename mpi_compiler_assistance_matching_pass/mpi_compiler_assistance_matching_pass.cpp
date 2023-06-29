@@ -85,7 +85,7 @@ struct MPICompilerAssistanceMatchingPass
 
     // Debug(M.dump(););
 
-    mpi_implementation_specifics = new ImplementationSpecifics(M);
+    ImplementationSpecifics::create_instance(M);
 
     mpi_func = get_used_mpi_functions(M);
     // TODO is_mpi_used only checks for MPI init, but we want to use this on
@@ -152,7 +152,7 @@ struct MPICompilerAssistanceMatchingPass
 
     errs() << "Successfully executed the pass\n\n";
     delete mpi_func;
-    delete mpi_implementation_specifics;
+    ImplementationSpecifics::delete_instance();
     delete analysis_results;
 
     delete function_metadata;

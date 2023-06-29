@@ -526,6 +526,7 @@ bool are_calls_conflicting(CallBase *orig_call, CallBase *conflict_call,
    return false;
    }*/
   // was done before
+  auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
 
   // TODO refactoring: we dont need this part
   bool check_for_loop_iter_difference = false;

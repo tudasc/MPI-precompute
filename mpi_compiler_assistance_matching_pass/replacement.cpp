@@ -112,6 +112,7 @@ void replace_with_info(CallBase *call, Function *func) {
 
   // before the original call
   builder.SetInsertPoint(call);
+  auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
 
   auto info_obj_ptr =
       builder.CreateAlloca(mpi_implementation_specifics->mpi_info);
