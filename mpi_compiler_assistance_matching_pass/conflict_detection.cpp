@@ -17,7 +17,6 @@
 #include "conflict_detection.h"
 #include "analysis_results.h"
 #include "frontend_plugin_data.h"
-#include "function_coverage.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "llvm/IR/Constants.h"

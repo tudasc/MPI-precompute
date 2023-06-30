@@ -7,9 +7,7 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
     conflict_detection.cpp
     implementation_specific.h
     implementation_specific.cpp
-    function_coverage.h
-    function_coverage.cpp
-    debug.h
+        debug.h
     analysis_results.h
     analysis_results.cpp
     replacement.h

@@ -50,7 +50,6 @@
 #include "conflict_detection.h"
 #include "debug.h"
 #include "frontend_plugin_data.h"
-#include "function_coverage.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "replacement.h"
@@ -64,7 +63,6 @@ RequiredAnalysisResults *analysis_results;
 
 struct mpi_functions *mpi_func;
 ImplementationSpecifics *mpi_implementation_specifics;
-FunctionMetadata *function_metadata;
 
 namespace {
 struct MPICompilerAssistanceMatchingPass
@@ -98,8 +96,6 @@ struct MPICompilerAssistanceMatchingPass
     }*/
 
     analysis_results = new RequiredAnalysisResults(AM, M);
-
-    function_metadata = new FunctionMetadata(analysis_results->getTLI(), M);
 
     FrontendPluginData::create_instance(M);
 
@@ -159,8 +155,6 @@ struct MPICompilerAssistanceMatchingPass
     FrontendPluginData::delete_instance();
 
     delete analysis_results;
-
-    delete function_metadata;
 
     if (replacement) {
       return PreservedAnalyses::none();
