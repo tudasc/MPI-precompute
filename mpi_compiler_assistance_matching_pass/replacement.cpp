@@ -218,8 +218,8 @@ void replace_communication_calls(std::vector<CallBase *> init_send_calls,
   std::copy(init_recv_calls.begin(), init_recv_calls.end(),
             std::inserter(calls_to_replace, calls_to_replace.begin()));
 
-  // first gather everythin to replace, than replace, otherwise we might break
-  // some def use chains in between, e.g. e a free is used by send_init and revc
+  // first gather everything to replace, then replace, otherwise we might break
+  // some def use chains in between, e.g. e a free is used by send_init and recv
   // init
 
   for (auto *call : init_send_calls) {
