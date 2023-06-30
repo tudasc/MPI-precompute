@@ -393,6 +393,9 @@ Value *get_communicator(CallBase *mpi_call) {
   } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Sendrecv) {
     total_num_args = 12;
     communicator_arg_pos = 10;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init || mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+      total_num_args = 7;
+      communicator_arg_pos = 5;
   } else {
     errs() << mpi_call->getCalledFunction()->getName()
            << ": This MPI function is currently not supported\n";
@@ -431,6 +434,9 @@ Value *get_src(CallBase *mpi_call, bool is_send) {
       src_arg_pos = 3;
     else
       src_arg_pos = 8;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init || mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+      total_num_args = 7;
+      src_arg_pos = 3;
   } else {
     errs() << mpi_call->getCalledFunction()->getName()
            << ": This MPI function is currently not supported\n";
@@ -469,6 +475,9 @@ Value *get_tag(CallBase *mpi_call, bool is_send) {
       tag_arg_pos = 4;
     else
       tag_arg_pos = 9;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init || mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+      total_num_args = 7;
+      tag_arg_pos = 4;
   } else {
     errs() << mpi_call->getCalledFunction()->getName()
            << ": This MPI function is currently not supported\n";
