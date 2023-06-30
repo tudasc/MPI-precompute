@@ -31,37 +31,14 @@ using namespace llvm;
 bool are_calls_conflicting(llvm::CallBase *orig_call,
                            llvm::CallBase *conflict_call, bool is_send);
 
-// gets the guarding comparision for this block if any
-std::pair<Value *, bool> get_guarding_compare(llvm::CallBase *call) {
-  auto *bb = call->getParent();
+bool uses_wildcard(CallBase *mpi_call, bool is_sending) {
 
-  if (pred_size(bb) == 1) // otherwise no single branch guard
-  {
-    for (BasicBlock *pred : predecessors(bb)) {
-      if (auto *term = dyn_cast<BranchInst>(pred->getTerminator())) {
-        if (term->isConditional()) {
+  auto implementation_specifics = ImplementationSpecifics::get_instance();
 
-          Value *guard = term->getCondition();
-          bool way_to_take = false; // assume our block is the false label
-          if (term->getSuccessor(0) == bb) {
-            way_to_take = true; // unless proven otherwise
-          }
+  auto tag = get_tag(mpi_call,is_sending);
+  auto src_rank = get_src(mpi_call,is_sending);
 
-          return std::make_pair(guard, way_to_take);
-        }
-      }
-    }
-  }
-
-  // nothing found
-  return std::make_pair(nullptr, false);
-}
-
-bool uses_wildcard(CallBase *mpi_call) {
-
-  // TODO IMPLEMENT
-
-  return false;
+  return tag == implementation_specifics->ANY_TAG || src_rank == implementation_specifics->ANY_SOURCE;
 }
 
 // True, if no conflicting call was found
@@ -76,7 +53,7 @@ bool check_call_for_conflict(CallBase *mpi_call, bool is_sending) {
     return true; // frontend determined that no conflicts present
   }
 
-  if (!is_sending && uses_wildcard(mpi_call)) {
+  if (!is_sending && uses_wildcard(mpi_call,is_sending)) {
     return false;
   }
 
@@ -102,24 +79,24 @@ bool check_mpi_recv_conflicts(llvm::CallBase *recv_init_call) {
 bool can_prove_val_different(Value *val_a, Value *val_b,
                              bool check_for_loop_iter_difference);
 
-// if at least one value is inside a loop, this function ties to prove that the
-// two values differ for every iteration of the loop
-// e.g. take in account the loop boundaries
-bool can_prove_val_different_respecting_loops(Value *val_a, Value *val_b) {
+bool can_prove_val_different_with_scalarEvolution(Value *val_a, Value *val_b) {
 
   auto *inst_a = dyn_cast<Instruction>(val_a);
   auto *inst_b = dyn_cast<Instruction>(val_b);
+  // swap args so that val_a is an instruction
   if (!inst_a && inst_b) {
-    return can_prove_val_different_respecting_loops(val_b, val_a);
+    return can_prove_val_different_with_scalarEvolution(val_b, val_a);
   } else if (!inst_a && !inst_b) {
     return false;
   }
-
   assert(inst_a);
 
-  LoopInfo *linfo = analysis_results->getLoopInfo(*inst_a->getFunction());
   ScalarEvolution *se = analysis_results->getSE(*inst_a->getFunction());
-  assert(linfo != nullptr && se != nullptr);
+  assert(se != nullptr);
+
+  if (! se->isSCEVable(inst_a->getType())){
+      return false;
+  }
 
   // Debug(errs() << "try to prove difference within loop\n";)
 
@@ -192,8 +169,8 @@ bool can_prove_val_different_for_different_loop_iters(Value *val_a,
 
 // TODO this analysis may not work if a thread gets a pointer to another
 // thread's stack, but whoever does that is dumb anyway...
-bool can_prove_val_different(Value *val_a, Value *val_b,
-                             bool check_for_loop_iter_difference) {
+bool can_prove_val_different(Value *val_a, Value *val_b
+                             ) {
 
   // errs() << "Comparing: \n";
   // val_a->dump();
@@ -218,15 +195,15 @@ bool can_prove_val_different(Value *val_a, Value *val_b,
     }
   }
 
-  if (can_prove_val_different_respecting_loops(val_a, val_b)) {
+  if (can_prove_val_different_with_scalarEvolution(val_a, val_b)) {
     return true;
   }
 
-  if (check_for_loop_iter_difference) {
+ /* if (check_for_loop_iter_difference) {
     if (can_prove_val_different_for_different_loop_iters(val_a, val_b)) {
       return true;
     }
-  }
+  }*/
 
   // could not prove difference
   return false;
@@ -332,18 +309,16 @@ bool are_calls_conflicting(CallBase *orig_call, CallBase *conflict_call,
   // was done before
   auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
 
-  // TODO refactoring: we dont need this part
-  bool check_for_loop_iter_difference = false;
-
   // check communicator
   auto *comm1 = get_communicator(orig_call);
   auto *comm2 = get_communicator(conflict_call);
-  if (can_prove_val_different(comm1, comm2, check_for_loop_iter_difference)) {
+  if (can_prove_val_different(comm1, comm2)) {
     return false;
   }
   // otherwise, we have not proven that the communicator is be different
   // TODO: (very advanced) if e.g. mpi comm split is used, we might be able to
   // statically prove different communicators
+  // we could also insert a runtime check if communicators are different
 
   // check src/dest
   auto *src1 = get_src(orig_call, is_send);
@@ -352,7 +327,7 @@ bool are_calls_conflicting(CallBase *orig_call, CallBase *conflict_call,
   if (!(src1 == mpi_implementation_specifics->ANY_SOURCE ||
         src2 == mpi_implementation_specifics->ANY_SOURCE)) {
     // if it can match any, there is no reason to prove difference
-    if (can_prove_val_different(src1, src2, check_for_loop_iter_difference)) {
+    if (can_prove_val_different(src1, src2)) {
       return false;
     }
   }
@@ -363,9 +338,9 @@ bool are_calls_conflicting(CallBase *orig_call, CallBase *conflict_call,
   if (!(tag1 == mpi_implementation_specifics->ANY_TAG ||
         tag2 == mpi_implementation_specifics->ANY_TAG)) {
     // if it can match any, there is no reason to prove difference
-    if (can_prove_val_different(tag1, tag2, check_for_loop_iter_difference)) {
+    if (can_prove_val_different(tag1, tag2)) {
       return false;
-    } // otherwise, we have not proven that the tag is be different
+    } // otherwise, we have not proven that the tag is different
   }
 
   // cannot disprove conflict
