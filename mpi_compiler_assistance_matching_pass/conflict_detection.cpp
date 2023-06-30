@@ -16,6 +16,7 @@
 
 #include "conflict_detection.h"
 #include "analysis_results.h"
+#include "frontend_plugin_data.h"
 #include "function_coverage.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
@@ -27,17 +28,6 @@
 #include "debug.h"
 
 using namespace llvm;
-
-// TODO remove unused code
-
-// do i need to export it into header?
-std::vector<CallBase *> get_corresponding_wait(CallBase *call);
-std::vector<CallBase *> get_corresponding_free(CallBase *call);
-std::vector<CallBase *> get_scope_endings(CallBase *call);
-std::vector<std::pair<llvm::CallBase *, llvm::CallBase *>>
-check_conflicts(llvm::Module &M, llvm::Function *f, bool is_send);
-std::vector<std::pair<llvm::CallBase *, llvm::CallBase *>>
-check_call_for_conflict(llvm::CallBase *mpi_call, bool is_send);
 
 bool are_calls_conflicting(llvm::CallBase *orig_call,
                            llvm::CallBase *conflict_call, bool is_send);
@@ -68,231 +58,46 @@ std::pair<Value *, bool> get_guarding_compare(llvm::CallBase *call) {
   return std::make_pair(nullptr, false);
 }
 
+bool uses_wildcard(CallBase *mpi_call) {
+
+  // TODO IMPLEMENT
+
+  return false;
+}
+
 // True, if no conflicting call was found
-bool check_call_for_conflict(CallBase *mpi_call,
-                             std::vector<CallBase *> scope_endings,
-                             bool is_sending) {
+bool check_call_for_conflict(CallBase *mpi_call, bool is_sending) {
 
-  // TODO if ANY_TAG or ANY_SOURCe is used: call conflicts with itself: no
-  // optimization possible!
+  auto frontend_plugin_data = FrontendPluginData::get_instance();
 
-  std::vector<std::pair<llvm::CallBase *, llvm::CallBase *>> conflicts;
+  auto possible_conflicts =
+      frontend_plugin_data->get_possibly_conflicting_calls(mpi_call);
 
-  std::set<Instruction *> to_check;
-  std::set<BasicBlock *>
-      already_checked; // be aware, that revisiting the current block might be
-                       // necessary if in a loop
-  std::set<CallBase *> potential_conflicts;
+  if (possible_conflicts.empty()) {
+    return true; // frontend determined that no conflicts present
+  }
 
-  Instruction *current_inst = dyn_cast<Instruction>(mpi_call);
-  assert(current_inst != nullptr);
-  Instruction *next_inst = current_inst->getNextNode();
+  if (!is_sending && uses_wildcard(mpi_call)) {
+    return false;
+  }
 
-  // what this function does:
-  // follow all possible* code paths until
-  // A a scope ending is reached (MPI_Request_free)
-  // B a conflicting call is detected
-  // C end of program (mpi finalize)
-
-  //* if call is within an if, we only folow the path where condition is the
-  // same as in our path
-
-  // errs()<< "Start analyzing Codepath\n";
-  // mpi_call->dump();
-
-  assert(!scope_endings.empty());
-
-  auto guard_pair = get_guarding_compare(mpi_call);
-  Value *guard = guard_pair.first;
-  bool way_to_take = guard_pair.second;
-
-  while (next_inst != nullptr) {
-    current_inst = next_inst;
-    // current_inst->dump();
-
-    if (auto *call = dyn_cast<CallBase>(current_inst)) {
-      if (is_mpi_call(call)) {
-        // check if this call is conflicting or if search can be stopped as this
-        // is the ending
-
-        if (call->getCalledFunction() == mpi_func->mpi_finalize) {
-          // no mpi beyond this
-          current_inst = nullptr;
-          Debug(errs() << "call to " << call->getCalledFunction()->getName()
-                       << "No Communication after this, WARNING: finalize "
-                          "without request Free is erronenous!\n";);
-          return false;
-
-        } else if (std::find(scope_endings.begin(), scope_endings.end(),
-                             call) != scope_endings.end()) {
-          // no conflict beyond this
-          current_inst = nullptr;
-          Debug(errs() << "Call To request Free encounterd without finding any "
-                          "conflicts\n";);
-          return false;
-
-        } else if (is_sending && is_send_function(call->getCalledFunction())) {
-
-          if (are_calls_conflicting(mpi_call, call, is_sending)) {
-            // end analysis: conflict found
-            return true;
-          }
-        } else if (!is_sending && is_recv_function(call->getCalledFunction())) {
-          if (are_calls_conflicting(mpi_call, call, is_sending)) {
-            // end analysis: conflict found
-            return true;
-          }
-        }
-        // else: Nothing to check
-
-      } else { // no mpi function
-
-        if (function_metadata->may_conflict(call->getCalledFunction())) {
-          Debug(errs() << "Call To " << call->getCalledFunction()->getName()
-                       << "May conflict\n";);
-          return true;
-        } else if (function_metadata->is_unknown(call->getCalledFunction())) {
-          Debug(
-              errs()
-                  << "Could not determine if call to "
-                  << call->getCalledFunction()->getName()
-                  << "will result in a conflict, for safety we will assume it "
-                     "does \n";);
-          // assume conflict
-          return true;
-        }
-      }
-    } // end if CallBase
-
-    // now fetch the next inst
-    next_inst = nullptr;
-
-    if (current_inst !=
-        nullptr) // if not discovered to stop analyzing this code path
-    {
-      if (current_inst->isTerminator()) {
-        if (auto *br = dyn_cast<BranchInst>(current_inst)) {
-          if (br->isConditional() && br->getCondition() == guard) {
-            // only add the corresponding successor
-
-            auto *next_block = current_inst->getSuccessor(1);
-            if (way_to_take) {
-              next_block = current_inst->getSuccessor(0);
-            }
-
-            if (already_checked.find(next_block) == already_checked.end()) {
-              to_check.insert(next_block->getFirstNonPHI());
-            }
-
-          } else {
-            // add all sucessors
-            for (unsigned int i = 0; i < current_inst->getNumSuccessors();
-                 ++i) {
-              auto *next_block = current_inst->getSuccessor(i);
-
-              if (already_checked.find(next_block) == already_checked.end()) {
-                to_check.insert(
-
-                    next_block->getFirstNonPHI());
-              }
-            }
-          }
-        } else { // e.g. some switch
-                 // add all sucessors
-          for (unsigned int i = 0; i < current_inst->getNumSuccessors(); ++i) {
-            auto *next_block = current_inst->getSuccessor(i);
-
-            if (already_checked.find(next_block) == already_checked.end()) {
-              to_check.insert(
-
-                  next_block->getFirstNonPHI());
-            }
-          }
-        }
-        if (isa<ReturnInst>(current_inst)) {
-          // we have to check all exit points of this function for conflicts as
-          // well...
-          Function *f = current_inst->getFunction();
-          for (auto *user : f->users()) {
-            if (auto *where_returns = dyn_cast<CallBase>(user)) {
-              if (where_returns->getCalledFunction() == f) {
-                assert(where_returns->getNextNode() != nullptr);
-                to_check.insert(
-
-                    where_returns->getNextNode());
-              }
-            }
-          }
-        }
-      }
-
-      next_inst = current_inst->getNextNode();
+  for (auto other_call : possible_conflicts) {
+    if (are_calls_conflicting(mpi_call, other_call, is_sending)) {
+      return false;
     }
+  }
 
-    if (dyn_cast_or_null<UnreachableInst>(next_inst)) { // stop at unreachable
-      next_inst = nullptr;
-    }
-
-    if (next_inst == nullptr) {
-      // errs() << to_check.size();
-      if (!to_check.empty()) {
-        auto it_pos = to_check.begin();
-
-        next_inst = *it_pos;
-
-        to_check.erase(it_pos);
-        already_checked.insert(
-            next_inst->getParent()); // will be checked now, so no revisiting
-                                     // necessary
-      }
-    }
-  } // end while
-
-  // should not reach this, analysis will stop beforehand
-  assert(false);
-
-  // no conflict found, bot one may be present after this anslysis, if it hasnt
-  // determined the ending of the requests score
+  // no conflicts found
   return true;
 }
 
-/*
-std::vector<std::pair<llvm::CallBase*, llvm::CallBase*>> check_conflicts(
-                llvm::Module &M, llvm::Function *f, bool is_sending) {
-        if (f == nullptr) {
-                // no messages: no conflict: return empty vector
-                return {};
-        }
-        std::vector<std::pair<llvm::CallBase*, llvm::CallBase*>> result;
-
-        for (auto user : f->users()) {
-                if (CallBase *call = dyn_cast<CallBase>(user)) {
-                        if (call->getCalledFunction() == f) {
-                                auto scope_endings = get_scope_endings(call);
-                                auto temp = check_call_for_conflict(call,
-scope_endings, is_sending); result.insert(result.end(), temp.begin(),
-temp.end());
-
-                        } else {
-                                call->dump();
-                                errs() << "\nWhy do you do that?\n";
-                        }
-                }
-        }
-
-        return result;
-}
-*/
-
 bool check_mpi_send_conflicts(llvm::CallBase *send_init_call) {
 
-  auto scope_endings = get_scope_endings(send_init_call);
-  return check_call_for_conflict(send_init_call, scope_endings, true);
+  return check_call_for_conflict(send_init_call, true);
 }
 
 bool check_mpi_recv_conflicts(llvm::CallBase *recv_init_call) {
-  auto scope_endings = get_scope_endings(recv_init_call);
-  return check_call_for_conflict(recv_init_call, scope_endings, false);
+  return check_call_for_conflict(recv_init_call, false);
 }
 
 bool can_prove_val_different(Value *val_a, Value *val_b,
@@ -566,251 +371,6 @@ bool are_calls_conflicting(CallBase *orig_call, CallBase *conflict_call,
 
   // cannot disprove conflict
   return true;
-}
-
-// TODO get scope ending for SendInit
-std::vector<CallBase *> get_scope_endings(CallBase *call) {
-
-  auto *F = call->getCalledFunction();
-  if (F == mpi_func->mpi_Irecv || F == mpi_func->mpi_Isend ||
-      F == mpi_func->mpi_Iallreduce || F == mpi_func->mpi_Ibarrier ||
-      F == mpi_func->mpi_Issend) {
-    return get_corresponding_wait(call);
-  } else if (F == mpi_func->mpi_Bsend ||
-             F == mpi_func->mpi_Ibsend) { // search for all mpi buffer detach
-
-    std::vector<CallBase *> scope_endings;
-    for (auto *user : mpi_func->mpi_buffer_detach->users()) {
-      if (auto *buffer_detach_call = dyn_cast<CallBase>(user)) {
-        assert(buffer_detach_call->getCalledFunction() ==
-               mpi_func->mpi_buffer_detach);
-        scope_endings.push_back(buffer_detach_call);
-      }
-    }
-    return scope_endings;
-  } else if (F == mpi_func->mpi_send_init || F == mpi_func->mpi_recv_init) {
-
-    return get_corresponding_free(call);
-  } else {
-    // no I.. call: no scope ending
-    return {};
-  }
-}
-
-bool is_waitall_matching(ConstantInt *begin_index, ConstantInt *match_index,
-                         CallBase *call) {
-  assert(begin_index->getType() == match_index->getType());
-  assert(call->getCalledFunction() == mpi_func->mpi_waitall);
-  assert(call->arg_size() == 3);
-
-  Debug(call->dump(); errs() << "Is this waitall matching?";);
-
-  if (auto *count = dyn_cast<ConstantInt>(call->getArgOperand(0))) {
-
-    auto begin = begin_index->getSExtValue();
-    auto match = match_index->getSExtValue();
-    auto num_req = count->getSExtValue();
-
-    if (begin + num_req > match && match >= begin) {
-      // proven, that this request is part of the requests waited for by the
-      // call
-      Debug(errs() << "  TRUE\n";);
-      return true;
-    }
-  }
-
-  // could not prove true
-  Debug(errs() << "  FALSE\n";);
-  return false;
-}
-
-std::vector<CallBase *> get_matching_waitall(AllocaInst *request_array,
-                                             ConstantInt *index) {
-  std::vector<CallBase *> result;
-
-  for (auto u : request_array->users()) {
-    if (auto *call = dyn_cast<CallBase>(u)) {
-      if (call->getCalledFunction() == mpi_func->mpi_wait && index->isZero()) {
-        // may use wait like this
-        result.push_back(call);
-      }
-      if (call->getCalledFunction() == mpi_func->mpi_waitall) {
-        if (is_waitall_matching(ConstantInt::get(index->getType(), 0), index,
-                                call)) {
-          result.push_back(call);
-        }
-      }
-    } else if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
-      if (gep->getNumIndices() == 2 && gep->hasAllConstantIndices()) {
-        auto *index_it = gep->idx_begin();
-        ConstantInt *i0 = dyn_cast<ConstantInt>(&*index_it);
-        index_it++;
-        ConstantInt *index_in_array = dyn_cast<ConstantInt>(&*index_it);
-        if (i0->isZero()) {
-
-          for (auto u2 : gep->users()) {
-            if (auto *call = dyn_cast<CallBase>(u2)) {
-              if (call->getCalledFunction() == mpi_func->mpi_wait &&
-                  index == index_in_array) {
-                // may use wait like this
-                result.push_back(call);
-              }
-              if (call->getCalledFunction() == mpi_func->mpi_waitall) {
-                if (is_waitall_matching(index_in_array, index, call)) {
-                  result.push_back(call);
-                }
-              }
-            }
-          }
-
-        } // end if index0 == 0
-      }   // end if gep has simple structure
-    }
-  }
-
-  return result;
-}
-
-std::vector<CallBase *> get_corresponding_wait(CallBase *call) {
-
-  // errs() << "Analyzing scope of \n";
-  // call->dump();
-
-  std::vector<CallBase *> result;
-  unsigned int req_arg_pos = 6;
-  if (call->getCalledFunction() == mpi_func->mpi_Ibarrier) {
-    assert(call->arg_size() == 2);
-    req_arg_pos = 1;
-  } else {
-    assert(call->getCalledFunction() == mpi_func->mpi_Isend ||
-           call->getCalledFunction() == mpi_func->mpi_Ibsend ||
-           call->getCalledFunction() == mpi_func->mpi_Issend ||
-           call->getCalledFunction() == mpi_func->mpi_Irsend ||
-           call->getCalledFunction() == mpi_func->mpi_Irecv ||
-           call->getCalledFunction() == mpi_func->mpi_Iallreduce);
-    assert(call->arg_size() == 7);
-  }
-
-  Value *req = call->getArgOperand(req_arg_pos);
-
-  // req->dump();
-  if (auto *alloc = dyn_cast<AllocaInst>(req)) {
-    for (auto *user : alloc->users()) {
-      if (auto *other_call = dyn_cast<CallBase>(user)) {
-        if (other_call->getCalledFunction() == mpi_func->mpi_wait) {
-          assert(other_call->arg_size() == 2);
-          assert(other_call->getArgOperand(0) == req &&
-                 "First arg of MPi wait is MPI_Request");
-          // found end of scope
-          // errs() << "possible ending of scope here \n";
-          // other_call->dump();
-          result.push_back(other_call);
-        }
-      }
-    }
-  }
-  // scope detection in basic waitall
-  // ofc at some point of pointer arithmetic, we cannot follow it
-  else if (auto *gep = dyn_cast<GetElementPtrInst>(req)) {
-    if (gep->isInBounds()) {
-      if (auto *req_array = dyn_cast<AllocaInst>(gep->getPointerOperand())) {
-        if (gep->getNumIndices() == 2 && gep->hasAllConstantIndices()) {
-
-          auto *index_it = gep->idx_begin();
-          ConstantInt *i0 = dyn_cast<ConstantInt>(&*index_it);
-          index_it++;
-          ConstantInt *index_in_array = dyn_cast<ConstantInt>(&*index_it);
-          if (i0->isZero()) {
-
-            auto temp = get_matching_waitall(req_array, index_in_array);
-            result.insert(result.end(), temp.begin(), temp.end());
-
-          } // end it index0 == 0
-        }   // end if gep has a simple structure
-        else {
-          // debug
-          Debug(gep->dump();
-                errs()
-                << "This structure is currently too complicated to analyze";);
-        }
-      }
-
-    } else { // end if inbounds
-      gep->dump();
-      errs() << "Strange, out of bounds getelemptr instruction should not "
-                "happen in this case\n";
-    }
-  }
-
-  if (result.empty()) {
-    errs() << "could not determine scope of \n";
-    call->dump();
-    errs() << "Assuming it will finish at mpi_finalize.\n"
-           << "The Analysis result is still valid, although the chance of "
-              "false positives is higher\n";
-  }
-
-  // mpi finalize will end all communication nontheles
-  for (auto *user : mpi_func->mpi_finalize->users()) {
-    if (auto *finalize_call = dyn_cast<CallBase>(user)) {
-      assert(finalize_call->getCalledFunction() == mpi_func->mpi_finalize);
-      result.push_back(finalize_call);
-    }
-  }
-
-  return result;
-}
-
-std::vector<CallBase *> get_corresponding_free(CallBase *call) {
-
-  // call->getFunction()->dump();
-  // errs() << "Analyzing scope of \n";
-
-  std::vector<CallBase *> result;
-  unsigned int req_arg_pos = 6;
-
-  assert(call->getCalledFunction() == mpi_func->mpi_send_init ||
-         call->getCalledFunction() == mpi_func->mpi_recv_init);
-  assert(call->arg_size() == 7);
-
-  Value *req = call->getArgOperand(req_arg_pos);
-
-  // req->dump();
-  if (auto *alloc = dyn_cast<AllocaInst>(req)) {
-    for (auto *user : alloc->users()) {
-      if (auto *other_call = dyn_cast<CallBase>(user)) {
-        if (other_call->getCalledFunction() == mpi_func->mpi_request_free) {
-          assert(other_call->arg_size() == 1);
-          assert(other_call->getArgOperand(0) == req);
-          // found end of scope
-          // errs() << "possible ending of scope here \n";
-          // other_call->dump();
-          result.push_back(other_call);
-        }
-      }
-    }
-  }
-
-  if (result.empty()) {
-    errs() << "could not determine scope of \n";
-    call->dump();
-    errs() << "Assuming it will finish at mpi_finalize.\n"
-           << "The Analysis result is still valid, although the chance of "
-              "false positives is higher\n";
-  }
-
-  // mpi finalize will end all communication nontheles
-  // a well-Formed MPI programm will free the request before finalize
-  if (mpi_func->mpi_finalize) {
-    for (auto *user : mpi_func->mpi_finalize->users()) {
-      if (auto *finalize_call = dyn_cast<CallBase>(user)) {
-        assert(finalize_call->getCalledFunction() == mpi_func->mpi_finalize);
-        result.push_back(finalize_call);
-      }
-    }
-  }
-
-  return result;
 }
 
 Value *get_communicator(CallBase *mpi_call) {
