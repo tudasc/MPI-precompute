@@ -51,6 +51,7 @@ private:
 public:
   std::vector<llvm::CallBase *>
   get_possibly_conflicting_calls(llvm::CallBase *orig_call);
+  llvm::CallBase *get_first_known_conflicting_call(llvm::CallBase *orig_call);
 
 private:
   std::vector<FunctionCallMetadata> functionCalls;

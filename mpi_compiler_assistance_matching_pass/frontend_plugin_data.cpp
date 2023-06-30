@@ -58,8 +58,8 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
           debug_loc.print(ss);
 
           if (location_to_metadata.find(as_str) != location_to_metadata.end()) {
-            errs() << "FOUND METADATA FOR\n";
-            call->dump();
+            // errs() << "FOUND METADATA FOR\n";
+            // call->dump();
             if (call_to_metadata_map.find(call) == call_to_metadata_map.end()) {
               call_to_metadata_map[call] = location_to_metadata[as_str];
               call_to_metadata_map[call]->call = call;
@@ -69,8 +69,8 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
           }
 
         } else {
-          errs() << "NO DEBUG LOC\n";
-          call->dump();
+          // errs() << "NO DEBUG LOC\n";
+          // call->dump();
         }
       }
     }
@@ -87,4 +87,28 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
     assert(functionCalls[i].id == i);
     assert(orderMatrix[i].size() == num_func_calls);
   }
+}
+
+std::vector<llvm::CallBase *>
+FrontendPluginData::get_possibly_conflicting_calls(llvm::CallBase *orig_call) {
+  std::vector<llvm::CallBase *> result;
+
+  // if frontend plugin does not know the call something went wrong
+  assert(call_to_metadata_map.find(orig_call) != call_to_metadata_map.end());
+
+  auto metadata = call_to_metadata_map[orig_call];
+
+  // TODO one could initialize this vec at the time of reading in the plugin
+  // result data
+  for (auto i : metadata->conflicts) {
+    result.push_back(functionCalls[i].call);
+  }
+
+  return result;
+}
+
+llvm::CallBase *FrontendPluginData::get_first_known_conflicting_call(
+    llvm::CallBase *orig_call) {
+  // TODO IMPLEMENT
+  return nullptr;
 }
