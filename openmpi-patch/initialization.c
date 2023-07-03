@@ -382,6 +382,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
     }
   }
 
+  request->original_request.req_type = MPIOPT_REQUEST_TYPE;
+
   request->dest = dest;
   request->dtype_size = type_size;
   request->tag = tag;

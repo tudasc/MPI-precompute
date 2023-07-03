@@ -18,4 +18,6 @@
 #include "ompi/mca/osc/ucx/osc_ucx.h"
 #include "ompi/mca/osc/ucx/osc_ucx_request.h"
 
+#define MPIOPT_REQUEST_TYPE (OMPI_REQUEST_MAX + 1)
+
 #endif /* MPIOPT_MPI_INTERNALS_H_ */

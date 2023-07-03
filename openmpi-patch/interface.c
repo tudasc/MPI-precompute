@@ -55,9 +55,13 @@ int MPIOPT_Recv_init_x(void *buf, int count, MPI_Datatype datatype, int source,
 }
 
 int MPIOPT_Start(MPI_Request *request) {
-  MPIOPT_Request *req = (MPIOPT_Request *)*request;
-  assert(req->start_fn != NULL);
-  return req->start_fn(req);
+  if ((*request)->req_type == MPIOPT_REQUEST_TYPE) {
+    MPIOPT_Request *req = (MPIOPT_Request *)*request;
+    assert(req->start_fn != NULL);
+    return req->start_fn(req);
+  } else {
+    return MPI_Start(request);
+  }
 }
 
 int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
@@ -75,19 +79,27 @@ int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
 }
 
 int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
-  MPIOPT_Request *req = (MPIOPT_Request *)*request;
-  mpiopt_request_test_fn_t test_fn = req->test_fn; // hoist read out of loop
-  int flag = 0;
-  while (!flag) {
-    test_fn(req, &flag, status);
+  if ((*request)->req_type == MPIOPT_REQUEST_TYPE) {
+    MPIOPT_Request *req = (MPIOPT_Request *)*request;
+    mpiopt_request_test_fn_t test_fn = req->test_fn; // hoist read out of loop
+    int flag = 0;
+    while (!flag) {
+      test_fn(req, &flag, status);
+    }
+    return MPI_SUCCESS;
+  } else {
+    return MPI_Wait(request, status);
   }
-  return MPI_SUCCESS;
 }
 
 int MPIOPT_Test(MPI_Request *request, int *flag, MPI_Status *status) {
-  MPIOPT_Request *req = (MPIOPT_Request *)*request;
-  assert(req->test_fn != NULL);
-  return req->test_fn(req, flag, status);
+  if ((*request)->req_type == MPIOPT_REQUEST_TYPE) {
+    MPIOPT_Request *req = (MPIOPT_Request *)*request;
+    assert(req->test_fn != NULL);
+    return req->test_fn(req, flag, status);
+  } else {
+    return MPI_Test(request, flag, status);
+  }
 }
 
 int MPIOPT_Waitany(int count, MPI_Request array_of_requests[], int *index,
@@ -196,10 +208,14 @@ int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
 }
 
 int MPIOPT_Request_free(MPI_Request *request) {
-  int retval = MPIOPT_Request_free_internal((MPIOPT_Request *)*request);
-  *request = NULL;
-  // free(*request);
-  return retval;
+  if ((*request)->req_type == MPIOPT_REQUEST_TYPE) {
+    int retval = MPIOPT_Request_free_internal((MPIOPT_Request *)*request);
+    *request = NULL;
+    // free(*request);
+    return retval;
+  } else {
+    return MPI_Request_free(request);
+  }
 }
 
 OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm) {
