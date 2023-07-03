@@ -35,10 +35,11 @@ bool uses_wildcard(CallBase *mpi_call, bool is_sending) {
 
   auto implementation_specifics = ImplementationSpecifics::get_instance();
 
-  auto tag = get_tag(mpi_call,is_sending);
-  auto src_rank = get_src(mpi_call,is_sending);
+  auto tag = get_tag(mpi_call, is_sending);
+  auto src_rank = get_src(mpi_call, is_sending);
 
-  return tag == implementation_specifics->ANY_TAG || src_rank == implementation_specifics->ANY_SOURCE;
+  return tag == implementation_specifics->ANY_TAG ||
+         src_rank == implementation_specifics->ANY_SOURCE;
 }
 
 // True, if no conflicting call was found
@@ -53,7 +54,7 @@ bool check_call_for_conflict(CallBase *mpi_call, bool is_sending) {
     return true; // frontend determined that no conflicts present
   }
 
-  if (!is_sending && uses_wildcard(mpi_call,is_sending)) {
+  if (!is_sending && uses_wildcard(mpi_call, is_sending)) {
     return false;
   }
 
@@ -94,8 +95,8 @@ bool can_prove_val_different_with_scalarEvolution(Value *val_a, Value *val_b) {
   ScalarEvolution *se = analysis_results->getSE(*inst_a->getFunction());
   assert(se != nullptr);
 
-  if (! se->isSCEVable(inst_a->getType())){
-      return false;
+  if (!se->isSCEVable(inst_a->getType())) {
+    return false;
   }
 
   // Debug(errs() << "try to prove difference within loop\n";)
@@ -169,8 +170,7 @@ bool can_prove_val_different_for_different_loop_iters(Value *val_a,
 
 // TODO this analysis may not work if a thread gets a pointer to another
 // thread's stack, but whoever does that is dumb anyway...
-bool can_prove_val_different(Value *val_a, Value *val_b
-                             ) {
+bool can_prove_val_different(Value *val_a, Value *val_b) {
 
   // errs() << "Comparing: \n";
   // val_a->dump();
@@ -199,11 +199,11 @@ bool can_prove_val_different(Value *val_a, Value *val_b
     return true;
   }
 
- /* if (check_for_loop_iter_difference) {
-    if (can_prove_val_different_for_different_loop_iters(val_a, val_b)) {
-      return true;
-    }
-  }*/
+  /* if (check_for_loop_iter_difference) {
+     if (can_prove_val_different_for_different_loop_iters(val_a, val_b)) {
+       return true;
+     }
+   }*/
 
   // could not prove difference
   return false;
@@ -368,9 +368,10 @@ Value *get_communicator(CallBase *mpi_call) {
   } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Sendrecv) {
     total_num_args = 12;
     communicator_arg_pos = 10;
-  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init || mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
-      total_num_args = 7;
-      communicator_arg_pos = 5;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+    total_num_args = 7;
+    communicator_arg_pos = 5;
   } else {
     errs() << mpi_call->getCalledFunction()->getName()
            << ": This MPI function is currently not supported\n";
@@ -409,9 +410,10 @@ Value *get_src(CallBase *mpi_call, bool is_send) {
       src_arg_pos = 3;
     else
       src_arg_pos = 8;
-  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init || mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
-      total_num_args = 7;
-      src_arg_pos = 3;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+    total_num_args = 7;
+    src_arg_pos = 3;
   } else {
     errs() << mpi_call->getCalledFunction()->getName()
            << ": This MPI function is currently not supported\n";
@@ -450,9 +452,10 @@ Value *get_tag(CallBase *mpi_call, bool is_send) {
       tag_arg_pos = 4;
     else
       tag_arg_pos = 9;
-  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init || mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
-      total_num_args = 7;
-      tag_arg_pos = 4;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+    total_num_args = 7;
+    tag_arg_pos = 4;
   } else {
     errs() << mpi_call->getCalledFunction()->getName()
            << ": This MPI function is currently not supported\n";
