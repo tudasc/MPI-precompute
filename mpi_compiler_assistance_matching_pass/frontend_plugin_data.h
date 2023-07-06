@@ -9,6 +9,16 @@
 #include <unordered_map>
 #include <vector>
 
+enum CommunicationOrder
+{
+    BeforeInLoop = -2,
+    Before = -1,
+    Unknown = 0,
+    After = 1,
+    AfterInLoop = 2,
+    UnknownInLoop = 3,
+};
+
 struct FunctionCallMetadata {
   std::vector<unsigned int> conflicts;
   std::string functionName;
