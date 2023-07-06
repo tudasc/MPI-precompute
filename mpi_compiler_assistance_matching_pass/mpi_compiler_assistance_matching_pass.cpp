@@ -142,7 +142,7 @@ struct MPICompilerAssistanceMatchingPass
       errs() << "Replace " << send_init_list.size() << " send Operations \nand "
              << recv_init_list.size() << " receive Operations\n";
 
-      replace_communication_calls(send_init_list, recv_init_list);
+      replace_communication_calls(M, send_init_list, recv_init_list);
     }
 
     // Beware: with operator | the functions will be executed with || they wont

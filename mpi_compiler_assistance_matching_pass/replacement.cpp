@@ -167,49 +167,57 @@ bool check_if_all_usages_of_ptr_are_lifetime(Value *ptr) {
   return true;
 }
 
-std::vector<CallBase *> get_usage_of_request(CallBase *call) {
+std::vector<CallBase *> get_request_handeling_calls_for(Module &M,
+                                                        Function *f) {
+  std::vector<CallBase *> result;
+  if (f) {
+    for (auto *u : f->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
+        if (call->getCalledFunction() == f) {
+          result.push_back(call);
+        }
+      }
+    }
+  }
+  return result;
+}
 
-  // get the request
-  unsigned int req_arg_pos = 6;
-
-  assert(call->getCalledFunction() == mpi_func->mpi_send_init ||
-         call->getCalledFunction() == mpi_func->mpi_recv_init);
-  assert(call->arg_size() == 7);
-
-  Value *req = call->getArgOperand(req_arg_pos);
+// calls like start wait test
+std::vector<CallBase *> get_request_handeling_calls(Module &M) {
 
   std::vector<CallBase *> calls_to_replace;
 
-  for (auto *u : req->users()) {
+  auto temp = get_request_handeling_calls_for(M, mpi_func->mpi_start);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_startall);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-    assert(u != nullptr);
-    if (auto *call = dyn_cast<CallBase>(u)) {
-      if (is_mpi_call(call)) {
-        calls_to_replace.push_back(call);
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_wait);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_waitall);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_waitany);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_waitsome);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-      } else {
-        errs() << "NOT SUPPORTED: Request is used in non MPI call:\n";
-        u->dump();
-        assert(false);
-      }
-    } else if (auto *cast = dyn_cast<BitCastInst>(u)) {
-      assert(check_if_all_usages_of_ptr_are_lifetime(cast));
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_test);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_testall);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_testany);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_testsome);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-      // this is allowed:
-      //%14 = bitcast %struct.ompi_request_t** %3 to i8*
-      // call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %14) #8
-
-    } else {
-      errs() << "NOT SUPPORTED: Request is used in non MPI call:\n";
-      u->dump();
-      assert(false);
-    }
-  }
+  temp = get_request_handeling_calls_for(M, mpi_func->mpi_request_free);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
   return calls_to_replace;
 }
 
-void replace_communication_calls(std::vector<CallBase *> init_send_calls,
+void replace_communication_calls(llvm::Module &M,
+                                 std::vector<CallBase *> init_send_calls,
                                  std::vector<CallBase *> init_recv_calls) {
 
   std::set<CallBase *> calls_to_replace;
@@ -222,26 +230,38 @@ void replace_communication_calls(std::vector<CallBase *> init_send_calls,
   // some def use chains in between, e.g. e a free is used by send_init and recv
   // init
 
-  for (auto *call : init_send_calls) {
-    auto temp = get_usage_of_request(call);
-    std::copy(temp.begin(), temp.end(),
-              std::inserter(calls_to_replace, calls_to_replace.begin()));
-  }
-
-  for (auto *call : init_recv_calls) {
-    auto temp = get_usage_of_request(call);
-    std::copy(temp.begin(), temp.end(),
-              std::inserter(calls_to_replace, calls_to_replace.begin()));
-  }
+  auto temp = get_request_handeling_calls(M);
+  std::copy(temp.begin(), temp.end(),
+            std::inserter(calls_to_replace, calls_to_replace.begin()));
 
   // do the actual replacement
   for (auto *call : calls_to_replace) {
     if (call->getCalledFunction() == mpi_func->mpi_wait) {
       replace_call(call, mpi_func->optimized.mpi_wait);
+    } else if (call->getCalledFunction() == mpi_func->mpi_waitall) {
+      replace_call(call, mpi_func->optimized.mpi_waitall);
+    } else if (call->getCalledFunction() == mpi_func->mpi_waitany) {
+      replace_call(call, mpi_func->optimized.mpi_waitany);
+    } else if (call->getCalledFunction() == mpi_func->mpi_waitsome) {
+      replace_call(call, mpi_func->optimized.mpi_waitsome);
+
+    } else if (call->getCalledFunction() == mpi_func->mpi_test) {
+      replace_call(call, mpi_func->optimized.mpi_test);
+    } else if (call->getCalledFunction() == mpi_func->mpi_testall) {
+      replace_call(call, mpi_func->optimized.mpi_testall);
+    } else if (call->getCalledFunction() == mpi_func->mpi_testany) {
+      replace_call(call, mpi_func->optimized.mpi_testany);
+    } else if (call->getCalledFunction() == mpi_func->mpi_testsome) {
+      replace_call(call, mpi_func->optimized.mpi_testsome);
+
     } else if (call->getCalledFunction() == mpi_func->mpi_start) {
       replace_call(call, mpi_func->optimized.mpi_start);
+    } else if (call->getCalledFunction() == mpi_func->mpi_startall) {
+      replace_call(call, mpi_func->optimized.mpi_startall);
+
     } else if (call->getCalledFunction() == mpi_func->mpi_request_free) {
       replace_call(call, mpi_func->optimized.mpi_request_free);
+
     } else if (call->getCalledFunction() == mpi_func->mpi_send_init) {
       replace_with_info(call, mpi_func->optimized.mpi_send_init_info);
     } else if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
