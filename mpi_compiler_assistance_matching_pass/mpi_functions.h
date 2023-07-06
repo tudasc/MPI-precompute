@@ -31,7 +31,15 @@ extern struct mpi_functions *mpi_func;
 // optimized version of persistent ops
 struct mpiopt_functions {
   llvm::Function *mpi_wait = nullptr;
+  llvm::Function *mpi_waitall = nullptr;
+  llvm::Function *mpi_waitany = nullptr;
+  llvm::Function *mpi_waitsome = nullptr;
+  llvm::Function *mpi_test = nullptr;
+  llvm::Function *mpi_testall = nullptr;
+  llvm::Function *mpi_testany = nullptr;
+  llvm::Function *mpi_testsome = nullptr;
   llvm::Function *mpi_start = nullptr;
+  llvm::Function *mpi_startall = nullptr;
   llvm::Function *mpi_send_init = nullptr;
   llvm::Function *mpi_send_init_info = nullptr;
   llvm::Function *mpi_recv_init = nullptr;
@@ -61,8 +69,13 @@ struct mpi_functions {
   llvm::Function *mpi_Irecv = nullptr;
 
   llvm::Function *mpi_test = nullptr;
+  llvm::Function *mpi_testall = nullptr;
+  llvm::Function *mpi_testany = nullptr;
+  llvm::Function *mpi_testsome = nullptr;
   llvm::Function *mpi_wait = nullptr;
   llvm::Function *mpi_waitall = nullptr;
+  llvm::Function *mpi_waitany = nullptr;
+  llvm::Function *mpi_waitsome = nullptr;
   llvm::Function *mpi_buffer_detach = nullptr;
 
   llvm::Function *mpi_barrier = nullptr;
@@ -71,6 +84,7 @@ struct mpi_functions {
   llvm::Function *mpi_Iallreduce = nullptr;
 
   llvm::Function *mpi_start = nullptr;
+  llvm::Function *mpi_startall = nullptr;
   llvm::Function *mpi_send_init = nullptr;
   llvm::Function *mpi_recv_init = nullptr;
   llvm::Function *mpi_request_free = nullptr;

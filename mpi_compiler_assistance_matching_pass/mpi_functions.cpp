@@ -123,13 +123,20 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 
     } else if (f->getName().equals("MPI_Test")) {
       result->mpi_test = f;
-
+    } else if (f->getName().equals("MPI_Testall")) {
+      result->mpi_testall = f;
+    } else if (f->getName().equals("MPI_Testany")) {
+      result->mpi_testany = f;
+    } else if (f->getName().equals("MPI_Testsome")) {
+      result->mpi_testsome = f;
     } else if (f->getName().equals("MPI_Wait")) {
       result->mpi_wait = f;
-
     } else if (f->getName().equals("MPI_Waitall")) {
       result->mpi_waitall = f;
-
+    } else if (f->getName().equals("MPI_Waitany")) {
+      result->mpi_waitany = f;
+    } else if (f->getName().equals("MPI_Waitsome")) {
+      result->mpi_waitsome = f;
     } else if (f->getName().equals("MPI_Start")) {
       result->mpi_start = f;
 
@@ -195,10 +202,66 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
                            .getCallee()
                            ->stripPointerCasts());
   }
+  if (result->mpi_waitall) {
+    result->optimized.mpi_waitall = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Waitall",
+                              result->mpi_waitall->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_waitany) {
+    result->optimized.mpi_waitany = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Waitany",
+                              result->mpi_waitany->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_waitsome) {
+    result->optimized.mpi_waitsome = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Waitsome",
+                              result->mpi_waitsome->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_test) {
+    result->optimized.mpi_test =
+        cast<Function>(M.getOrInsertFunction(
+                            "MPIOPT_Test", result->mpi_test->getFunctionType())
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_testall) {
+    result->optimized.mpi_testall = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Testall",
+                              result->mpi_testall->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_testany) {
+    result->optimized.mpi_testany = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Testany",
+                              result->mpi_testany->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_testsome) {
+    result->optimized.mpi_testsome = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Testsome",
+                              result->mpi_testsome->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
   if (result->mpi_start) {
     result->optimized.mpi_start = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Start",
                               result->mpi_start->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_startall) {
+    result->optimized.mpi_startall = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Startall",
+                              result->mpi_startall->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
