@@ -31,6 +31,8 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "llvm/IR/Verifier.h"
+
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -155,6 +157,11 @@ struct MPICompilerAssistanceMatchingPass
     FrontendPluginData::delete_instance();
 
     delete analysis_results;
+
+#ifndef NDEBUG
+    auto has_error = verifyModule(M, &errs(), nullptr);
+    assert(!has_error);
+#endif
 
     if (replacement) {
       return PreservedAnalyses::none();
