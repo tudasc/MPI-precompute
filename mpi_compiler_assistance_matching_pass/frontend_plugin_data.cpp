@@ -23,25 +23,27 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
   auto file_content = file.get()->getBuffer();
   auto plugin_data = nlohmann::json::parse(file_content);
 
-  std::unordered_map<std::string, FunctionCallMetadata *> location_to_metadata;
+  std::unordered_map<std::string, std::shared_ptr<FunctionCallMetadata>>
+      location_to_metadata;
 
   // parse json to struct
   for (const auto &functionCallJson : plugin_data["FunctionCalls"]) {
-    FunctionCallMetadata functionCall;
-    functionCall.functionName = functionCallJson["Function"];
-    functionCall.sourceLocation = functionCallJson["SourceLocation"];
-    functionCall.id = functionCallJson["id"];
+    std::shared_ptr<FunctionCallMetadata> functionCall =
+        std::make_shared<FunctionCallMetadata>();
+    functionCall->functionName = functionCallJson["Function"];
+    functionCall->sourceLocation = functionCallJson["SourceLocation"];
+    functionCall->id = functionCallJson["id"];
+    // errs() << functionCall->functionName << "\n";
     for (const auto &conflict : functionCallJson["Conflicts"]) {
-      functionCall.conflicts.push_back(conflict);
+      functionCall->conflicts.push_back(conflict);
+      // errs() << "conflicts with: " << int(conflict) << "\n";
     }
-    functionCall.call = nullptr;
-    functionCalls.push_back(std::move(functionCall));
-    // get the address
-    auto this_call = &functionCalls.back();
+    functionCall->call = nullptr;
+    functionCalls.push_back(functionCall);
 
-    if (location_to_metadata.find(this_call->sourceLocation) ==
+    if (location_to_metadata.find(functionCall->sourceLocation) ==
         location_to_metadata.end()) {
-      location_to_metadata[this_call->sourceLocation] = this_call;
+      location_to_metadata[functionCall->sourceLocation] = functionCall;
     } else {
       assert(false && "Multiple metadata entries for same call found!");
     }
@@ -84,7 +86,7 @@ FrontendPluginData::FrontendPluginData(llvm::Module &M) {
   assert(functionCalls.size() == num_func_calls);
   assert(orderMatrix.size() == num_func_calls);
   for (unsigned int i = 0; i < functionCalls.size(); ++i) {
-    assert(functionCalls[i].id == i);
+    assert(functionCalls[i]->id == i);
     assert(orderMatrix[i].size() == num_func_calls);
   }
 }
@@ -97,11 +99,12 @@ FrontendPluginData::get_possibly_conflicting_calls(llvm::CallBase *orig_call) {
   assert(call_to_metadata_map.find(orig_call) != call_to_metadata_map.end());
 
   auto metadata = call_to_metadata_map[orig_call];
+  assert(metadata != nullptr);
 
   // TODO one could initialize this vec at the time of reading in the plugin
   // result data
   for (auto i : metadata->conflicts) {
-    result.push_back(functionCalls[i].call);
+    result.push_back(functionCalls[i]->call);
   }
 
   return result;

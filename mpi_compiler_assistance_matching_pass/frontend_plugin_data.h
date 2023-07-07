@@ -9,14 +9,13 @@
 #include <unordered_map>
 #include <vector>
 
-enum CommunicationOrder
-{
-    BeforeInLoop = -2,
-    Before = -1,
-    Unknown = 0,
-    After = 1,
-    AfterInLoop = 2,
-    UnknownInLoop = 3,
+enum CommunicationOrder {
+  BeforeInLoop = -2,
+  Before = -1,
+  Unknown = 0,
+  After = 1,
+  AfterInLoop = 2,
+  UnknownInLoop = 3,
 };
 
 struct FunctionCallMetadata {
@@ -64,8 +63,8 @@ public:
   llvm::CallBase *get_first_known_conflicting_call(llvm::CallBase *orig_call);
 
 private:
-  std::vector<FunctionCallMetadata> functionCalls;
-  std::unordered_map<llvm::CallBase *, FunctionCallMetadata *>
+  std::vector<std::shared_ptr<FunctionCallMetadata>> functionCalls;
+  std::unordered_map<llvm::CallBase *, std::shared_ptr<FunctionCallMetadata>>
       call_to_metadata_map;
   std::vector<std::vector<int>> orderMatrix;
 };
