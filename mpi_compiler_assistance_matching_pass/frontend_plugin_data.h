@@ -55,7 +55,7 @@ public:
 private:
   static FrontendPluginData *instance;
   FrontendPluginData(llvm::Module &M);
-  ~FrontendPluginData();
+  ~FrontendPluginData() = default;
 
 public:
   std::vector<llvm::CallBase *>
