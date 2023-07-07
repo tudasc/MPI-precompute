@@ -23,7 +23,7 @@ LINKAGE_TYPE int progress_send_request_handshake_begin(MPIOPT_Request *request,
   assert(request->type == SEND_REQUEST_TYPE_HANDSHAKE_INITIATED);
   MPI_Comm comm_to_use =
       request->communicators->handshake_response_communicator;
-  assert(request->remote_data_addr == NULL);
+  assert(request->remote_data_addr == 0); //==NULL
   int local_flag = 0;
   MPI_Test(&request->backup_request, &local_flag, status); // payload
 
@@ -133,8 +133,8 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   add_operation_to_trace(request, "Send handshake");
 #endif
 
-  uint64_t flag_ptr = &request->flag;
-  uint64_t data_ptr;
+  void *flag_ptr = &request->flag;
+  void *data_ptr;
 
   size_t buffer_size;
   if (!request->is_cont) {
@@ -254,9 +254,9 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   current_pos += sizeof(size_t);
   *(size_t *)current_pos = rkey_size_flag;
   current_pos += sizeof(size_t);
-  *(u_int64_t *)current_pos = data_ptr;
+  *(u_int64_t *)current_pos = (u_int64_t)data_ptr;
   current_pos += sizeof(u_int64_t);
-  *(u_int64_t *)current_pos = flag_ptr;
+  *(u_int64_t *)current_pos = (u_int64_t)flag_ptr;
   current_pos += sizeof(u_int64_t);
   memcpy(current_pos, rkey_buffer_data, rkey_size_data);
   current_pos += rkey_size_data;
@@ -270,7 +270,7 @@ LINKAGE_TYPE void send_rdma_info(MPIOPT_Request *request) {
   if (request->nc_strategy == NC_MIXED && request->pack_size != 0) {
     *(size_t *)current_pos = rkey_size_packed_buf;
     current_pos += sizeof(size_t);
-    *(u_int64_t *)current_pos = request->packed_buf;
+    *(u_int64_t *)current_pos = (u_int64_t)request->packed_buf;
     current_pos += sizeof(u_int64_t);
     memcpy(current_pos, rkey_packed_buffer, rkey_size_packed_buf);
     current_pos += rkey_size_packed_buf;

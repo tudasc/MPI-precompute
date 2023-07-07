@@ -283,7 +283,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   // wie viele Tasks gibt es?
   MPI_Comm_size(comm, &numtasks);
 
-  uint64_t buffer_ptr = buf;
+  void *buffer_ptr = buf;
 
   ompi_osc_ucx_module_t *module =
       (ompi_osc_ucx_module_t *)global_comm_win->w_osc_module;
@@ -388,7 +388,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->dtype_size = type_size;
   request->tag = tag;
   request->backup_request = MPI_REQUEST_NULL;
-  request->remote_data_addr = NULL;
+  request->remote_data_addr = 0; // NULL
 
   request->communicators = find_comm(comm);
   assert(request->communicators != NULL);
