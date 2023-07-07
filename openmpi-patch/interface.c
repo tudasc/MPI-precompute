@@ -1,10 +1,9 @@
+#include "mpi-internals.h"
 #include <mpi.h>
 #include <ucp/api/ucp.h>
 
 // why does other header miss this include?
 #include <stdbool.h>
-
-#include "mpi-internals.h"
 
 #include <stdlib.h>
 #include <unistd.h>

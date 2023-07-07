@@ -21,6 +21,7 @@
 struct mpiopt_request; // forward declaration of struct type
 typedef struct mpiopt_request MPIOPT_Request;
 // BEFORE including other headers
+#include "mpi-internals.h"
 
 #include <mpi.h>
 
@@ -36,7 +37,6 @@ typedef struct mpiopt_request MPIOPT_Request;
 #include <ucp/api/ucp.h>
 #include <unistd.h>
 
-#include "mpi-internals.h"
 #ifndef NDEBUG
 // instead of #include "debug.h" to avoid cyclic inclusion
 struct debug_data;
