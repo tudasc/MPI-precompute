@@ -21,36 +21,43 @@
 int MPIOPT_Send_init(const void *buf, int count, MPI_Datatype datatype,
                      int dest, int tag, MPI_Comm comm, MPI_Request *request) {
 
-  *request = malloc(sizeof(MPIOPT_Request));
-
-  return MPIOPT_Send_init_internal(buf, count, datatype, dest, tag, comm,
-                                   (MPIOPT_Request *)*request, MPI_INFO_NULL);
+  return MPIOPT_Send_init_x(buf, count, datatype, dest, tag, comm, request,
+                            MPI_INFO_NULL);
 }
 
 int MPIOPT_Send_init_x(const void *buf, int count, MPI_Datatype datatype,
                        int dest, int tag, MPI_Comm comm, MPI_Request *request,
                        MPI_Info info) {
 
-  *request = malloc(sizeof(MPIOPT_Request));
+  if (dest == MPI_PROC_NULL || comm == MPI_COMM_NULL || comm == MPI_COMM_SELF) {
+    return MPI_Send_init(buf, count, datatype, dest, tag, comm, request);
+  } else {
 
-  return MPIOPT_Send_init_internal(buf, count, datatype, dest, tag, comm,
-                                   (MPIOPT_Request *)*request, info);
+    *request = malloc(sizeof(MPIOPT_Request));
+
+    return MPIOPT_Send_init_internal(buf, count, datatype, dest, tag, comm,
+                                     (MPIOPT_Request *)*request, info);
+  }
 }
 
 int MPIOPT_Recv_init(void *buf, int count, MPI_Datatype datatype, int source,
                      int tag, MPI_Comm comm, MPI_Request *request) {
-  *request = malloc(sizeof(MPIOPT_Request));
-  return MPIOPT_Recv_init_internal(buf, count, datatype, source, tag, comm,
-                                   (MPIOPT_Request *)*request, MPI_INFO_NULL);
+  return MPIOPT_Recv_init_x(buf, count, datatype, source, tag, comm, request,
+                            MPI_INFO_NULL);
 }
 
 int MPIOPT_Recv_init_x(void *buf, int count, MPI_Datatype datatype, int source,
                        int tag, MPI_Comm comm, MPI_Request *request,
                        MPI_Info info) {
-  *request = malloc(sizeof(MPIOPT_Request));
+  if (source == MPI_PROC_NULL || comm == MPI_COMM_NULL ||
+      comm == MPI_COMM_SELF) {
+    return MPI_Recv_init(buf, count, datatype, source, tag, comm, request);
+  } else {
+    *request = malloc(sizeof(MPIOPT_Request));
 
-  return MPIOPT_Recv_init_internal(buf, count, datatype, source, tag, comm,
-                                   (MPIOPT_Request *)*request, info);
+    return MPIOPT_Recv_init_internal(buf, count, datatype, source, tag, comm,
+                                     (MPIOPT_Request *)*request, info);
+  }
 }
 
 int MPIOPT_Start(MPI_Request *request) {
