@@ -249,15 +249,11 @@ LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
 
 // call if one get stuck while waiting for a request to complete: progresses all
 // other requests
-LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
+LINKAGE_TYPE void progress_all_requests() {
   struct list_elem *current_elem = request_list_head->next;
 
   while (current_elem != NULL) {
-    // we are stuck on this request, and should progress the others
-    // after we return, the control flow goes back to this request anyway
-    if (current_elem->elem != current_request) {
-      progress_request(current_elem->elem);
-    }
+    progress_request(current_elem->elem);
     current_elem = current_elem->next;
   }
 }

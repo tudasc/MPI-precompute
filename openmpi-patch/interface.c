@@ -87,10 +87,11 @@ int MPIOPT_Startall(int count, MPI_Request array_of_requests[]) {
 int MPIOPT_Wait(MPI_Request *request, MPI_Status *status) {
   if ((*request)->req_type == MPIOPT_REQUEST_TYPE) {
     MPIOPT_Request *req = (MPIOPT_Request *)*request;
-    mpiopt_request_test_fn_t test_fn = req->test_fn; // hoist read out of loop
     int flag = 0;
+    req->test_fn(req, &flag, status);
     while (!flag) {
-      test_fn(req, &flag, status);
+      progress_all_requests();
+      req->test_fn(req, &flag, status);
     }
     return MPI_SUCCESS;
   } else {
@@ -110,9 +111,17 @@ int MPIOPT_Test(MPI_Request *request, int *flag, MPI_Status *status) {
 
 int MPIOPT_Waitany(int count, MPI_Request array_of_requests[], int *index,
                    MPI_Status *status) {
-
   int flag = 0;
+  for (int i = 0; i < count; ++i) {
+    MPIOPT_Test(&array_of_requests[i], &flag, status);
+    if (flag) {
+      *index = i;
+      return 0;
+    }
+  }
+
   while (!flag) {
+    progress_all_requests();
     for (int i = 0; i < count; ++i) {
       MPIOPT_Test(&array_of_requests[i], &flag, status);
       if (flag) {
@@ -159,7 +168,9 @@ int MPIOPT_Testall(int count, MPI_Request array_of_requests[], int *flag,
 int MPIOPT_Waitall(int count, MPI_Request array_of_requests[],
                    MPI_Status array_of_statuses[]) {
   int flag = 0;
+  MPIOPT_Testall(count, array_of_requests, &flag, array_of_statuses);
   while (!flag) {
+    progress_all_requests();
     MPIOPT_Testall(count, array_of_requests, &flag, array_of_statuses);
   }
   return 0;
