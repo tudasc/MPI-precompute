@@ -1,5 +1,3 @@
-#define _GNU_SOURCE /* needed for some ompi internal headers*/
-
 #include <inttypes.h>
 #include <malloc.h>
 #include <math.h>
@@ -8,7 +6,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#include "interface.h"
+#include "mpi.h"
 
 #include <execinfo.h>
 
@@ -18,28 +16,12 @@
 /*  main                                                                    */
 /* ************************************************************************ */
 
-// #define STATISTIC_PRINTING
-#define READY_TO_RECEIVE 1
-#define READY_TO_SEND 2
-
-#define SEND 3
-#define RECEIVED 4
-
 #define DUMMY_WLOAD_TIME = 10
-
-// bufsize and num iter have to be large to get performance benefit, otherwise
-// slowdown occur
-// KB
-// #define BUFFER_SIZE 1000
-// MB
-// #define BUFFER_SIZE 1000000
 
 // 10KB
 #define BUFFER_SIZE 10000
-#define NUM_ITERS 100000
+#define NUM_ITERS 1000
 
-// #define BUFFER_SIZE 10
-// #define NUM_ITERS 10
 
 #define N BUFFER_SIZE
 
@@ -69,14 +51,10 @@ void check_buffer_content(int *buf, int n) {
 #define tag_rkey_data 43
 #define tag_rkey_flag 44
 
-void use_self_implemented_comm() {
-
-  MPIOPT_INIT();
+void use_persistent_comm() {
 
   MPI_Comm comm;
   MPI_Comm_dup(MPI_COMM_WORLD, &comm);
-
-  MPIOPT_Register_Communicator(comm);
 
   int rank, numtasks;
   // Welchen rang habe ich?
@@ -91,7 +69,7 @@ void use_self_implemented_comm() {
 
   if (rank == 1) {
 
-    MPIOPT_Send_init(buffer, N, MPI_INT, 0, 42, comm, &req);
+    MPI_Send_init(buffer, N, MPI_INT, 0, 42, comm, &req);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < N; ++i) {
@@ -99,46 +77,28 @@ void use_self_implemented_comm() {
       }
 
       printf("Send %d\n", n);
-      MPIOPT_Start(&req);
+      MPI_Start(&req);
       dummy_workload(work_buffer);
-      // MPIOPT_Wait(&req,MPI_STATUS_IGNORE);
-      int flag = 0;
-      while (!flag) {
-        MPIOPT_Test(&req, &flag, MPI_STATUS_IGNORE);
-      }
+      MPI_Wait(&req,MPI_STATUS_IGNORE);
     }
   } else {
 
-    MPIOPT_Recv_init(buffer, N, MPI_INT, 1, 42, comm, &req);
+    MPI_Recv_init(buffer, N, MPI_INT, 1, 42, comm, &req);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < N; ++i) {
         buffer[i] = rank * i * n;
       }
       printf("Recv %d\n", n);
-      MPIOPT_Start(&req);
+      MPI_Start(&req);
       dummy_workload(work_buffer);
-      MPIOPT_Wait(&req, MPI_STATUS_IGNORE);
-      // int flag=0;
-      // while (! flag){
-      //     MPIOPT_Test(&req,&flag, MPI_STATUS_IGNORE);
-      //}
-#ifdef STATISTIC_PRINTING
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
       check_buffer_content(buffer, n);
-#endif
-    }
-
-    // after comm
-    /*
-     for (int i = 0; i < N; ++i) {
-     printf("%i,", buffer[i]);
-     }
-     printf("\n");
-     */
   }
 
-  MPIOPT_Request_free(&req);
-  MPIOPT_FINALIZE();
+  }
+
+  MPI_Request_free(&req);
 }
 
 int main(int argc, char **argv) {
@@ -150,12 +110,12 @@ int main(int argc, char **argv) {
   MPI_Init(&argc, &argv);
 
   gettimeofday(&start_time, NULL); /*  start timer         */
-  use_self_implemented_comm();
+  use_persistent_comm();
   gettimeofday(&stop_time, NULL); /*  stop timer          */
   double time = (stop_time.tv_sec - start_time.tv_sec) +
                 (stop_time.tv_usec - start_time.tv_usec) * 1e-6;
 
-  printf("Self Implemented:    %f s \n", time);
+  printf("Time:    %f s \n", time);
 
   MPI_Finalize();
   return 0;
