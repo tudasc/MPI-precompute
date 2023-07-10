@@ -21,11 +21,9 @@
 
 #define DUMMY_WLOAD_TIME 10
 
-
 // 10KB
 #define BUFFER_SIZE 1000
 #define NUM_ITERS 100
-
 
 #define N BUFFER_SIZE
 
@@ -78,12 +76,12 @@ void use_persistent_comm() {
   for (int i = 0; i < NUM_REQUESTS / 2; ++i) {
 
     MPI_Send_init(&buffer[i * N], N, MPI_INT, nxt, 42 + i, MPI_COMM_WORLD,
-                     &reqs[i]);
+                  &reqs[i]);
   }
   for (int i = NUM_REQUESTS / 2; i < NUM_REQUESTS; ++i) {
     int tag = 42 + i - (NUM_REQUESTS / 2);
     MPI_Recv_init(&buffer[i * N], N, MPI_INT, prev, tag, MPI_COMM_WORLD,
-                     &reqs[i]);
+                  &reqs[i]);
   }
 
   for (int n = 0; n < NUM_ITERS; ++n) {
@@ -96,13 +94,11 @@ void use_persistent_comm() {
     dummy_workload(work_buffer);
 
     MPI_Waitall(NUM_REQUESTS, reqs, MPI_STATUSES_IGNORE);
-
   }
 
   for (int i = 0; i < NUM_REQUESTS; ++i) {
     MPI_Request_free(&reqs[i]);
   }
-
 }
 
 int main(int argc, char **argv) {

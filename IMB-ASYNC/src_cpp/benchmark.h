@@ -47,45 +47,74 @@ goods and services.
 */
 
 #pragma once
-#include <memory>
 #include "scope.h"
 #include <iostream>
+#include <memory>
 
-#define UNUSED(expr) do { (void)(expr); } while (0)
+#define UNUSED(expr)                                                           \
+  do {                                                                         \
+    (void)(expr);                                                              \
+  } while (0)
 
 class BenchmarkSuiteBase;
 class Benchmark {
-    public:
-        Benchmark() : initialized(false) {}
-        virtual const std::string get_name() const { return std::string(""); }
-        virtual Benchmark* create_myself() const { return NULL; }
-        virtual void allocate_internals() {}
-        virtual bool init_description() { return true; }
-        virtual void init() { } 
-        virtual void run(const scope_item &) = 0;
-        virtual void finalize() { }
-        virtual bool is_default() { return true; }
-        virtual std::vector<std::string> get_comments() { return std::vector<std::string>(0); }
-        std::shared_ptr<Scope> get_scope() { if (scope.get() == NULL) { scope.reset(new Scope); scope->commit(); } return scope; }
-        virtual ~Benchmark() { }
-        bool initialized;
-        BenchmarkSuiteBase *suite;
-    protected:
-        std::shared_ptr<Scope> scope;
-    private:
-        Benchmark &operator=(const Benchmark &) { return *this; }
-        Benchmark(const Benchmark &) {}
+public:
+  Benchmark() : initialized(false) {}
+  virtual const std::string get_name() const { return std::string(""); }
+  virtual Benchmark *create_myself() const { return NULL; }
+  virtual void allocate_internals() {}
+  virtual bool init_description() { return true; }
+  virtual void init() {}
+  virtual void run(const scope_item &) = 0;
+  virtual void finalize() {}
+  virtual bool is_default() { return true; }
+  virtual std::vector<std::string> get_comments() {
+    return std::vector<std::string>(0);
+  }
+  std::shared_ptr<Scope> get_scope() {
+    if (scope.get() == NULL) {
+      scope.reset(new Scope);
+      scope->commit();
+    }
+    return scope;
+  }
+  virtual ~Benchmark() {}
+  bool initialized;
+  BenchmarkSuiteBase *suite;
+
+protected:
+  std::shared_ptr<Scope> scope;
+
+private:
+  Benchmark &operator=(const Benchmark &) { return *this; }
+  Benchmark(const Benchmark &) {}
 };
 
-#define DEFINE_INHERITED(CLASS, SUITE_CLASS) static const char *name; \
-    virtual const std::string get_name() const { return name; } \
-    virtual Benchmark *create_myself() const { return new CLASS; } \
-    CLASS() { Benchmark::suite = SUITE_CLASS::register_elem(this); this->allocate_internals(); }
+#define DEFINE_INHERITED(CLASS, SUITE_CLASS)                                   \
+  static const char *name;                                                     \
+  virtual const std::string get_name() const { return name; }                  \
+  virtual Benchmark *create_myself() const { return new CLASS; }               \
+  CLASS() {                                                                    \
+    Benchmark::suite = SUITE_CLASS::register_elem(this);                       \
+    this->allocate_internals();                                                \
+  }
 
-#define DECLARE_INHERITED(CLASS, NAME) namespace { CLASS elem_ ## NAME; } const char *CLASS::name = #NAME;
+#define DECLARE_INHERITED(CLASS, NAME)                                         \
+  namespace {                                                                  \
+  CLASS elem_##NAME;                                                           \
+  }                                                                            \
+  const char *CLASS::name = #NAME;
 
-#ifdef __GNUC__ 
-#define DECLARE_INHERITED_TEMPLATE(CLASS, NAME) namespace { CLASS elem_ ## NAME; } template<> const char *CLASS::name = #NAME;
+#ifdef __GNUC__
+#define DECLARE_INHERITED_TEMPLATE(CLASS, NAME)                                \
+  namespace {                                                                  \
+  CLASS elem_##NAME;                                                           \
+  }                                                                            \
+  template <> const char *CLASS::name = #NAME;
 #else
-#define DECLARE_INHERITED_TEMPLATE(CLASS, NAME) namespace { CLASS elem_ ## NAME; } const char *CLASS::name = #NAME;
+#define DECLARE_INHERITED_TEMPLATE(CLASS, NAME)                                \
+  namespace {                                                                  \
+  CLASS elem_##NAME;                                                           \
+  }                                                                            \
+  const char *CLASS::name = #NAME;
 #endif

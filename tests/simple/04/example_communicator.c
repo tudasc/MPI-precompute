@@ -22,7 +22,6 @@
 #define BUFFER_SIZE 10000
 #define NUM_ITERS 1000
 
-
 #define N BUFFER_SIZE
 
 void dummy_workload(double *buf) {
@@ -79,7 +78,7 @@ void use_persistent_comm() {
       printf("Send %d\n", n);
       MPI_Start(&req);
       dummy_workload(work_buffer);
-      MPI_Wait(&req,MPI_STATUS_IGNORE);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
   } else {
 
@@ -94,8 +93,7 @@ void use_persistent_comm() {
       dummy_workload(work_buffer);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
       check_buffer_content(buffer, n);
-  }
-
+    }
   }
 
   MPI_Request_free(&req);

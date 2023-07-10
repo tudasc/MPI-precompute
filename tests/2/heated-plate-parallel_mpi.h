@@ -36,95 +36,99 @@
 
 class Matrix {
 public:
-    double **data;
-    MPI_Request comm_requests[4];
-    int rows, columns;
+  double **data;
+  MPI_Request comm_requests[4];
+  int rows, columns;
 
-    Matrix(const int global_rows, const int global_columns, const double inner_value, const int msg_tag) {
-        int rank, size;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        MPI_Comm_size(MPI_COMM_WORLD, &size);
-        calculate_num_local_rows(global_rows, global_columns, rank, size);
-        // allocate additional space for the halo lines
-        allocateMatrix(this->rows + 2, this->columns + 2);
-        init_communication(rank, size, msg_tag);
-        init_matrix(rank, size, inner_value);
-    }
+  Matrix(const int global_rows, const int global_columns,
+         const double inner_value, const int msg_tag) {
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    calculate_num_local_rows(global_rows, global_columns, rank, size);
+    // allocate additional space for the halo lines
+    allocateMatrix(this->rows + 2, this->columns + 2);
+    init_communication(rank, size, msg_tag);
+    init_matrix(rank, size, inner_value);
+  }
 
-    ~Matrix() {
-        for (int i = 0; i < 4; ++i) {
-            if (comm_requests[i] != MPI_REQUEST_NULL) {
-                MPI_Request_free(&comm_requests[i]);
-            }
-        }
-        freeMatrix();
+  ~Matrix() {
+    for (int i = 0; i < 4; ++i) {
+      if (comm_requests[i] != MPI_REQUEST_NULL) {
+        MPI_Request_free(&comm_requests[i]);
+      }
     }
+    freeMatrix();
+  }
 
-    // may be useful for debugging
-    void print_matrix(const int N, const int M) {
-        for (int i = 0; i < N + 2; ++i) {
-            std::cout << '\n';
-            for (int j = 0; j < M; ++j) {
-                std::cout << std::fixed << std::setw(11) << std::setprecision(6)
-                          << data[i][j];
-            }
-        }
-        std::cout << '\n';
+  // may be useful for debugging
+  void print_matrix(const int N, const int M) {
+    for (int i = 0; i < N + 2; ++i) {
+      std::cout << '\n';
+      for (int j = 0; j < M; ++j) {
+        std::cout << std::fixed << std::setw(11) << std::setprecision(6)
+                  << data[i][j];
+      }
     }
+    std::cout << '\n';
+  }
 
-    void begin_halo_receive() {
-        MPI_Start(&comm_requests[1]);
-        MPI_Start(&comm_requests[3]);
-    }
+  void begin_halo_receive() {
+    MPI_Start(&comm_requests[1]);
+    MPI_Start(&comm_requests[3]);
+  }
 
-    void begin_halo_send() {
-        MPI_Start(&comm_requests[0]);
-        MPI_Start(&comm_requests[2]);
-    }
+  void begin_halo_send() {
+    MPI_Start(&comm_requests[0]);
+    MPI_Start(&comm_requests[2]);
+  }
 
-    void end_halo_exchange() {
-        // could also use MPI_waitall
-        for (int i = 0; i < 4; ++i) {
-            MPI_Wait(&comm_requests[i], MPI_STATUS_IGNORE);
-        }
+  void end_halo_exchange() {
+    // could also use MPI_waitall
+    for (int i = 0; i < 4; ++i) {
+      MPI_Wait(&comm_requests[i], MPI_STATUS_IGNORE);
     }
+  }
 
 private:
-    void init_matrix(const int rank, const int numTasks, const double inner_value);
+  void init_matrix(const int rank, const int numTasks,
+                   const double inner_value);
 
-    void calculate_num_local_rows(const int global_rows, const int global_columns, const int rank, const int numTasks);
+  void calculate_num_local_rows(const int global_rows, const int global_columns,
+                                const int rank, const int numTasks);
 
-    void init_communication(const int rank, const int numTasks, const int msg_tag);
-    /* ************************************************************************ */
-    /* helper function: freeMatrix: frees memory of the matrix                  */
-    /* ************************************************************************ */
-    void freeMatrix() {
-        free(data[0]);
-        data[0] = nullptr;
-        free(data);
-        data = nullptr;
+  void init_communication(const int rank, const int numTasks,
+                          const int msg_tag);
+  /* ************************************************************************ */
+  /* helper function: freeMatrix: frees memory of the matrix                  */
+  /* ************************************************************************ */
+  void freeMatrix() {
+    free(data[0]);
+    data[0] = nullptr;
+    free(data);
+    data = nullptr;
+  }
+
+  /* ************************************************************************ */
+  /* helper function: allocateMatrix: allocates memory for a matrix           */
+  /* ************************************************************************ */
+  void allocateMatrix(int x, int y) {
+    int i;
+
+    double *data_layer = (double *)malloc(x * y * sizeof(double));
+    double **resultmatrix = (double **)malloc(x * sizeof(double *));
+
+    if (data_layer == NULL || resultmatrix == NULL) {
+      printf("ERROR ALLOCATING MEMORY\n");
+      exit(1);
     }
 
-    /* ************************************************************************ */
-    /* helper function: allocateMatrix: allocates memory for a matrix           */
-    /* ************************************************************************ */
-    void allocateMatrix(int x, int y) {
-        int i;
-
-        double *data_layer = (double *) malloc(x * y * sizeof(double));
-        double **resultmatrix = (double **) malloc(x * sizeof(double *));
-
-        if (data_layer == NULL || resultmatrix == NULL) {
-            printf("ERROR ALLOCATING MEMORY\n");
-            exit(1);
-        }
-
-        for (i = 0; i < x; i++) {
-            resultmatrix[i] = data_layer + i * y;
-        }
-
-        data = resultmatrix;
+    for (i = 0; i < x; i++) {
+      resultmatrix[i] = data_layer + i * y;
     }
+
+    data = resultmatrix;
+  }
 };
 
 //  iterate until the  new solution W differs from the old solution U
@@ -134,4 +138,3 @@ std::pair<int, double> calculate(int rank, double epsilon, int rows,
                                  int columns, Matrix &Matrix_In,
                                  Matrix &Matrix_Out,
                                  struct comm_info comm_partners);
-

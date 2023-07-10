@@ -165,7 +165,7 @@ void use_persistent_comm() {
 
   if (rank == 1) {
 
-    MPI_Send_init(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req );
+    MPI_Send_init(buffer, N, nc_datatype, 0, 42, MPI_COMM_WORLD, &req);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
@@ -177,12 +177,10 @@ void use_persistent_comm() {
       MPI_Start(&req);
       dummy_workload(work_buffer);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
-
     }
   } else {
 
-    MPI_Recv_init(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req
-                       );
+    MPI_Recv_init(buffer, N, nc_datatype, 1, 42, MPI_COMM_WORLD, &req);
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
@@ -196,16 +194,12 @@ void use_persistent_comm() {
       MPI_Wait(&req, MPI_STATUS_IGNORE);
       check_buffer_content(buffer, n, block_lenghts);
     }
-
   }
 
   MPI_Type_free(&nc_datatype);
 
   MPI_Request_free(&req);
-
 }
-
-
 
 int main(int argc, char **argv) {
 
@@ -222,7 +216,7 @@ int main(int argc, char **argv) {
                 (stop_time.tv_usec - start_time.tv_usec) * 1e-6;
 
   printf("Time needed:    %f s \n", time);
-  
+
   MPI_Finalize();
   return 0;
 }
