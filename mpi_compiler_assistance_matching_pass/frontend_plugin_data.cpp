@@ -18,8 +18,12 @@ using namespace llvm;
 FrontendPluginData *FrontendPluginData::instance = nullptr;
 
 FrontendPluginData::FrontendPluginData(llvm::Module &M) {
+
+  auto fname = std::getenv("MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE");
+  assert(fname &&
+         "Env var MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE must be set");
   // read json
-  auto file = MemoryBuffer::getFileOrSTDIN("plugin_data.json");
+  auto file = MemoryBuffer::getFileOrSTDIN(fname);
   auto file_content = file.get()->getBuffer();
   auto plugin_data = nlohmann::json::parse(file_content);
 

@@ -2,12 +2,15 @@
 
 #using openmpi:
 
-INCLUDE="-I/home/td37cari/openmpi-4.1.1/ -I/home/td37cari/openmpi-4.1.1/opal/include -I/home/td37cari/openmpi-4.1.1/ompi/include/ -I/home/td37cari/openmpi-4.1.1/orte/include"
+#INCLUDE="-I/home/td37cari/openmpi-4.1.1/ -I/home/td37cari/openmpi-4.1.1/opal/include -I/home/td37cari/openmpi-4.1.1/ompi/include/ -I/home/td37cari/openmpi-4.1.1/orte/include"
+INCLUDE=""
 
 #CFLAGS="-std=c11 -O3 ${INCLUDE}"
 CFLAGS="-std=c11 -O0 -g ${INCLUDE}"
 LIBS="-lopen-pal -lucp -lm"
 
+
+export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="plugin_data.json"
 #
 if [ ${1: -2} == ".c" ]; then
 
