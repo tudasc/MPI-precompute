@@ -24,7 +24,7 @@ ExternalProject_Get_property(ompi INSTALL_DIR)
 
 set(PASS_LIB ${CMAKE_BINARY_DIR}/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so)
 
-add_custom_target(setup_env.sh
+add_custom_target(setup_env.sh ALL
         COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/setup_env.sh.in ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export PATH=\\$$PATH:${INSTALL_DIR}/bin" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPICC=${INSTALL_DIR}/bin/mpicc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
@@ -36,7 +36,7 @@ add_custom_target(setup_env.sh
 
         DEPENDS setup_env.sh.in)
 
-add_custom_target(run.sh
+add_custom_target(run.sh ALL
         COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/run.sh ${CMAKE_CURRENT_BINARY_DIR}/run.sh
 
         DEPENDS run.sh)
