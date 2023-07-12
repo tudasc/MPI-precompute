@@ -14,7 +14,7 @@ OMPI_CC=clang $MPICC $CFLAGS -o a.out_original $1 $LIBS
 
 elif [ ${1: -4} == ".cpp" ]; then
 OMPI_CXX=clang++ $MPICXX $CFLAGS -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS  $1 $LIBS
-OMPI_CXX=clang $MPICC $CXXFLAGS -o a.out_original $1 $LIBS
+OMPI_CXX=clang $MPICXX $CXXFLAGS -o a.out_original $1 $LIBS
 else
 echo "Unknown file suffix, use this script with .c or .cpp files"
 fi

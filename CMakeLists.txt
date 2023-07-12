@@ -27,6 +27,8 @@ set(PASS_LIB ${CMAKE_BINARY_DIR}/mpi_compiler_assistance_matching_pass/libmpi_co
 add_custom_target(setup_env.sh
         COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/setup_env.sh.in ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export PATH=\\$$PATH:${INSTALL_DIR}/bin" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export MPICC=${INSTALL_DIR}/bin/mpicc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export MPICXX=${INSTALL_DIR}/bin/mpicxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export CPATH=\\$$CPATH:${INSTALL_DIR}/include" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export LIBRARY_PATH=\\$$LIBRARY_PATH:${INSTALL_DIR}/lib" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export LD_LIBRARY_PATH=\\$$LD_LIBRARY_PATH:${INSTALL_DIR}/lib" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
@@ -34,4 +36,10 @@ add_custom_target(setup_env.sh
 
         DEPENDS setup_env.sh.in)
 
+add_custom_target(run.sh
+        COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/run.sh ${CMAKE_CURRENT_BINARY_DIR}/run.sh
+
+        DEPENDS run.sh)
+
+enable_testing()
 add_subdirectory(tests)
