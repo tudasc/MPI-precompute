@@ -63,9 +63,6 @@ ExternalProject_Add_StepTargets(ompi build)
 
 ExternalProject_Get_property(ompi SOURCE_DIR INSTALL_DIR BINARY_DIR)
 
-message("Source dir of ompi = ${SOURCE_DIR}")
-
-# SRc and binary dir?
 # source dir and binary dir, as some headers are in the source dir and others are created at build time
 set(persistent_implementation-include -I${BINARY_DIR} -I${BINARY_DIR}/opal/include -I${BINARY_DIR}/ompi/include/ -I${BINARY_DIR}/orte/include
         -I${SOURCE_DIR} -I${SOURCE_DIR}/opal/include -I${SOURCE_DIR}/ompi/include/ -I${SOURCE_DIR}/orte/include)
