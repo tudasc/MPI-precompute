@@ -28,9 +28,11 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DDEBUG_MACH_PASS=0 
 # Use C++17 to compile our pass (i.e., supply -std=c++11).
 target_compile_features(mpi_compiler_assistance_matching_pass PRIVATE cxx_std_17)
 
-target_include_directories(mpi_compiler_assistance_matching_pass PUBLIC ${ompi_inc_dir})
+ExternalProject_Get_property(ompi INSTALL_DIR)
+target_include_directories(mpi_compiler_assistance_matching_pass PUBLIC ${INSTALL_DIR}/include)
 
 add_dependencies(mpi_compiler_assistance_matching_pass ompi)
+
 
 # LLVM is (typically) built with no C++ RTTI. We need to match that;
 # otherwise, we'll get linker errors about missing RTTI data.

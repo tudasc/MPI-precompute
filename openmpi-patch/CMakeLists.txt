@@ -62,7 +62,7 @@ ExternalProject_Add_Step(ompi include_implementation
 ExternalProject_Add_StepTargets(ompi build)
 
 ExternalProject_Get_property(ompi SOURCE_DIR INSTALL_DIR BINARY_DIR)
-set(ompi_inc_dir ${INSTALL_DIR}/include)
+
 message("Source dir of ompi = ${SOURCE_DIR}")
 
 # SRc and binary dir?
