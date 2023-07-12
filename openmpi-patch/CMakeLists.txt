@@ -70,13 +70,6 @@ message("Source dir of ompi = ${SOURCE_DIR}")
 set(persistent_implementation-include -I${BINARY_DIR} -I${BINARY_DIR}/opal/include -I${BINARY_DIR}/ompi/include/ -I${BINARY_DIR}/orte/include
         -I${SOURCE_DIR} -I${SOURCE_DIR}/opal/include -I${SOURCE_DIR}/ompi/include/ -I${SOURCE_DIR}/orte/include)
 
-if (CMAKE_BUILD_TYPE EQUAL "DEBUG")
-    #add example executable for testing the implementation
-add_executable(implementation_test_example
-        example.c
-        one-sided-persistent.c )
-endif(CMAKE_BUILD_TYPE EQUAL "DEBUG")
-
 set(PERSISTENT_IMPLEMENTATION_FILES debug.c debug.h finalization.c finalization.h globals.c globals.h handshake.c handshake.h interface.c interface.h mpi-internals.h pack.c pack.h request_type.h settings.h start.c start.h test.c test.h wait.c wait.h)
 
 add_custom_target(persistent_implementation
@@ -85,3 +78,7 @@ add_custom_target(persistent_implementation
         DEPENDS ompi-build ${PERSISTENT_IMPLEMENTATION_FILES}
         )
 
+#if(CMAKE_BUILD_TYPE MATCHES Debug)
+#add example executable for testing the implementation
+add_subdirectory(example)
+#endif(CMAKE_BUILD_TYPE MATCHES Debug)
