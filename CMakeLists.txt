@@ -8,4 +8,10 @@ add_definitions(${LLVM_DEFINITIONS})
 include_directories(${LLVM_INCLUDE_DIRS})
 link_directories(${LLVM_LIBRARY_DIRS})
 
+add_subdirectory(openmpi-patch)
+#add the mpi requirement
 add_subdirectory(mpi_compiler_assistance_matching_pass)
+
+#TODO add a setup_env target
+
+#TODO add test target
