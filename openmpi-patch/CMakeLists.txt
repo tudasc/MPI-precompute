@@ -19,6 +19,10 @@ endif(CMAKE_BUILD_TYPE EQUAL "DEBUG")
 
 #TODO assert that generator is makefiles
 
+#TODO fix dependency: mpi implementation is not automatically rebuild if persistent implementation changes
+
+#or also support ninja
+
 ExternalProject_Add(
         ompi
         URL https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.1.tar.gz
