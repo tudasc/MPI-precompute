@@ -4,6 +4,12 @@ cmake_policy(SET CMP0118 NEW)
 
 project("MPI Assertion Checking")
 
+if(NOT CMAKE_BUILD_TYPE)
+set(CMAKE_BUILD_TYPE Debug)
+endif(NOT CMAKE_BUILD_TYPE)
+message("Build Type: ${CMAKE_BUILD_TYPE}")
+
+
 find_package(LLVM REQUIRED CONFIG)
 
 add_definitions(${LLVM_DEFINITIONS})
@@ -14,7 +20,6 @@ add_subdirectory(openmpi-patch)
 #add the mpi requirement
 add_subdirectory(mpi_compiler_assistance_matching_pass)
 
-#TODO add a setup_env target
 ExternalProject_Get_property(ompi INSTALL_DIR)
 
 add_custom_target(setup_env.sh
@@ -27,3 +32,4 @@ add_custom_target(setup_env.sh
         DEPENDS setup_env.sh.in)
 
 #TODO add test target
+

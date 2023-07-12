@@ -78,7 +78,7 @@ add_custom_target(persistent_implementation
         DEPENDS ompi-build ${PERSISTENT_IMPLEMENTATION_FILES}
         )
 
-#if(CMAKE_BUILD_TYPE MATCHES Debug)
+if(CMAKE_BUILD_TYPE MATCHES Debug)
 #add example executable for testing the implementation
 add_subdirectory(example)
-#endif(CMAKE_BUILD_TYPE MATCHES Debug)
+endif(CMAKE_BUILD_TYPE MATCHES Debug)
