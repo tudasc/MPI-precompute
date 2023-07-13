@@ -34,12 +34,11 @@ void dummy_workload(double *buf) {
   }
 }
 
-// TODO not correct for ring comm sceme
-void check_buffer_content(int *buf, int n) {
+void check_buffer_content(int *buf, int n, int rank) {
   int not_correct = 0;
 
-  for (int i = 0; i < N; ++i) {
-    if (buf[i] != 1 * i * n) {
+  for (int i = 0; i < N * NUM_REQUESTS; ++i) {
+    if (buf[i] != 1 * (rank + 1) * i * n) {
       not_correct++;
     }
   }
@@ -86,7 +85,7 @@ void use_persistent_comm() {
 
   for (int n = 0; n < NUM_ITERS; ++n) {
     for (int i = 0; i < N * NUM_REQUESTS; ++i) {
-      buffer[i] = rank * i * n;
+      buffer[i] = (rank + 1) * i * n;
     }
 
     MPI_Startall(NUM_REQUESTS, reqs);
@@ -94,6 +93,7 @@ void use_persistent_comm() {
     dummy_workload(work_buffer);
 
     MPI_Waitall(NUM_REQUESTS, reqs, MPI_STATUSES_IGNORE);
+    check_buffer_content(buffer, n, prev);
   }
 
   for (int i = 0; i < NUM_REQUESTS; ++i) {

@@ -1,0 +1,9 @@
+explanation for the testcases:
+
+01-02: targeted at testing the static analysis wit everything in multiple functions
+other tests target the implementation
+03 non contigous datatype
+04 other communicator than wolrd
+05 multiple requests
+06 very basic test
+07-09 different orderings of wait to check implementation for deadlock
