@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <inttypes.h>
 #include <malloc.h>
 #include <math.h>
@@ -7,38 +6,33 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#include "mpi.h"
-
 #include <execinfo.h>
 
 #include <math.h>
+
+#include <mpi.h>
 
 /* ************************************************************************ */
 /*  main                                                                    */
 /* ************************************************************************ */
 
-#define NUM_REQUESTS 4
-
-#define DUMMY_WLOAD_TIME 10
-
 // 10KB
-#define BUFFER_SIZE 1000
-#define NUM_ITERS 100
+#define BUFFER_SIZE 10000
+#define NUM_ITERS 10
 
-#define N BUFFER_SIZE
+#define W_BUFFER_SIZE 100
 
 void dummy_workload(double *buf) {
 
-  for (int i = 0; i < N - 1; ++i) {
+  for (int i = 0; i < W_BUFFER_SIZE - 1; ++i) {
     buf[i] = sin(buf[i + 1]);
   }
 }
 
-// TODO not correct for ring comm sceme
 void check_buffer_content(int *buf, int n) {
   int not_correct = 0;
 
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < BUFFER_SIZE; ++i) {
     if (buf[i] != 1 * i * n) {
       not_correct++;
     }
@@ -50,9 +44,7 @@ void check_buffer_content(int *buf, int n) {
   }
 }
 
-#define tag_entry 42
-#define tag_rkey_data 43
-#define tag_rkey_flag 44
+#define TAG 42
 
 void use_persistent_comm() {
 
@@ -61,44 +53,50 @@ void use_persistent_comm() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  int *buffer = malloc(N * NUM_REQUESTS * sizeof(int));
-  double *work_buffer = calloc(N, sizeof(double));
-  work_buffer[N - 1] = 0.6;
+  char *buffer = malloc(BUFFER_SIZE * sizeof(int));
+  double *work_buffer = calloc(W_BUFFER_SIZE, sizeof(double));
+  work_buffer[W_BUFFER_SIZE - 1] = 0.6;
 
-  MPI_Request reqs[NUM_REQUESTS];
+  MPI_Datatype datatype = MPI_INT;
 
-  int nxt = (rank + 1) % numtasks;
-  int prev = (rank + numtasks - 1) % numtasks;
+  MPI_Request req;
 
-  assert(NUM_REQUESTS % 2 == 0);
+  if (rank == 1) {
 
-  // TODO fuse these loops for better redability
-  for (int i = 0; i < NUM_REQUESTS / 2; ++i) {
+    MPI_Send_init(buffer, BUFFER_SIZE, datatype, 0, 42, MPI_COMM_WORLD, &req);
 
-    MPI_Send_init(&buffer[i * N], N, MPI_INT, nxt, 42 + i, MPI_COMM_WORLD,
-                  &reqs[i]);
-  }
-  for (int i = NUM_REQUESTS / 2; i < NUM_REQUESTS; ++i) {
-    int tag = 42 + i - (NUM_REQUESTS / 2);
-    MPI_Recv_init(&buffer[i * N], N, MPI_INT, prev, tag, MPI_COMM_WORLD,
-                  &reqs[i]);
-  }
+    for (int n = 0; n < NUM_ITERS; ++n) {
+      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+        // buffer[i] = rank * i * n;
+        buffer[i] = 2 * (n + 1);
+      }
 
-  for (int n = 0; n < NUM_ITERS; ++n) {
-    for (int i = 0; i < N * NUM_REQUESTS; ++i) {
-      buffer[i] = rank * i * n;
+      printf("Send %d\n", n);
+      MPI_Start(&req);
+      dummy_workload(work_buffer);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
+  } else {
 
-    MPI_Startall(NUM_REQUESTS, reqs);
+    MPI_Recv_init(buffer, BUFFER_SIZE, datatype, 1, 42, MPI_COMM_WORLD, &req);
+    for (int n = 0; n < NUM_ITERS; ++n) {
 
-    dummy_workload(work_buffer);
+      for (int i = 0; i < BUFFER_SIZE; ++i) {
+        // buffer[i] = rank * i * n;
+        buffer[i] = (n + 1);
+      }
 
-    MPI_Waitall(NUM_REQUESTS, reqs, MPI_STATUSES_IGNORE);
+      printf("Recv %d\n", n);
+      MPI_Start(&req);
+      dummy_workload(work_buffer);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
+      check_buffer_content(buffer, n, block_lenghts);
+    }
   }
 
-  for (int i = 0; i < NUM_REQUESTS; ++i) {
-    MPI_Request_free(&reqs[i]);
-  }
+  MPI_Type_free(&nc_datatype);
+
+  MPI_Request_free(&req);
 }
 
 int main(int argc, char **argv) {
@@ -115,7 +113,7 @@ int main(int argc, char **argv) {
   double time = (stop_time.tv_sec - start_time.tv_sec) +
                 (stop_time.tv_usec - start_time.tv_usec) * 1e-6;
 
-  printf("Time:    %f s \n", time);
+  printf("Time needed:    %f s \n", time);
 
   MPI_Finalize();
   return 0;

@@ -42,7 +42,7 @@ void check_buffer_content(int *buf, int n) {
 
   if (not_correct != 0) {
     printf("ERROR: %d: buffer has unexpected content\n", n);
-    // exit(-1);
+    exit(-1);
   }
 }
 

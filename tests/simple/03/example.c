@@ -82,7 +82,7 @@ void check_buffer_content(char *buf, int n, int *block_sizes) {
     printf(
         "ERROR: %d: buffer has unexpected content (counted %d wrong values)\n",
         n, not_correct);
-    // exit(-1);
+    exit(-1);
   }
 }
 

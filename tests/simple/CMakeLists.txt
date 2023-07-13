@@ -29,3 +29,9 @@ add_test(NAME test05
         )
 set_tests_properties(test05 PROPERTIES DISABLED true)
 
+add_test(NAME test06
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test.sh ${CMAKE_CURRENT_SOURCE_DIR}/06
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        )
+set_tests_properties(test06 PROPERTIES DISABLED true)
+
