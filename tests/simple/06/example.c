@@ -53,7 +53,7 @@ void use_persistent_comm() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  char *buffer = malloc(BUFFER_SIZE * sizeof(int));
+  int *buffer = malloc(BUFFER_SIZE * sizeof(int));
   double *work_buffer = calloc(W_BUFFER_SIZE, sizeof(double));
   work_buffer[W_BUFFER_SIZE - 1] = 0.6;
 
@@ -66,9 +66,8 @@ void use_persistent_comm() {
     MPI_Send_init(buffer, BUFFER_SIZE, datatype, 0, 42, MPI_COMM_WORLD, &req);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
-        // buffer[i] = rank * i * n;
-        buffer[i] = 2 * (n + 1);
+      for (int i = 0; i < BUFFER_SIZE; ++i) {
+        buffer[i] = rank * i * n;
       }
 
       printf("Send %d\n", n);
@@ -82,21 +81,16 @@ void use_persistent_comm() {
     for (int n = 0; n < NUM_ITERS; ++n) {
 
       for (int i = 0; i < BUFFER_SIZE; ++i) {
-        // buffer[i] = rank * i * n;
-        buffer[i] = (n + 1);
+        buffer[i] = rank * i * n;
       }
 
       printf("Recv %d\n", n);
       MPI_Start(&req);
       dummy_workload(work_buffer);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
-      check_buffer_content(buffer, n, block_lenghts);
+      check_buffer_content(buffer, n);
     }
   }
-
-  MPI_Type_free(&nc_datatype);
-
-  MPI_Request_free(&req);
 }
 
 int main(int argc, char **argv) {
