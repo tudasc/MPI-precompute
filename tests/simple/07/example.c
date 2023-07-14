@@ -67,7 +67,7 @@ void use_persistent_comm() {
       MPI_Start(&req2);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
       MPI_Wait(&req2, MPI_STATUS_IGNORE);
-        check_buffer_content(buffer2, n);
+      check_buffer_content(buffer2, n);
     }
   } else {
 
@@ -83,7 +83,7 @@ void use_persistent_comm() {
       MPI_Start(&req2);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
       MPI_Wait(&req2, MPI_STATUS_IGNORE);
-        check_buffer_content(buffer2, n);
+      check_buffer_content(buffer2, n);
     }
   }
 
