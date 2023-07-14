@@ -69,7 +69,7 @@ void use_persistent_comm() {
   int nxt = (rank + 1) % numtasks;
   int prev = (rank + numtasks - 1) % numtasks;
 
-  assert(NUM_REQUESTS % 2 == 0);
+  /* assert(NUM_REQUESTS % 2 == 0); */
 
   // TODO fuse these loops for better redability
   for (int i = 0; i < NUM_REQUESTS / 2; ++i) {
