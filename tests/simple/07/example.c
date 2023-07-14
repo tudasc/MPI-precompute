@@ -24,7 +24,8 @@ void check_buffer_content(int *buf, int n) {
   int not_correct = 0;
 
   for (int i = 0; i < BUFFER_SIZE; ++i) {
-    if (buf[i] != 1 * i * n) {
+    if (buf[i] != 2 * (n + 1)) {
+      //  printf("%d vs %d\n",buf[i],2 * (n + 1));
       not_correct++;
     }
   }
@@ -44,8 +45,8 @@ void use_persistent_comm() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  char *buffer = malloc(BUFFER_SIZE * sizeof(int));
-  char *buffer2 = malloc(BUFFER_SIZE * sizeof(int));
+  int *buffer = malloc(BUFFER_SIZE * sizeof(int));
+  int *buffer2 = malloc(BUFFER_SIZE * sizeof(int));
 
   MPI_Datatype datatype = MPI_INT;
 
@@ -55,34 +56,35 @@ void use_persistent_comm() {
   if (rank == 1) {
 
     MPI_Send_init(buffer, BUFFER_SIZE, datatype, 0, 42, MPI_COMM_WORLD, &req);
-    MPI_Recv_init(buffer, BUFFER_SIZE, datatype, 0, 42, MPI_COMM_WORLD, &req);
+    MPI_Recv_init(buffer2, BUFFER_SIZE, datatype, 0, 42, MPI_COMM_WORLD, &req2);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+      for (int i = 0; i < BUFFER_SIZE; ++i) {
         buffer[i] = 2 * (n + 1);
       }
 
       MPI_Start(&req);
-      MPI_Start(&re2);
+      MPI_Start(&req2);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
       MPI_Wait(&req2, MPI_STATUS_IGNORE);
+        check_buffer_content(buffer2, n);
     }
   } else {
 
-    MPI_Send_init(buffer, BUFFER_SIZE, datatype, 0, 42, MPI_COMM_WORLD, &req);
-    MPI_Recv_init(buffer, BUFFER_SIZE, datatype, 0, 42, MPI_COMM_WORLD, &req);
+    MPI_Send_init(buffer, BUFFER_SIZE, datatype, 1, 42, MPI_COMM_WORLD, &req);
+    MPI_Recv_init(buffer2, BUFFER_SIZE, datatype, 1, 42, MPI_COMM_WORLD, &req2);
 
     for (int n = 0; n < NUM_ITERS; ++n) {
-      for (int i = 0; i < BLOCK_COUNT * BLOCK_SIZE * N; ++i) {
+      for (int i = 0; i < BUFFER_SIZE; ++i) {
         buffer[i] = 2 * (n + 1);
       }
 
       MPI_Start(&req);
-      MPI_Start(&re2);
+      MPI_Start(&req2);
       MPI_Wait(&req, MPI_STATUS_IGNORE);
       MPI_Wait(&req2, MPI_STATUS_IGNORE);
+        check_buffer_content(buffer2, n);
     }
-    check_buffer_content(buffer, n, block_lenghts);
   }
 
   MPI_Request_free(&req);
