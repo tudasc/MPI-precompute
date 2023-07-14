@@ -15,13 +15,11 @@ add_test(NAME test03
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test.sh ${CMAKE_CURRENT_SOURCE_DIR}/03
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         )
-set_tests_properties(test03 PROPERTIES DISABLED true)
 
 add_test(NAME test04
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test.sh ${CMAKE_CURRENT_SOURCE_DIR}/04
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         )
-set_tests_properties(test04 PROPERTIES DISABLED true)
 
 add_test(NAME test05
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test.sh ${CMAKE_CURRENT_SOURCE_DIR}/05
