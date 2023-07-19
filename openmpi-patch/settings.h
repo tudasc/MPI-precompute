@@ -4,7 +4,8 @@
 // config :
 #define RDMA_SPIN_WAIT_THRESHOLD 32
 
-// used for the tests to check if the version without matching is actually used (or if the compile time analysis failed for some reason)
+// used for the tests to check if the version without matching is actually used
+// (or if the compile time analysis failed for some reason)
 #define PRINT_SUCCESSFUL_HANDSHAKE
 
 #define DUMP_DEBUG_TRACE_EVERY_TIME

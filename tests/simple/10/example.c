@@ -88,13 +88,12 @@ int main(int argc, char *argv[]) {
     DATA[i] = 42.0;
   }
 
-  FILE* mpiConfig=fopen("config.cfg","r");
+  FILE *mpiConfig = fopen("config.cfg", "r");
   int tag;
-  fscanf(mpiConfig,"%d", &tag);
+  fscanf(mpiConfig, "%d", &tag);
   fclose(mpiConfig);
 
   init_communication(rank, size, tag);
-
 
   calculate();
 
@@ -102,4 +101,3 @@ int main(int argc, char *argv[]) {
 
   MPI_Finalize();
 }
-

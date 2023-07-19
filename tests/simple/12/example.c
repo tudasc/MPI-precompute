@@ -6,11 +6,11 @@ double *DATA;
 
 MPI_Request comm_requests[4];
 
-int global_tag=42;
+int global_tag = 42;
 
 void init_communication_static(int rank, int size) {
   printf("Static\n");
-  static int tag_to_use=0;
+  static int tag_to_use = 0;
   int other = MPI_PROC_NULL;
   if (rank != 0) {
     other = rank - 1;
@@ -115,17 +115,15 @@ int main(int argc, char *argv[]) {
     DATA[i] = 42.0;
   }
 
+  void (*init_communication)(int, int) = 0;
 
-  void (*init_communication)(int, int)=0;
-
-  if(argc==3){
-    init_communication=init_communication_static;
-  }else {
-    init_communication=init_communication_global;
+  if (argc == 3) {
+    init_communication = init_communication_static;
+  } else {
+    init_communication = init_communication_global;
   }
 
-
-  init_communication(rank,size);
+  init_communication(rank, size);
 
   calculate();
 
@@ -133,4 +131,3 @@ int main(int argc, char *argv[]) {
 
   MPI_Finalize();
 }
-
