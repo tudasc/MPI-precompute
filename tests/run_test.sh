@@ -22,21 +22,25 @@ $RUN_SCRIPT *.c
 
 EXPECT_MPIOPT=1
 
-objdump -T ./a.out | grep -q MPIOPT
-NO_MPI_OPT= $?
-# 1 if grep was empty, 0 if functions starting with MPIOPT are used
+mpirun -n 2 ./a.out_original | grep "Usage of MPIOPT optimized communication sceme"
+NO_MPI_OPT=$?
+# 1 if grep was empty, 0 otherwise
+if [[ "$NO_MPI_OPT" == 0 ]]; then
+  echo "Expected NO MPIOPT in unaltered application usage but found usage"
+  exit 1
+fi
 
-if [[ "EXPECT_MPIOPT" == 1 && "$NO_MPI_OPT" == 1 ]]; then
+mpirun -n 2 ./a.out | grep "Usage of MPIOPT optimized communication sceme"
+NO_MPI_OPT=$?
+echo " grep return code: ${NO_MPI_OPT}"
+if [[ "$EXPECT_MPIOPT" == 1 && "$NO_MPI_OPT" == 1 ]]; then
   echo "Expected MPIOPT usage but none found"
   exit 1
 fi
-if [[ "EXPECT_MPIOPT" == 0 && "$NO_MPI_OPT" == 0 ]]; then
-  echo "Expected NOP MPIOPT usage but found usage"
+if [[ "$EXPECT_MPIOPT" == 0 && "$NO_MPI_OPT" == 0 ]]; then
+  echo "Expected NO MPIOPT usage but found usage"
   exit 1
 fi
-
-mpirun -n 2 ./a.out_original
-mpirun -n 2 ./a.out
 
 rm a.out a.out_original
 

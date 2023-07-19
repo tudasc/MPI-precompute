@@ -353,6 +353,10 @@ LINKAGE_TYPE void receive_handshake(MPIOPT_Request *request) {
 
   free(tmp_buf);
 
+#ifdef PRINT_SUCCESSFUL_HANDSHAKE
+  printf("Usage of MPIOPT optimized communication sceme\n");
+#endif
+
 #ifndef NDEBUG
   add_operation_to_trace(request, "received Handshake");
 #endif
