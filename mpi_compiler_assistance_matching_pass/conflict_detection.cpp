@@ -42,7 +42,7 @@ bool uses_wildcard(CallBase *mpi_call, bool is_sending) {
          src_rank == implementation_specifics->ANY_SOURCE;
 }
 
-// True, if no conflicting call was found
+// True, if a conflicting call was found
 bool check_call_for_conflict(CallBase *mpi_call, bool is_sending) {
 
   auto frontend_plugin_data = FrontendPluginData::get_instance();
@@ -51,21 +51,21 @@ bool check_call_for_conflict(CallBase *mpi_call, bool is_sending) {
       frontend_plugin_data->get_possibly_conflicting_calls(mpi_call);
 
   if (possible_conflicts.empty()) {
-    return true; // frontend determined that no conflicts present
+    return false; // frontend determined that no conflicts present
   }
 
   if (!is_sending && uses_wildcard(mpi_call, is_sending)) {
-    return false;
+    return true; // wildcard always conflicts
   }
 
   for (auto other_call : possible_conflicts) {
     if (are_calls_conflicting(mpi_call, other_call, is_sending)) {
-      return false;
+      return true;
     }
   }
 
   // no conflicts found
-  return true;
+  return false;
 }
 
 bool check_mpi_send_conflicts(llvm::CallBase *send_init_call) {
