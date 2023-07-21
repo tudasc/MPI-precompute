@@ -419,7 +419,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   }
   if (info_flag) {
     // in case of 0: empty string
-    conflicts = info_send_strategy[0] != 0;
+    conflicts = info_send_strategy[0] == 0 || info_send_strategy[0] == '0' ||
+                info_send_strategy == "FALSE" || info_send_strategy == "false";
     // all other characters are considered true
   }
 
