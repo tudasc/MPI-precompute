@@ -407,9 +407,24 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->chekcking_request = MPI_REQUEST_NULL;
 #endif
 
-  int conflicts = 0;
+  // only skip matching if the user provided the corresponding info
+  int conflicts = 1;
+  char info_send_strategy[MPI_MAX_INFO_VAL];
+  int info_flag;
+  if (info != MPI_INFO_NULL) {
+    MPI_Info_get(info, "skip_matching", MPI_MAX_INFO_VAL, info_send_strategy,
+                 &info_flag);
+  } else {
+    info_flag = 0;
+  }
+  if (info_flag) {
+    // in case of 0: empty string
+    conflicts = info_send_strategy[0] != 0;
+    // all other characters are considered true
+  }
+
 #ifdef CHECK_FOR_MATCHING_CONFLICTS
-  conflicts = check_for_conflicting_request(request);
+  conflicts = conflicts || check_for_conflicting_request(request);
 #endif
 
 #ifdef USE_FALLBACK_UNTIL_THRESHOLD
