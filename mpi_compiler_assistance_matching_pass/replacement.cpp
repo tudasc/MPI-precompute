@@ -137,6 +137,12 @@ void replace_with_info(CallBase *call, Function *func) {
   builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
                      mpi_func->mpi_info_set, {info_obj, key, value});
 
+  // enable skipping of matching
+  key = builder.CreateGlobalStringPtr("skip_matching");
+  value = builder.CreateGlobalStringPtr("1");
+  builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
+                     mpi_func->mpi_info_set, {info_obj, key, value});
+
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
     args.push_back(call->getArgOperand(i));
   }
