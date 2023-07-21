@@ -17,9 +17,48 @@
 #ifndef MACH_CONFLICT_DETECTION_H_
 #define MACH_CONFLICT_DETECTION_H_
 
+#include "frontend_plugin_data.h"
 #include "llvm/IR/InstrTypes.h"
 
 #include <vector>
+
+class PersistentMPIInitCall {
+public:
+  static std::shared_ptr<PersistentMPIInitCall>
+  get_PersistentMPIInitCall(llvm::CallBase *init_call);
+
+private:
+  static std::map<llvm::CallBase *, std::shared_ptr<PersistentMPIInitCall>>
+      instances;
+  explicit PersistentMPIInitCall(llvm::CallBase *init_call)
+      : init_call(init_call) {
+    auto frontent_plugin_data = FrontendPluginData::get_instance();
+
+    for (auto c :
+         frontent_plugin_data->get_possibly_conflicting_calls(init_call)) {
+      conflicting_calls.push_back(
+          PersistentMPIInitCall::get_PersistentMPIInitCall(c));
+    }
+  }
+  // default destructor
+
+  // first de do analysis than replacement
+  // analysis would break if we first replace one call and than later try to
+  // analyze it again in a different conflict we can also introduce a way of
+  // propagating analysis results if a and b are conflict free b and a are as
+  // well
+  // void perform_analysis();
+  void perform_replacement();
+
+private:
+  llvm::CallBase *init_call;
+  bool analyzed = false;
+  bool replaced = false;
+
+  std::vector<std::shared_ptr<PersistentMPIInitCall>> conflicting_calls = {};
+  // std::vector<std::tuple<llvm::Value *,llvm::Value *,llvm::Value *>>
+  // conflicting_envelopes = {};
+};
 
 bool check_mpi_recv_conflicts(llvm::CallBase *send_init_call);
 

@@ -108,11 +108,12 @@ bool can_prove_val_different_with_scalarEvolution(Value *val_a, Value *val_b) {
   // "\n";)
 
   bool result = se->isKnownPredicate(CmpInst::Predicate::ICMP_NE, sc_a, sc_b);
-  /*Debug(if (result) {errs() << "Known different\n";} else {
-   errs() << "could not prove difference\n";
-   })*/
+  Debug(
+      if (result) { errs() << "Known different\n"; } else {
+        errs() << "could not prove difference\n";
+      })
 
-  return result;
+      return result;
 }
 
 // this function tries to prove if the given values differ for different loop
@@ -172,9 +173,9 @@ bool can_prove_val_different_for_different_loop_iters(Value *val_a,
 // thread's stack, but whoever does that is dumb anyway...
 bool can_prove_val_different(Value *val_a, Value *val_b) {
 
-  // errs() << "Comparing: \n";
-  // val_a->dump();
-  // val_b->dump();
+  errs() << "Comparing: \n";
+  val_a->dump();
+  val_b->dump();
 
   if (val_a->getType() != val_b->getType()) {
     // this should not happen anyway
@@ -186,10 +187,11 @@ bool can_prove_val_different(Value *val_a, Value *val_b) {
     if (auto *c2 = dyn_cast<Constant>(val_b)) {
       if (c1 != c2) {
         // different constants
-        // errs() << "Different\n";
+        errs() << "Different Constants\n";
         return true;
       } else {
         // proven same
+        errs() << "SAME Constants\n";
         return false;
       }
     }
@@ -313,6 +315,7 @@ bool are_calls_conflicting(CallBase *orig_call, CallBase *conflict_call,
   auto *comm1 = get_communicator(orig_call);
   auto *comm2 = get_communicator(conflict_call);
   if (can_prove_val_different(comm1, comm2)) {
+
     return false;
   }
   // otherwise, we have not proven that the communicator is be different
@@ -465,4 +468,21 @@ Value *get_tag(CallBase *mpi_call, bool is_send) {
   assert(mpi_call->arg_size() == total_num_args);
 
   return mpi_call->getArgOperand(tag_arg_pos);
+}
+
+std::shared_ptr<PersistentMPIInitCall>
+PersistentMPIInitCall::get_PersistentMPIInitCall(llvm::CallBase *init_call) {
+
+  // allow make_shared to call the private constructor
+  struct make_shared_enabler : public PersistentMPIInitCall {
+    make_shared_enabler(llvm::CallBase *init_call)
+        : PersistentMPIInitCall(std::forward<llvm::CallBase *>(init_call)) {}
+  };
+  if (instances.find(init_call) != instances.end()) {
+    return instances[init_call];
+  } else {
+    auto new_instance = std::make_shared<make_shared_enabler>(init_call);
+    instances[init_call] = new_instance;
+    return new_instance;
+  }
 }
