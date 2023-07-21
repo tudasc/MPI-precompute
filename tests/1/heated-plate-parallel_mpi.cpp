@@ -113,7 +113,7 @@ double run_iteration(double **Matrix_In, double **Matrix_Out, const int rows,
                                    ? columns / size_of_block
                                    : 1 + (columns / size_of_block);
 
-#pragma omp parallel for reduction(max : diff)
+// #pragma omp parallel for reduction(max : diff)
   for (int blk = 0; blk < number_of_blocks; ++blk) {
     const int block_begin = 1 + blk * size_of_block;
     const int block_end = std::min(1 + ((blk + 1) * size_of_block), columns);
