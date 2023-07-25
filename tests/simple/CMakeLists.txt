@@ -60,6 +60,20 @@ add_test(NAME test12
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test.sh ${CMAKE_CURRENT_SOURCE_DIR}/12
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         )
+
+set_tests_properties(test01 PROPERTIES PROCESSORS 2)
+set_tests_properties(test02 PROPERTIES PROCESSORS 2)
+set_tests_properties(test03 PROPERTIES PROCESSORS 2)
+set_tests_properties(test04 PROPERTIES PROCESSORS 2)
+set_tests_properties(test05 PROPERTIES PROCESSORS 2)
+set_tests_properties(test06 PROPERTIES PROCESSORS 2)
+set_tests_properties(test07 PROPERTIES PROCESSORS 2)
+set_tests_properties(test08 PROPERTIES PROCESSORS 2)
+set_tests_properties(test09 PROPERTIES PROCESSORS 2)
+set_tests_properties(test10 PROPERTIES PROCESSORS 2)
+set_tests_properties(test11 PROPERTIES PROCESSORS 2)
+set_tests_properties(test12 PROPERTIES PROCESSORS 2)
+
 set_tests_properties(test10 PROPERTIES DISABLED true)
 set_tests_properties(test11 PROPERTIES DISABLED true)
 set_tests_properties(test12 PROPERTIES DISABLED true)
