@@ -19,6 +19,7 @@
 #include "frontend_plugin_data.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
+#include "replacement.h"
 #include "llvm/IR/Constants.h"
 
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -27,55 +28,6 @@
 #include "debug.h"
 
 using namespace llvm;
-
-bool are_calls_conflicting(llvm::CallBase *orig_call,
-                           llvm::CallBase *conflict_call, bool is_send);
-
-bool uses_wildcard(CallBase *mpi_call, bool is_sending) {
-
-  auto implementation_specifics = ImplementationSpecifics::get_instance();
-
-  auto tag = get_tag(mpi_call, is_sending);
-  auto src_rank = get_src(mpi_call, is_sending);
-
-  return tag == implementation_specifics->ANY_TAG ||
-         src_rank == implementation_specifics->ANY_SOURCE;
-}
-
-// True, if a conflicting call was found
-bool check_call_for_conflict(CallBase *mpi_call, bool is_sending) {
-
-  auto frontend_plugin_data = FrontendPluginData::get_instance();
-
-  auto possible_conflicts =
-      frontend_plugin_data->get_possibly_conflicting_calls(mpi_call);
-
-  if (possible_conflicts.empty()) {
-    return false; // frontend determined that no conflicts present
-  }
-
-  if (!is_sending && uses_wildcard(mpi_call, is_sending)) {
-    return true; // wildcard always conflicts
-  }
-
-  for (auto other_call : possible_conflicts) {
-    if (are_calls_conflicting(mpi_call, other_call, is_sending)) {
-      return true;
-    }
-  }
-
-  // no conflicts found
-  return false;
-}
-
-bool check_mpi_send_conflicts(llvm::CallBase *send_init_call) {
-
-  return check_call_for_conflict(send_init_call, true);
-}
-
-bool check_mpi_recv_conflicts(llvm::CallBase *recv_init_call) {
-  return check_call_for_conflict(recv_init_call, false);
-}
 
 bool can_prove_val_different(Value *val_a, Value *val_b,
                              bool check_for_loop_iter_difference);
@@ -299,58 +251,7 @@ bool are_calls_in_different_loop_iters(CallBase *orig_call,
                                confilct_block, visited);
 }
 
-bool are_calls_conflicting(CallBase *orig_call, CallBase *conflict_call,
-                           bool is_send) {
-
-  // if one is send and the other a recv: fond a match which means no conflict
-  /*
-   if ((is_send && is_recv_function(conflict_call->getCalledFunction()))
-   || (!is_send && is_send_function(conflict_call->getCalledFunction()))) {
-   return false;
-   }*/
-  // was done before
-  auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
-
-  // check communicator
-  auto *comm1 = get_communicator(orig_call);
-  auto *comm2 = get_communicator(conflict_call);
-  if (can_prove_val_different(comm1, comm2)) {
-
-    return false;
-  }
-  // otherwise, we have not proven that the communicator is be different
-  // TODO: (very advanced) if e.g. mpi comm split is used, we might be able to
-  // statically prove different communicators
-  // we could also insert a runtime check if communicators are different
-
-  // check src/dest
-  auto *src1 = get_src(orig_call, is_send);
-  auto *src2 = get_src(conflict_call, is_send);
-
-  if (!(src1 == mpi_implementation_specifics->ANY_SOURCE ||
-        src2 == mpi_implementation_specifics->ANY_SOURCE)) {
-    // if it can match any, there is no reason to prove difference
-    if (can_prove_val_different(src1, src2)) {
-      return false;
-    }
-  }
-
-  // check tag
-  auto *tag1 = get_tag(orig_call, is_send);
-  auto *tag2 = get_tag(conflict_call, is_send);
-  if (!(tag1 == mpi_implementation_specifics->ANY_TAG ||
-        tag2 == mpi_implementation_specifics->ANY_TAG)) {
-    // if it can match any, there is no reason to prove difference
-    if (can_prove_val_different(tag1, tag2)) {
-      return false;
-    } // otherwise, we have not proven that the tag is different
-  }
-
-  // cannot disprove conflict
-  return true;
-}
-
-Value *get_communicator(CallBase *mpi_call) {
+Value *get_communicator_value(CallBase *mpi_call) {
 
   unsigned int total_num_args = 0;
   unsigned int communicator_arg_pos = 0;
@@ -386,7 +287,7 @@ Value *get_communicator(CallBase *mpi_call) {
   return mpi_call->getArgOperand(communicator_arg_pos);
 }
 
-Value *get_src(CallBase *mpi_call, bool is_send) {
+Value *get_src_value(CallBase *mpi_call, bool is_send) {
 
   unsigned int total_num_args = 0;
   unsigned int src_arg_pos = 0;
@@ -428,7 +329,7 @@ Value *get_src(CallBase *mpi_call, bool is_send) {
   return mpi_call->getArgOperand(src_arg_pos);
 }
 
-Value *get_tag(CallBase *mpi_call, bool is_send) {
+Value *get_tag_value(CallBase *mpi_call, bool is_send) {
 
   unsigned int total_num_args = 0;
   unsigned int tag_arg_pos = 0;
@@ -484,5 +385,84 @@ PersistentMPIInitCall::get_PersistentMPIInitCall(llvm::CallBase *init_call) {
     auto new_instance = std::make_shared<make_shared_enabler>(init_call);
     instances[init_call] = new_instance;
     return new_instance;
+  }
+}
+
+std::map<llvm::CallBase *, std::shared_ptr<PersistentMPIInitCall>>
+    PersistentMPIInitCall::instances = {};
+
+PersistentMPIInitCall::PersistentMPIInitCall(llvm::CallBase *init_call)
+    : init_call(init_call) {
+  auto frontent_plugin_data = FrontendPluginData::get_instance();
+
+  for (auto c :
+       frontent_plugin_data->get_possibly_conflicting_calls(init_call)) {
+    conflicting_calls.push_back(
+        PersistentMPIInitCall::get_PersistentMPIInitCall(c));
+  }
+  bool is_send = is_send_function(init_call->getCalledFunction());
+  if (is_send) {
+    assert(init_call->getCalledFunction() == mpi_func->mpi_send_init);
+  } else {
+    assert(init_call->getCalledFunction() == mpi_func->mpi_recv_init);
+  }
+  tag = get_tag_value(init_call, is_send);
+  src = get_src_value(init_call, is_send);
+  comm = get_communicator_value(init_call);
+}
+
+void PersistentMPIInitCall::perform_replacement() {
+
+  bool perform_replacement = true;
+  auto mpi_implementation_specifics = ImplementationSpecifics::get_instance();
+  for (auto c : conflicting_calls) {
+
+    auto *comm1 = comm;
+    auto *comm2 = c->get_communicator();
+    if (can_prove_val_different(comm1, comm2)) {
+      continue;
+    }
+    // otherwise, we have not proven that the communicator is be different
+    // TODO: (very advanced) if e.g. mpi comm split is used, we might be able to
+    // statically prove different communicators
+    // we could also insert a runtime check if communicators are different
+
+    // check src/dest
+    auto *src1 = src;
+    auto *src2 = c->get_src();
+
+    if (!(src1 == mpi_implementation_specifics->ANY_SOURCE ||
+          src2 == mpi_implementation_specifics->ANY_SOURCE)) {
+      // if it can match any, there is no reason to prove difference
+      if (can_prove_val_different(src1, src2)) {
+        continue;
+      }
+    }
+
+    // check tag
+    auto *tag1 = tag;
+    auto *tag2 = c->get_tag();
+    if (!(tag1 == mpi_implementation_specifics->ANY_TAG ||
+          tag2 == mpi_implementation_specifics->ANY_TAG)) {
+      // if it can match any, there is no reason to prove difference
+      if (can_prove_val_different(tag1, tag2)) {
+        continue;
+      } // otherwise, we have not proven that the tag is different
+
+      // could not disprove conflict
+      perform_replacement = false;
+      break;
+    }
+  }
+
+  if (perform_replacement) {
+    bool is_send = is_send_function(init_call->getCalledFunction());
+    if (is_send) {
+      assert(init_call->getCalledFunction() == mpi_func->mpi_send_init);
+      replace_with_info(init_call, mpi_func->optimized.mpi_send_init_info);
+    } else {
+      assert(init_call->getCalledFunction() == mpi_func->mpi_recv_init);
+      replace_with_info(init_call, mpi_func->optimized.mpi_recv_init_info);
+    }
   }
 }

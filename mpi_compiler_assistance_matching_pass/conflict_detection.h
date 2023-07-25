@@ -30,18 +30,12 @@ public:
 private:
   static std::map<llvm::CallBase *, std::shared_ptr<PersistentMPIInitCall>>
       instances;
-  explicit PersistentMPIInitCall(llvm::CallBase *init_call)
-      : init_call(init_call) {
-    auto frontent_plugin_data = FrontendPluginData::get_instance();
 
-    for (auto c :
-         frontent_plugin_data->get_possibly_conflicting_calls(init_call)) {
-      conflicting_calls.push_back(
-          PersistentMPIInitCall::get_PersistentMPIInitCall(c));
-    }
-  }
+  explicit PersistentMPIInitCall(llvm::CallBase *init_call);
+
   // default destructor
 
+public:
   // first de do analysis than replacement
   // analysis would break if we first replace one call and than later try to
   // analyze it again in a different conflict we can also introduce a way of
@@ -54,18 +48,25 @@ private:
   llvm::CallBase *init_call;
   bool analyzed = false;
   bool replaced = false;
+  llvm::Value *tag;
+  llvm::Value *src;
+  llvm::Value *comm;
 
   std::vector<std::shared_ptr<PersistentMPIInitCall>> conflicting_calls = {};
+
   // std::vector<std::tuple<llvm::Value *,llvm::Value *,llvm::Value *>>
   // conflicting_envelopes = {};
+  llvm::Value *get_tag() { return tag; }
+  llvm::Value *get_src() { return src; }
+  llvm::Value *get_communicator() { return comm; }
 };
 
 bool check_mpi_recv_conflicts(llvm::CallBase *send_init_call);
 
 bool check_mpi_send_conflicts(llvm::CallBase *recv_init_call);
 
-llvm::Value *get_communicator(llvm::CallBase *mpi_call);
-llvm::Value *get_src(llvm::CallBase *mpi_call, bool is_send);
-llvm::Value *get_tag(llvm::CallBase *mpi_call, bool is_send);
+// llvm::Value *get_communicator(llvm::CallBase *mpi_call);
+// llvm::Value *get_src(llvm::CallBase *mpi_call, bool is_send);
+// llvm::Value *get_tag(llvm::CallBase *mpi_call, bool is_send);
 
 #endif /* MACH_CONFLICT_DETECTION_H_ */

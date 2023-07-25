@@ -84,7 +84,7 @@ struct MPICompilerAssistanceMatchingPass
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
 
-    // Debug(M.dump(););
+    Debug(M.dump(););
 
     ImplementationSpecifics::create_instance(M);
 
@@ -102,8 +102,8 @@ struct MPICompilerAssistanceMatchingPass
     FrontendPluginData::create_instance(M);
 
     // collect all Persistent Comm Operations
-    std::vector<llvm::CallBase *> send_init_list;
-    std::vector<llvm::CallBase *> recv_init_list;
+    std::vector<std::shared_ptr<PersistentMPIInitCall>> send_init_list;
+    std::vector<std::shared_ptr<PersistentMPIInitCall>> recv_init_list;
 
     if (mpi_func->mpi_send_init) {
       for (auto *u : mpi_func->mpi_send_init->users()) {
@@ -111,7 +111,8 @@ struct MPICompilerAssistanceMatchingPass
           if (call->getCalledFunction() == mpi_func->mpi_send_init) {
             // not that I think anyone will pass a ptr to MPI func into another
             // func, but better save than sorry
-            send_init_list.push_back(call);
+            send_init_list.push_back(
+                PersistentMPIInitCall::get_PersistentMPIInitCall(call));
           }
         }
       }
@@ -120,31 +121,26 @@ struct MPICompilerAssistanceMatchingPass
       for (auto *u : mpi_func->mpi_recv_init->users()) {
         if (auto *call = dyn_cast<CallBase>(u)) {
           if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
-            recv_init_list.push_back(call);
+            recv_init_list.push_back(
+                PersistentMPIInitCall::get_PersistentMPIInitCall(call));
           }
         }
       }
     }
 
-    // remove any calls, where conflicts are possible
-    send_init_list.erase(std::remove_if(send_init_list.begin(),
-                                        send_init_list.end(),
-                                        check_mpi_send_conflicts),
-                         send_init_list.end());
-
-    recv_init_list.erase(std::remove_if(recv_init_list.begin(),
-                                        recv_init_list.end(),
-                                        check_mpi_recv_conflicts),
-                         recv_init_list.end());
+    errs() << "gathered " << send_init_list.size() << " send Operations \nand "
+           << recv_init_list.size() << " receive Operations\n";
 
     bool replacement = !send_init_list.empty() && !recv_init_list.empty();
     // otherwise nothing should be done
     if (replacement) {
 
-      errs() << "Replace " << send_init_list.size() << " send Operations \nand "
-             << recv_init_list.size() << " receive Operations\n";
-
-      replace_communication_calls(M, send_init_list, recv_init_list);
+      for (auto c : send_init_list) {
+        c->perform_replacement();
+      }
+      for (auto c : recv_init_list) {
+        c->perform_replacement();
+      }
     }
 
     // Beware: with operator | the functions will be executed with || they wont
