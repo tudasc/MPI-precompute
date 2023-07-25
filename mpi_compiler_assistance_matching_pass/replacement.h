@@ -26,5 +26,6 @@ bool add_init(llvm::Module &M);
 bool add_finalize(llvm::Module &M);
 
 void replace_request_handling_calls(llvm::Module &M);
-void replace_with_info(llvm::CallBase *call, llvm::Function *func);
+void replace_init_call_statically_proven_save(llvm::CallBase *call,
+                                              llvm::Function *func);
 #endif /* MACH_REPLACEMENT_H_ */

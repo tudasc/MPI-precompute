@@ -103,7 +103,7 @@ void replace_call(CallBase *call, Function *func) {
   // call->eraseFromParent();
 }
 
-void replace_with_info(CallBase *call, Function *func) {
+void replace_init_call_statically_proven_save(CallBase *call, Function *func) {
 
   // one could assert that the only addition is the info object
   assert(call->getFunctionType() != func->getFunctionType());
@@ -156,21 +156,6 @@ void replace_with_info(CallBase *call, Function *func) {
 
   call->replaceAllUsesWith(new_call);
   call->eraseFromParent();
-}
-
-bool check_if_all_usages_of_ptr_are_lifetime(Value *ptr) {
-
-  for (auto *u : ptr->users()) {
-    if (auto *call = dyn_cast<CallBase>(u)) {
-      if (!call->getCalledFunction()->isIntrinsic()) {
-        return false;
-      }
-
-    } else {
-      return false;
-    }
-  }
-  return true;
 }
 
 std::vector<CallBase *> get_request_handeling_calls_for(Module &M,
@@ -254,10 +239,10 @@ void replace_request_handling_calls(llvm::Module &M) {
     } else if (call->getCalledFunction() == mpi_func->mpi_request_free) {
       replace_call(call, mpi_func->optimized.mpi_request_free);
 
-    } else if (call->getCalledFunction() == mpi_func->mpi_send_init) {
-      replace_with_info(call, mpi_func->optimized.mpi_send_init_info);
-    } else if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
-      replace_with_info(call, mpi_func->optimized.mpi_recv_init_info);
+      //} else if (call->getCalledFunction() == mpi_func->mpi_send_init) {
+      //  replace_with_info(call, mpi_func->optimized.mpi_send_init_info);
+      //} else if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
+      //  replace_with_info(call, mpi_func->optimized.mpi_recv_init_info);
     } else {
 
       errs() << "This MPI call is currently NOT supported\n";

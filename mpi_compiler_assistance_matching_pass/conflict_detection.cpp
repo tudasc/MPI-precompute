@@ -367,10 +367,12 @@ void PersistentMPIInitCall::perform_replacement() {
     bool is_send = is_send_function(init_call->getCalledFunction());
     if (is_send) {
       assert(init_call->getCalledFunction() == mpi_func->mpi_send_init);
-      replace_with_info(init_call, mpi_func->optimized.mpi_send_init_info);
+      replace_init_call_statically_proven_save(
+          init_call, mpi_func->optimized.mpi_send_init_info);
     } else {
       assert(init_call->getCalledFunction() == mpi_func->mpi_recv_init);
-      replace_with_info(init_call, mpi_func->optimized.mpi_recv_init_info);
+      replace_init_call_statically_proven_save(
+          init_call, mpi_func->optimized.mpi_recv_init_info);
     }
   }
 
