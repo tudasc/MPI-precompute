@@ -22,7 +22,8 @@
 
 #include <vector>
 
-class PersistentMPIInitCall {
+class PersistentMPIInitCall
+    : public std::enable_shared_from_this<PersistentMPIInitCall> {
 public:
   static std::shared_ptr<PersistentMPIInitCall>
   get_PersistentMPIInitCall(llvm::CallBase *init_call);
@@ -50,6 +51,13 @@ private:
   bool statically_proven_safe();
   void perform_statically_proven_safe_replacement();
 
+  llvm::Value *
+  get_conflict_result(std::shared_ptr<PersistentMPIInitCall> other);
+  // true if conflict is not important and matching can be skipped
+  // false if conflict is present and matching cannot be skipped
+  llvm::Value *
+  compute_conflict_result(std::shared_ptr<PersistentMPIInitCall> other);
+
   llvm::CallBase *init_call;
   // bool analyzed = false;
   bool replaced = false;
@@ -58,6 +66,8 @@ private:
   llvm::Value *comm;
 
   std::vector<std::shared_ptr<PersistentMPIInitCall>> conflicting_calls = {};
+  std::map<std::shared_ptr<PersistentMPIInitCall>, llvm::Value *>
+      conflict_results = {};
 
   // std::vector<std::tuple<llvm::Value *,llvm::Value *,llvm::Value *>>
   // conflicting_envelopes = {};

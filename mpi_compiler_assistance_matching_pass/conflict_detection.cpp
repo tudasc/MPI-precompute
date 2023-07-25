@@ -65,7 +65,10 @@ bool can_prove_val_different_with_scalarEvolution(Value *val_a, Value *val_b) {
       return result;
 }
 
-bool can_prove_val_different(Value *val_a, Value *val_b) {
+// 1: proven different
+// 0: could not prove difference
+// -1: could actually prove identitiy
+int can_prove_val_different(Value *val_a, Value *val_b) {
 
   errs() << "Comparing: \n";
   val_a->dump();
@@ -82,21 +85,21 @@ bool can_prove_val_different(Value *val_a, Value *val_b) {
       if (c1 != c2) {
         // different constants
         errs() << "Different Constants\n";
-        return true;
+        return 1;
       } else {
         // proven same
         errs() << "SAME Constants\n";
-        return false;
+        return -1;
       }
     }
   }
 
   if (can_prove_val_different_with_scalarEvolution(val_a, val_b)) {
-    return true;
+    return 1;
   }
 
   // could not prove difference
-  return false;
+  return 0;
 }
 
 Value *get_communicator_value(CallBase *mpi_call) {
@@ -270,60 +273,78 @@ void PersistentMPIInitCall::populate_conflicting_calls() {
 void PersistentMPIInitCall::perform_replacement() {
 
   assert(replaced == false);
-  bool perform_replacement = true;
-  auto mpi_implementation_specifics = ImplementationSpecifics::get_instance();
-  for (auto c : conflicting_calls) {
 
-    auto *comm1 = comm;
-    auto *comm2 = c->get_communicator();
-    if (can_prove_val_different(comm1, comm2)) {
-      continue;
-    }
-    // otherwise, we have not proven that the communicator is be different
-    // TODO: (very advanced) if e.g. mpi comm split is used, we might be able to
-    // statically prove different communicators
-    // we could also insert a runtime check if communicators are different
+  std::vector<Value *> conf_res;
 
-    // check src/dest
-    auto *src1 = src;
-    auto *src2 = c->get_src();
+  std::transform(conflicting_calls.begin(), conflicting_calls.end(),
+                 std::back_inserter(conf_res), [this](auto c) {
+                   return c->get_conflict_result(this->shared_from_this());
+                 });
 
-    if (!(src1 == mpi_implementation_specifics->ANY_SOURCE ||
-          src2 == mpi_implementation_specifics->ANY_SOURCE)) {
-      // if it can match any, there is no reason to prove difference
-      if (can_prove_val_different(src1, src2)) {
-        continue;
-      }
-    }
+  auto combined = combine_runtime_checks(init_call, conf_res);
 
-    // check tag
-    auto *tag1 = tag;
-    auto *tag2 = c->get_tag();
-    if (!(tag1 == mpi_implementation_specifics->ANY_TAG ||
-          tag2 == mpi_implementation_specifics->ANY_TAG)) {
-      // if it can match any, there is no reason to prove difference
-      if (can_prove_val_different(tag1, tag2)) {
-        continue;
-      } // otherwise, we have not proven that the tag is different
-
-      // could not disprove conflict
-      perform_replacement = false;
-      break;
-    }
+  if (conflicting_calls.empty()) {
+    // nothing to conflict with
+    combined = get_runtime_check_result_true(init_call);
   }
 
-  if (perform_replacement) {
-    bool is_send = is_send_function(init_call->getCalledFunction());
-    if (is_send) {
-      assert(init_call->getCalledFunction() == mpi_func->mpi_send_init);
-      replace_init_call(init_call, mpi_func->optimized.mpi_send_init_info,
-                        get_runtime_check_result_true(init_call));
-    } else {
-      assert(init_call->getCalledFunction() == mpi_func->mpi_recv_init);
-      replace_init_call(init_call, mpi_func->optimized.mpi_recv_init_info,
-                        get_runtime_check_result_true(init_call));
-    }
+  auto as_str = get_runtime_check_result_str(init_call, combined);
+
+  bool is_send = is_send_function(init_call->getCalledFunction());
+  if (is_send) {
+    assert(init_call->getCalledFunction() == mpi_func->mpi_send_init);
+    replace_init_call(init_call, mpi_func->optimized.mpi_send_init_info,
+                      as_str);
+  } else {
+    assert(init_call->getCalledFunction() == mpi_func->mpi_recv_init);
+    replace_init_call(init_call, mpi_func->optimized.mpi_recv_init_info,
+                      as_str);
   }
 
   replaced = true;
+}
+
+llvm::Value *PersistentMPIInitCall::compute_conflict_result(
+    std::shared_ptr<PersistentMPIInitCall> other) {
+
+  assert(replaced == false);
+
+  auto *other_tag = other->get_tag();
+  auto *other_src = other->get_src();
+  auto *other_comm = other->get_communicator();
+
+  // check for wildcard usage
+  auto mpi_implementation_specifics = ImplementationSpecifics::get_instance();
+  if (src == mpi_implementation_specifics->ANY_SOURCE ||
+      other_src == mpi_implementation_specifics->ANY_SOURCE ||
+      tag == mpi_implementation_specifics->ANY_TAG ||
+      other_tag == mpi_implementation_specifics->ANY_TAG) {
+    // wildcard always conflicts
+    return get_runtime_check_result_false(init_call);
+  }
+
+  // tag
+  auto tag_different = can_prove_val_different(tag, other_tag);
+  auto src_different = can_prove_val_different(src, other_src);
+  auto comm_different = can_prove_val_different(comm, other_comm);
+
+  if (tag_different == 1 || src_different == 1 || comm_different == 1) {
+    return get_runtime_check_result_true(init_call);
+  }
+
+  // TODO runtime check
+  return get_runtime_check_result_false(init_call);
+
+  return nullptr;
+}
+
+llvm::Value *PersistentMPIInitCall::get_conflict_result(
+    std::shared_ptr<PersistentMPIInitCall> other) {
+
+  if (conflict_results.find(other) != conflict_results.end()) {
+    return conflict_results[other];
+  }
+  auto v = compute_conflict_result(other);
+  conflict_results[other] = v;
+  return v;
 }

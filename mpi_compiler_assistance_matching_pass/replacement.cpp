@@ -268,15 +268,48 @@ llvm::Value *combine_runtime_checks(llvm::CallBase *call,
 }
 
 llvm::Value *get_runtime_check_result_true(llvm::CallBase *call) {
+  return ConstantInt::get(IntegerType::getInt8Ty(call->getContext()), 1);
+}
+llvm::Value *get_runtime_check_result_false(llvm::CallBase *call) {
+  return ConstantInt::get(IntegerType::getInt8Ty(call->getContext()), 0);
+}
+
+llvm::Value *get_runtime_check_result_str(llvm::CallBase *call,
+                                          llvm::Value *check_result) {
   IRBuilder<> builder(call);
-  return builder.CreateGlobalStringPtr("1");
+  auto &context = call->getContext();
+  assert(check_result->getType() == Type::getInt8Ty(context));
+
+  // TODO these string constants should only be created once
+
+  if (auto *as_const = dyn_cast<ConstantInt>(check_result)) {
+    if (as_const->isZero()) {
+      return builder.CreateGlobalStringPtr("0");
+    } else if (as_const->isOne()) {
+      return builder.CreateGlobalStringPtr("1");
+    } else {
+      as_const->dump();
+      assert(false && "ERROR unknown bool const");
+    }
+  }
+
+  auto zero = builder.CreateGlobalStringPtr("0");
+  auto one = builder.CreateGlobalStringPtr("1");
+
+  auto result = builder.CreateSelect(check_result, one, zero);
+
+  // for debug
+  call->getParent()->dump();
+
+  return result;
 }
 
 llvm::Value *
 combine_runtime_checks(llvm::CallBase *call,
                        const std::vector<llvm::Value *> &check_results) {
-  IRBuilder<> builder(call);
+
   auto &context = call->getContext();
+  IRBuilder<> builder(call);
 
   std::vector<llvm::Value *> no_null_vec;
 
@@ -285,29 +318,17 @@ combine_runtime_checks(llvm::CallBase *call,
                [](auto *p) { return p != nullptr; });
 
   if (no_null_vec.empty()) {
-    return builder.CreateGlobalStringPtr("");
+    return ConstantInt::get(IntegerType::getInt8Ty(context), 0);
   }
 
   for (auto r : check_results) {
     assert(r->getType() == Type::getInt8Ty(context));
   }
 
-  // TODO TEST
-
-  auto result = builder.CreateAlloca(
-      Type::getInt8Ty(context),
-      ConstantInt::get(IntegerType::getInt8Ty(context), 2));
-  // empty string 2 times the null terminator
-  builder.CreateStore(ConstantInt::get(IntegerType::getInt16Ty(context), 0),
-                      result);
-
-  Value *combined = *no_null_vec.begin();
-  if (no_null_vec.size() > 1) {
-    combined = builder.CreateOr(no_null_vec);
+  if (no_null_vec.size() == 1) {
+    return no_null_vec[0];
   }
-  builder.CreateStore(combined, result);
 
-  call->getParent()->dump();
-
-  return result;
+  // TODO optimization: run constant propagation on this expression
+  return builder.CreateOr(no_null_vec);
 }
