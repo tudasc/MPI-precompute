@@ -344,7 +344,9 @@ llvm::Value *PersistentMPIInitCall::get_conflict_result(
   if (conflict_results.find(other) != conflict_results.end()) {
     return conflict_results[other];
   }
+
   auto v = compute_conflict_result(other);
   conflict_results[other] = v;
+  other->conflict_results[shared_from_this()] = v;
   return v;
 }
