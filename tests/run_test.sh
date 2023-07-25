@@ -30,8 +30,19 @@ if [[ "$NO_MPI_OPT" == 0 ]]; then
   exit 1
 fi
 
-mpirun -n 2 ./a.out | grep "Usage of MPIOPT optimized communication sceme"
 NO_MPI_OPT=$?
+
+mpirun -n 2 ./a.out | grep "Usage of MPIOPT optimized communication sceme"
+SAVE_STATUS=$PIPESTATUS
+MPIRUN_STATUS=${SAVE_STATUS[0]}
+NO_MPI_OPT=${SAVE_STATUS[1]}
+
+
+if [[ "$MPIRUN_STATUS" != 0 ]]; then
+  echo "Crash of result application"
+  exit 1
+fi
+echo " mpirun return code: ${MPIRUN_STATUS}"
 echo " grep return code: ${NO_MPI_OPT}"
 if [[ "$EXPECT_MPIOPT" == 1 && "$NO_MPI_OPT" == 1 ]]; then
   echo "Expected MPIOPT usage but none found"
