@@ -103,7 +103,8 @@ void replace_call(CallBase *call, Function *func) {
   // call->eraseFromParent();
 }
 
-void replace_init_call_statically_proven_save(CallBase *call, Function *func) {
+void replace_init_call(llvm::CallBase *call, llvm::Function *func,
+                       llvm::Value *runtime_check_result) {
 
   // one could assert that the only addition is the info object
   assert(call->getFunctionType() != func->getFunctionType());
@@ -139,9 +140,9 @@ void replace_init_call_statically_proven_save(CallBase *call, Function *func) {
 
   // enable skipping of matching
   key = builder.CreateGlobalStringPtr("skip_matching");
-  value = builder.CreateGlobalStringPtr("1");
   builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
-                     mpi_func->mpi_info_set, {info_obj, key, value});
+                     mpi_func->mpi_info_set,
+                     {info_obj, key, runtime_check_result});
 
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
     args.push_back(call->getArgOperand(i));
@@ -158,8 +159,7 @@ void replace_init_call_statically_proven_save(CallBase *call, Function *func) {
   call->eraseFromParent();
 }
 
-std::vector<CallBase *> get_request_handeling_calls_for(Module &M,
-                                                        Function *f) {
+std::vector<CallBase *> get_request_handling_calls_for(Module &M, Function *f) {
   std::vector<CallBase *> result;
   if (f) {
     for (auto *u : f->users()) {
@@ -174,34 +174,34 @@ std::vector<CallBase *> get_request_handeling_calls_for(Module &M,
 }
 
 // calls like start wait test
-std::vector<CallBase *> get_request_handeling_calls(Module &M) {
+std::vector<CallBase *> get_request_handling_calls(Module &M) {
 
   std::vector<CallBase *> calls_to_replace;
 
-  auto temp = get_request_handeling_calls_for(M, mpi_func->mpi_start);
+  auto temp = get_request_handling_calls_for(M, mpi_func->mpi_start);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_startall);
-  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_wait);
-  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_waitall);
-  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_waitany);
-  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_waitsome);
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_startall);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_test);
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_wait);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_testall);
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_waitall);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_testany);
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_waitany);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_testsome);
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_waitsome);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-  temp = get_request_handeling_calls_for(M, mpi_func->mpi_request_free);
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_test);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_testall);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_testany);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_testsome);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_request_free);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
   return calls_to_replace;
@@ -209,7 +209,7 @@ std::vector<CallBase *> get_request_handeling_calls(Module &M) {
 
 void replace_request_handling_calls(llvm::Module &M) {
 
-  auto calls_to_replace = get_request_handeling_calls(M);
+  auto calls_to_replace = get_request_handling_calls(M);
 
   // do the actual replacement
   for (auto *call : calls_to_replace) {
@@ -239,10 +239,6 @@ void replace_request_handling_calls(llvm::Module &M) {
     } else if (call->getCalledFunction() == mpi_func->mpi_request_free) {
       replace_call(call, mpi_func->optimized.mpi_request_free);
 
-      //} else if (call->getCalledFunction() == mpi_func->mpi_send_init) {
-      //  replace_with_info(call, mpi_func->optimized.mpi_send_init_info);
-      //} else if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
-      //  replace_with_info(call, mpi_func->optimized.mpi_recv_init_info);
     } else {
 
       errs() << "This MPI call is currently NOT supported\n";
@@ -251,4 +247,67 @@ void replace_request_handling_calls(llvm::Module &M) {
       assert(false);
     }
   }
+}
+
+// returns the llvm value that represents is the result of the runtime check
+llvm::Value *insert_runtime_check(llvm::Value *val_a, llvm::Value *val_b) {
+  assert(false && "Not implemented");
+}
+
+// returns the llvm value that represents is the result of the runtime check
+llvm::Value *combine_runtime_checks(llvm::CallBase *call,
+                                    llvm::Value *result_src,
+                                    llvm::Value *result_tag,
+                                    llvm::Value *result_comm) {
+  std::vector<llvm::Value *> results;
+  results.push_back(result_src);
+  results.push_back(result_tag);
+  results.push_back(result_comm);
+
+  return combine_runtime_checks(call, results);
+}
+
+llvm::Value *get_runtime_check_result_true(llvm::CallBase *call) {
+  IRBuilder<> builder(call);
+  return builder.CreateGlobalStringPtr("1");
+}
+
+llvm::Value *
+combine_runtime_checks(llvm::CallBase *call,
+                       const std::vector<llvm::Value *> &check_results) {
+  IRBuilder<> builder(call);
+  auto &context = call->getContext();
+
+  std::vector<llvm::Value *> no_null_vec;
+
+  std::copy_if(check_results.begin(), check_results.end(),
+               std::back_inserter(no_null_vec),
+               [](auto *p) { return p != nullptr; });
+
+  if (no_null_vec.empty()) {
+    return builder.CreateGlobalStringPtr("");
+  }
+
+  for (auto r : check_results) {
+    assert(r->getType() == Type::getInt8Ty(context));
+  }
+
+  // TODO TEST
+
+  auto result = builder.CreateAlloca(
+      Type::getInt8Ty(context),
+      ConstantInt::get(IntegerType::getInt8Ty(context), 2));
+  // empty string 2 times the null terminator
+  builder.CreateStore(ConstantInt::get(IntegerType::getInt16Ty(context), 0),
+                      result);
+
+  Value *combined = *no_null_vec.begin();
+  if (no_null_vec.size() > 1) {
+    combined = builder.CreateOr(no_null_vec);
+  }
+  builder.CreateStore(combined, result);
+
+  call->getParent()->dump();
+
+  return result;
 }

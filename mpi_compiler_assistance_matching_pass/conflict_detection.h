@@ -47,6 +47,9 @@ public:
 private:
   void populate_conflicting_calls();
 
+  bool statically_proven_safe();
+  void perform_statically_proven_safe_replacement();
+
   llvm::CallBase *init_call;
   // bool analyzed = false;
   bool replaced = false;
