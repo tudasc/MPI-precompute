@@ -23,9 +23,18 @@ $RUN_SCRIPT *.c
 EXPECT_MPIOPT=1
 
 mpirun -n 2 ./a.out_original | grep "Usage of MPIOPT optimized communication sceme"
-NO_MPI_OPT=$?
+SAVE_STATUS=( "${PIPESTATUS[@]}" )
+MPIRUN_STATUS=${SAVE_STATUS[0]}
+NO_MPI_OPT=${SAVE_STATUS[1]}
+
+if [[ "$MPIRUN_STATUS" != 0 ]]; then
+  echo "Crash of ORIGINAL result application - testcase probably broken"
+  exit 1
+fi
+
+
 # 1 if grep was empty, 0 otherwise
-if [[ "$NO_MPI_OPT" == 0 ]]; then
+if [[ "$NO_MPI_OPT" != 1 ]]; then
   echo "Expected NO MPIOPT in unaltered application usage but found usage"
   exit 1
 fi
