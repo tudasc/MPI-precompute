@@ -384,6 +384,7 @@ PersistentMPIInitCall::get_PersistentMPIInitCall(llvm::CallBase *init_call) {
   } else {
     auto new_instance = std::make_shared<make_shared_enabler>(init_call);
     instances[init_call] = new_instance;
+    new_instance->populate_conflicting_calls();
     return new_instance;
   }
 }
@@ -393,13 +394,6 @@ std::map<llvm::CallBase *, std::shared_ptr<PersistentMPIInitCall>>
 
 PersistentMPIInitCall::PersistentMPIInitCall(llvm::CallBase *init_call)
     : init_call(init_call) {
-  auto frontent_plugin_data = FrontendPluginData::get_instance();
-
-  for (auto c :
-       frontent_plugin_data->get_possibly_conflicting_calls(init_call)) {
-    conflicting_calls.push_back(
-        PersistentMPIInitCall::get_PersistentMPIInitCall(c));
-  }
   bool is_send = is_send_function(init_call->getCalledFunction());
   if (is_send) {
     assert(init_call->getCalledFunction() == mpi_func->mpi_send_init);
@@ -409,6 +403,15 @@ PersistentMPIInitCall::PersistentMPIInitCall(llvm::CallBase *init_call)
   tag = get_tag_value(init_call, is_send);
   src = get_src_value(init_call, is_send);
   comm = get_communicator_value(init_call);
+}
+
+void PersistentMPIInitCall::populate_conflicting_calls() {
+  auto frontend_plugin_data = FrontendPluginData::get_instance();
+  for (auto c :
+       frontend_plugin_data->get_possibly_conflicting_calls(init_call)) {
+    conflicting_calls.push_back(
+        PersistentMPIInitCall::get_PersistentMPIInitCall(c));
+  }
 }
 
 void PersistentMPIInitCall::perform_replacement() {

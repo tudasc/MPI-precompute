@@ -45,6 +45,8 @@ public:
   void perform_replacement();
 
 private:
+  void populate_conflicting_calls();
+
   llvm::CallBase *init_call;
   // bool analyzed = false;
   bool replaced = false;
