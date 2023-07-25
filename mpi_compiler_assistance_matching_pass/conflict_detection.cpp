@@ -121,8 +121,6 @@ bool can_prove_val_different_for_different_loop_iters(Value *val_a,
   return false;
 }
 
-// TODO this analysis may not work if a thread gets a pointer to another
-// thread's stack, but whoever does that is dumb anyway...
 bool can_prove_val_different(Value *val_a, Value *val_b) {
 
   errs() << "Comparing: \n";
@@ -153,102 +151,8 @@ bool can_prove_val_different(Value *val_a, Value *val_b) {
     return true;
   }
 
-  /* if (check_for_loop_iter_difference) {
-     if (can_prove_val_different_for_different_loop_iters(val_a, val_b)) {
-       return true;
-     }
-   }*/
-
   // could not prove difference
   return false;
-}
-
-// true if there is a path from current pos containing block1 and then block2
-// (and all blocks are in the loop) depth first search through the loop
-bool is_path_in_loop_iter(BasicBlock *current_pos, bool encountered1,
-                          Loop *loop, BasicBlock *block1, BasicBlock *block2,
-                          std::set<BasicBlock *> &visited) {
-
-  // end
-  if (current_pos == block2) {
-    return encountered1;
-    // if we first discover block2 and then block 1 this does not count
-  }
-
-  bool has_encountered_1 = encountered1;
-  if (current_pos == block1) {
-    has_encountered_1 = true;
-  }
-
-  visited.insert(current_pos);
-
-  auto *term = current_pos->getTerminator();
-
-  for (unsigned int i = 0; i < term->getNumSuccessors(); ++i) {
-    auto *next = term->getSuccessor(i);
-    if (loop->contains(next) && visited.find(next) == visited.end()) {
-      // do not leave one loop iter
-      if (is_path_in_loop_iter(next, has_encountered_1, loop, block1, block2,
-                               visited)) {
-        // found path
-        return true;
-      }
-    }
-    // else search for other paths
-  }
-
-  // no path found
-  return false;
-}
-
-// TODO does not work for all cases
-
-// true if both calls are in the same loop and there is no loop iterations where
-// both calls are called
-bool are_calls_in_different_loop_iters(CallBase *orig_call,
-                                       CallBase *conflict_call) {
-
-  if (orig_call == conflict_call) {
-    // call conflicting with itself may only be bart of one loop
-    return true;
-  }
-
-  if (orig_call->getFunction() != conflict_call->getFunction()) {
-
-    return false;
-  }
-
-  LoopInfo *linfo = analysis_results->getLoopInfo(*orig_call->getFunction());
-  assert(linfo != nullptr);
-
-  Loop *loop = linfo->getLoopFor(orig_call->getParent());
-
-  if (!loop) { // not in loop
-    return false;
-  }
-
-  if (loop != linfo->getLoopFor(conflict_call->getParent())) {
-    // if in different loops or one is not in a loop
-    return false;
-  }
-
-  assert(loop != nullptr &&
-         loop == linfo->getLoopFor(conflict_call->getParent()));
-
-  BasicBlock *orig_block = orig_call->getParent();
-  BasicBlock *confilct_block = conflict_call->getParent();
-
-  if (orig_block == confilct_block) {
-    // obvious: true on every loop iteration
-    return true;
-  }
-
-  // depth first search from the loop header to find a path through the
-  // iteration containing both calls
-
-  std::set<BasicBlock *> visited = {}; // start with empty set
-  return !is_path_in_loop_iter(loop->getHeader(), false, loop, orig_block,
-                               confilct_block, visited);
 }
 
 Value *get_communicator_value(CallBase *mpi_call) {
