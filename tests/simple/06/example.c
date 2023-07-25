@@ -91,6 +91,8 @@ void use_persistent_comm() {
       check_buffer_content(buffer, n);
     }
   }
+
+  MPI_Request_free(&req);
 }
 
 int main(int argc, char **argv) {
