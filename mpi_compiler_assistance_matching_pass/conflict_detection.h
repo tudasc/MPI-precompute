@@ -46,7 +46,7 @@ public:
 
 private:
   llvm::CallBase *init_call;
-  bool analyzed = false;
+  // bool analyzed = false;
   bool replaced = false;
   llvm::Value *tag;
   llvm::Value *src;

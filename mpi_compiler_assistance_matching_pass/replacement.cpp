@@ -222,23 +222,9 @@ std::vector<CallBase *> get_request_handeling_calls(Module &M) {
   return calls_to_replace;
 }
 
-void replace_communication_calls(llvm::Module &M,
-                                 std::vector<CallBase *> init_send_calls,
-                                 std::vector<CallBase *> init_recv_calls) {
+void replace_request_handling_calls(llvm::Module &M) {
 
-  std::set<CallBase *> calls_to_replace;
-  std::copy(init_send_calls.begin(), init_send_calls.end(),
-            std::inserter(calls_to_replace, calls_to_replace.begin()));
-  std::copy(init_recv_calls.begin(), init_recv_calls.end(),
-            std::inserter(calls_to_replace, calls_to_replace.begin()));
-
-  // first gather everything to replace, then replace, otherwise we might break
-  // some def use chains in between, e.g. e a free is used by send_init and recv
-  // init
-
-  auto temp = get_request_handeling_calls(M);
-  std::copy(temp.begin(), temp.end(),
-            std::inserter(calls_to_replace, calls_to_replace.begin()));
+  auto calls_to_replace = get_request_handeling_calls(M);
 
   // do the actual replacement
   for (auto *call : calls_to_replace) {

@@ -25,8 +25,6 @@
 bool add_init(llvm::Module &M);
 bool add_finalize(llvm::Module &M);
 
-void replace_communication_calls(llvm::Module &M,
-                                 std::vector<llvm::CallBase *> init_send_calls,
-                                 std::vector<llvm::CallBase *> init_recv_calls);
+void replace_request_handling_calls(llvm::Module &M);
 void replace_with_info(llvm::CallBase *call, llvm::Function *func);
 #endif /* MACH_REPLACEMENT_H_ */

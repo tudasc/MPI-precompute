@@ -141,11 +141,11 @@ struct MPICompilerAssistanceMatchingPass
       for (auto c : recv_init_list) {
         c->perform_replacement();
       }
-    }
 
-    // Beware: with operator | the functions will be executed with || they wont
-    replacement = replacement | add_init(M);
-    replacement = replacement | add_finalize(M);
+      replace_request_handling_calls(M);
+      add_init(M);
+      add_finalize(M);
+    }
 
     errs() << "Successfully executed the pass\n\n";
     delete mpi_func;

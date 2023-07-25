@@ -413,6 +413,7 @@ PersistentMPIInitCall::PersistentMPIInitCall(llvm::CallBase *init_call)
 
 void PersistentMPIInitCall::perform_replacement() {
 
+  assert(replaced == false);
   bool perform_replacement = true;
   auto mpi_implementation_specifics = ImplementationSpecifics::get_instance();
   for (auto c : conflicting_calls) {
@@ -465,4 +466,6 @@ void PersistentMPIInitCall::perform_replacement() {
       replace_with_info(init_call, mpi_func->optimized.mpi_recv_init_info);
     }
   }
+
+  replaced = true;
 }
