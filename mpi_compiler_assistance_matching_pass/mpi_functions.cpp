@@ -139,7 +139,8 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
       result->mpi_waitsome = f;
     } else if (f->getName().equals("MPI_Start")) {
       result->mpi_start = f;
-
+    } else if (f->getName().equals("MPI_Startall")) {
+      result->mpi_startall = f;
     } else if (f->getName().equals("MPI_Recv_init")) {
       result->mpi_recv_init = f;
 
