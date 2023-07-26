@@ -125,21 +125,23 @@ void replace_init_call(llvm::CallBase *call, llvm::Function *func,
       builder.CreateLoad(mpi_implementation_specifics->mpi_info, info_obj_ptr);
   std::vector<Value *> args;
 
+  auto strings = StringConstants::get_instance(call->getModule());
+
   // set a key value pair to the info object:
-  auto key = builder.CreateGlobalStringPtr("nc_send_strategy");
-  auto value = builder.CreateGlobalStringPtr(STRATEGY);
+  auto key = strings->get_string_ptr("nc_send_strategy");
+  auto value = strings->get_string_ptr(STRATEGY);
   builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
                      mpi_func->mpi_info_set, {info_obj, key, value});
 
-  key = builder.CreateGlobalStringPtr("nc_mixed_threshold");
+  key = strings->get_string_ptr("nc_mixed_threshold");
   char threshold_str[30];
   sprintf(threshold_str, "%d", THRESHOLD);
-  value = builder.CreateGlobalStringPtr(threshold_str);
+  value = strings->get_string_ptr(threshold_str);
   builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
                      mpi_func->mpi_info_set, {info_obj, key, value});
 
   // enable skipping of matching
-  key = builder.CreateGlobalStringPtr("skip_matching");
+  key = strings->get_string_ptr("skip_matching");
   builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
                      mpi_func->mpi_info_set,
                      {info_obj, key, runtime_check_result});
@@ -284,17 +286,20 @@ llvm::Value *get_runtime_check_result_str(llvm::CallBase *call,
 
   if (auto *as_const = dyn_cast<ConstantInt>(check_result)) {
     if (as_const->isZero()) {
-      return builder.CreateGlobalStringPtr("0");
+      return StringConstants::get_instance(call->getModule())
+          ->get_string_ptr("0");
     } else if (as_const->isOne()) {
-      return builder.CreateGlobalStringPtr("1");
+      return StringConstants::get_instance(call->getModule())
+          ->get_string_ptr("1");
     } else {
       as_const->dump();
       assert(false && "ERROR unknown bool const");
     }
   }
 
-  auto zero = builder.CreateGlobalStringPtr("0");
-  auto one = builder.CreateGlobalStringPtr("1");
+  auto strings = StringConstants::get_instance(call->getModule());
+  auto zero = strings->get_string_ptr("0");
+  auto one = strings->get_string_ptr("1");
 
   auto result = builder.CreateSelect(check_result, one, zero);
 
@@ -331,4 +336,17 @@ combine_runtime_checks(llvm::CallBase *call,
 
   // TODO optimization: run constant propagation on this expression
   return builder.CreateOr(no_null_vec);
+}
+
+std::shared_ptr<StringConstants> StringConstants::instance = nullptr;
+
+llvm::Constant *StringConstants::get_string_ptr(const std::string &s) {
+  if (strings_used.find(s) != strings_used.end()) {
+    return strings_used[s];
+  }
+  IRBuilder<> builder(M->getContext());
+
+  auto val = builder.CreateGlobalStringPtr(s, "", 0, M);
+  strings_used[s] = val;
+  return val;
 }

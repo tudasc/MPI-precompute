@@ -17,9 +17,38 @@
 #ifndef MACH_REPLACEMENT_H_
 #define MACH_REPLACEMENT_H_
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 
+#include <map>
 #include <vector>
+
+// singelton
+class StringConstants {
+
+private:
+  explicit StringConstants(llvm::Module *M) : M(M) {}
+  static std::shared_ptr<StringConstants> instance;
+
+public:
+  static std::shared_ptr<StringConstants> get_instance(llvm::Module *M) {
+    if (instance == nullptr) {
+      // allow make_shared to call the private constructor
+      struct make_shared_enabler : public StringConstants {
+        make_shared_enabler(llvm::Module *M)
+            : StringConstants(std::forward<llvm::Module *>(M)) {}
+      };
+      instance = std::make_shared<make_shared_enabler>(M);
+    }
+    return instance;
+  }
+
+  llvm::Constant *get_string_ptr(const std::string &s);
+
+private:
+  std::map<std::string, llvm::Constant *> strings_used;
+  llvm::Module *M;
+};
 
 // true if something changed
 bool add_init(llvm::Module &M);
