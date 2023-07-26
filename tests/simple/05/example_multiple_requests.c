@@ -37,9 +37,11 @@ void dummy_workload(double *buf) {
 void check_buffer_content(int *buf, int n, int rank) {
   int not_correct = 0;
 
-  for (int i = 0; i < N * NUM_REQUESTS; ++i) {
-    if (buf[i] != 1 * (rank + 1) * i * n) {
+  for (int i = NUM_REQUESTS / 2; i < N * NUM_REQUESTS; ++i) {
+    if (buf[i] != (rank + 1) * i * n) {
       not_correct++;
+      printf("ERROR: %d: buffer has unexpected content %d expected %d\n", i,
+             buf[i], (rank + 1) * (i - (NUM_REQUESTS / 2)) * n);
     }
   }
 
@@ -60,43 +62,43 @@ void use_persistent_comm() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  int *buffer = malloc(N * NUM_REQUESTS * sizeof(int));
+  int *buffer_s = malloc(N * NUM_REQUESTS * sizeof(int));
+  int *buffer_r = malloc(N * NUM_REQUESTS * sizeof(int));
   double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
 
-  MPI_Request reqs[NUM_REQUESTS];
+  MPI_Request reqs[NUM_REQUESTS * 2];
 
   int nxt = (rank + 1) % numtasks;
   int prev = (rank + numtasks - 1) % numtasks;
 
-  assert(NUM_REQUESTS % 2 == 0);
+  // assert(NUM_REQUESTS % 2 == 0); assert(NUM_REQUESTS / 2 < 42);
 
   // TODO fuse these loops for better redability
-  for (int i = 0; i < NUM_REQUESTS / 2; ++i) {
+  for (int i = 0; i < NUM_REQUESTS; ++i) {
 
-    MPI_Send_init(&buffer[i * N], N, MPI_INT, nxt, 42 + i, MPI_COMM_WORLD,
+    MPI_Send_init(&buffer_s[i * N], N, MPI_INT, nxt, 42 + i, MPI_COMM_WORLD,
                   &reqs[i]);
-  }
-  for (int i = NUM_REQUESTS / 2; i < NUM_REQUESTS; ++i) {
-    int tag = 42 + i - (NUM_REQUESTS / 2);
-    MPI_Recv_init(&buffer[i * N], N, MPI_INT, prev, tag, MPI_COMM_WORLD,
-                  &reqs[i]);
+    MPI_Recv_init(&buffer_r[i * N], N, MPI_INT, prev, 42 + i, MPI_COMM_WORLD,
+                  &reqs[i + NUM_REQUESTS]);
   }
 
-  for (int n = 0; n < NUM_ITERS; ++n) {
+  for (int n = 1; n < NUM_ITERS; ++n) {
     for (int i = 0; i < N * NUM_REQUESTS; ++i) {
-      buffer[i] = (rank + 1) * i * n;
+      buffer_s[i] = (rank + 1) * i * n;
+      buffer_r[i] = (rank + 1) * i * n;
     }
 
-    MPI_Startall(NUM_REQUESTS, reqs);
+    MPI_Startall(NUM_REQUESTS * 2, reqs);
 
     dummy_workload(work_buffer);
 
-    MPI_Waitall(NUM_REQUESTS, reqs, MPI_STATUSES_IGNORE);
-    check_buffer_content(buffer, n, prev);
+    MPI_Waitall(NUM_REQUESTS * 2, reqs, MPI_STATUSES_IGNORE);
+    if (rank == 0)
+      check_buffer_content(buffer_r, n, prev);
   }
 
-  for (int i = 0; i < NUM_REQUESTS; ++i) {
+  for (int i = 0; i < NUM_REQUESTS * 2; ++i) {
     MPI_Request_free(&reqs[i]);
   }
 }
