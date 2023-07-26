@@ -60,7 +60,7 @@ private:
 public:
   std::vector<llvm::CallBase *>
   get_possibly_conflicting_calls(llvm::CallBase *orig_call);
-  llvm::CallBase *get_first_known_conflicting_call(llvm::CallBase *orig_call);
+  int get_order(llvm::CallBase *call1, llvm::CallBase *call2);
 
 private:
   std::vector<std::shared_ptr<FunctionCallMetadata>> functionCalls;

@@ -114,8 +114,15 @@ FrontendPluginData::get_possibly_conflicting_calls(llvm::CallBase *orig_call) {
   return result;
 }
 
-llvm::CallBase *FrontendPluginData::get_first_known_conflicting_call(
-    llvm::CallBase *orig_call) {
-  // TODO IMPLEMENT
-  return nullptr;
+int FrontendPluginData::get_order(llvm::CallBase *call1,
+                                  llvm::CallBase *call2) {
+  if (call_to_metadata_map.find(call1) == call_to_metadata_map.end() ||
+      call_to_metadata_map.find(call2) == call_to_metadata_map.end()) {
+    return Unknown;
+  }
+
+  auto id_1 = call_to_metadata_map[call1]->id;
+  auto id_2 = call_to_metadata_map[call2]->id;
+
+  return orderMatrix[id_1][id_2];
 }

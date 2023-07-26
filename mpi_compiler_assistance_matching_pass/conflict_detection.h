@@ -52,11 +52,11 @@ private:
   void perform_statically_proven_safe_replacement();
 
   llvm::Value *
-  get_conflict_result(std::shared_ptr<PersistentMPIInitCall> other);
+  get_conflict_result(const std::shared_ptr<PersistentMPIInitCall> &other);
   // true if conflict is not important and matching can be skipped
   // false if conflict is present and matching cannot be skipped
   llvm::Value *
-  compute_conflict_result(std::shared_ptr<PersistentMPIInitCall> other);
+  compute_conflict_result(const std::shared_ptr<PersistentMPIInitCall> &other);
 
   llvm::CallBase *init_call;
   // bool analyzed = false;

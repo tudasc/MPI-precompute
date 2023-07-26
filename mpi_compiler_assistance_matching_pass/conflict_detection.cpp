@@ -223,8 +223,13 @@ Value *get_tag_value(CallBase *mpi_call, bool is_send) {
 }
 
 // TODO implement
-bool is_runtime_check_possible(Value *val_a, Value *val_b) {
-  assert(false && "Not implemented");
+// TODO refactoring: extra file?
+// i8 Value with result of runtime check
+// returns nullptr if runtime check is not possible
+Value *get_runtime_check(Instruction *insert_point, Value *val_a,
+                         Value *val_b) {
+
+  return ConstantInt::get(IntegerType::getInt8Ty(val_a->getContext()), 0);
 }
 
 std::shared_ptr<PersistentMPIInitCall>
@@ -305,7 +310,7 @@ void PersistentMPIInitCall::perform_replacement() {
 }
 
 llvm::Value *PersistentMPIInitCall::compute_conflict_result(
-    std::shared_ptr<PersistentMPIInitCall> other) {
+    const std::shared_ptr<PersistentMPIInitCall> &other) {
 
   assert(replaced == false);
 
@@ -323,7 +328,7 @@ llvm::Value *PersistentMPIInitCall::compute_conflict_result(
     return get_runtime_check_result_false(init_call);
   }
 
-  // tag
+  // static check
   auto tag_different = can_prove_val_different(tag, other_tag);
   auto src_different = can_prove_val_different(src, other_src);
   auto comm_different = can_prove_val_different(comm, other_comm);
@@ -332,14 +337,42 @@ llvm::Value *PersistentMPIInitCall::compute_conflict_result(
     return get_runtime_check_result_true(init_call);
   }
 
-  // TODO runtime check
-  return get_runtime_check_result_false(init_call);
+  CallBase *first_call = nullptr;
+  auto order = FrontendPluginData::get_instance()->get_order(init_call,
+                                                             other->init_call);
+  if (order == Before || order == BeforeInLoop) {
+    first_call = init_call;
+  }
+  if (order == After || order == AfterInLoop) {
+    first_call = other->init_call;
+  }
+  if (first_call) {
 
-  return nullptr;
+    Value *tag_runtime_result = nullptr;
+    if (tag_different == 0) {
+      // otherwise static analysis has proven them to be same
+      tag_runtime_result = get_runtime_check(first_call, tag, other_tag);
+    }
+    Value *src_runtime_result = nullptr;
+    if (src_different == 0) {
+      // otherwise static analysis has proven them to be same
+      src_runtime_result = get_runtime_check(first_call, src, other_src);
+    }
+    Value *comm_runtime_result = nullptr;
+    if (comm_different == 0) {
+      // otherwise static analysis has proven them to be same
+      comm_runtime_result = get_runtime_check(first_call, comm, other_comm);
+    }
+
+    return combine_runtime_checks(init_call, tag_runtime_result,
+                                  src_runtime_result, comm_runtime_result);
+  } // else no call was determined to be before the other: we dont know where to
+    // insert the runtime check
+  return get_runtime_check_result_false(init_call);
 }
 
 llvm::Value *PersistentMPIInitCall::get_conflict_result(
-    std::shared_ptr<PersistentMPIInitCall> other) {
+    const std::shared_ptr<PersistentMPIInitCall> &other) {
 
   if (conflict_results.find(other) != conflict_results.end()) {
     return conflict_results[other];
