@@ -60,7 +60,7 @@ ExternalProject_Add_Step(ompi include_implementation
         COMMAND ${CMAKE_COMMAND} -E copy_if_different one-sided-persistent.c <SOURCE_DIR>/ompi/mca/osc/ucx/one-sided-persistent.c
         DEPENDEES build
         DEPENDERS build_with_implementation
-        DEPENDS persistent_implementation
+        DEPENDS one-sided-persistent.c
         )
 
 ExternalProject_Add_StepTargets(ompi build)
@@ -73,9 +73,10 @@ set(persistent_implementation-include -I${BINARY_DIR} -I${BINARY_DIR}/opal/inclu
 
 set(PERSISTENT_IMPLEMENTATION_FILES debug.c debug.h finalization.c finalization.h globals.c globals.h handshake.c handshake.h interface.c interface.h mpi-internals.h pack.c pack.h request_type.h settings.h start.c start.h test.c test.h wait.c wait.h)
 
-add_custom_target(persistent_implementation
+add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
         COMMAND ${CMAKE_C_COMPILER} -E ${CFLAGS} ${persistent_implementation-include} -DLINKAGE_TYPE=static ${CMAKE_CURRENT_SOURCE_DIR}/one-sided-persistent.h -o ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
-        BYPRODUCTS one-sided-persistent.c
+        COMMENT "rebuild one sided persistent implementation"
         DEPENDS ompi-build ${PERSISTENT_IMPLEMENTATION_FILES}
         )
 
