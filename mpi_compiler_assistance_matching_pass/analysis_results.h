@@ -31,6 +31,7 @@ public:
   llvm::AAResults *getAAResults(llvm::Function &f);
   llvm::LoopInfo *getLoopInfo(llvm::Function &f);
   llvm::ScalarEvolution *getSE(llvm::Function &f);
+  llvm::DominatorTree *getDomTree(llvm::Function &f);
 
   llvm::TargetLibraryInfo *getTLI();
 

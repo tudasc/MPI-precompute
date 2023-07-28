@@ -24,6 +24,7 @@
 
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/IR/CFG.h"
+#include "llvm/IR/Dominators.h"
 
 #include "debug.h"
 
@@ -222,12 +223,98 @@ Value *get_tag_value(CallBase *mpi_call, bool is_send) {
   return mpi_call->getArgOperand(tag_arg_pos);
 }
 
+// true if a is known to be before b, false otherwise
+bool known_to_be_before(Instruction *a, Instruction *b) {
+
+  if (a->getFunction() != b->getFunction()) {
+    return false;
+  }
+
+  auto *domtree = analysis_results->getDomTree(*a->getFunction());
+
+  return domtree->dominates(a, b);
+}
+
+Value *get_runtime_value_global(Instruction *insert_point, LoadInst *v) {
+
+  return nullptr;
+}
+
+Value *get_runtime_value_local(Instruction *insert_point, LoadInst *v) {
+
+  auto *ptr = dyn_cast<AllocaInst>(v->getPointerOperand());
+  assert(ptr);
+
+  if (insert_point->getFunction() != ptr->getFunction()) {
+    // only inside one function
+    return nullptr;
+  }
+  if (known_to_be_before(v, insert_point)) {
+    return v;
+  }
+
+  // TODO this is the interesting part as we need to have the value of v to be
+  // available before it is computed
+
+  return nullptr;
+}
+
+// try to get the runtime value of the loadInst at the specified insert point
+// returns nullptr if it connot be determined
+Value *get_runtime_value(Instruction *insert_point, LoadInst *v) {
+  if (auto *global = dyn_cast<GlobalVariable>(v->getPointerOperand())) {
+    get_runtime_value_global(insert_point, v);
+  }
+  if (auto *local = dyn_cast<AllocaInst>(v->getPointerOperand())) {
+    get_runtime_value_local(insert_point, v);
+  }
+
+  return nullptr;
+}
+
+Value *get_runtime_value(Instruction *insert_point, Constant *c) { return c; }
+
+Value *get_runtime_value(Instruction *insert_point, Value *v) {
+
+  if (auto *c = dyn_cast<Constant>(v)) {
+    return get_runtime_value(insert_point, c);
+  }
+  if (auto *l = dyn_cast<LoadInst>(v)) {
+    return get_runtime_value(insert_point, l);
+  }
+
+  // are there other cases we can handle?
+  // PHI, select, arithmetic
+
+  return nullptr;
+}
+
 // TODO implement
 // TODO refactoring: extra file?
 // i8 Value with result of runtime check
 // returns nullptr if runtime check is not possible
 Value *get_runtime_check(Instruction *insert_point, Value *val_a,
                          Value *val_b) {
+  assert(val_a->getType() == val_b->getType());
+  auto *inst_a = dyn_cast<Instruction>(val_a);
+  auto *inst_b = dyn_cast<Instruction>(val_b);
+  // swap args so that val_a is an instruction
+  if (!inst_a && inst_b) {
+    return get_runtime_check(insert_point, val_b, val_a);
+  }
+  assert(inst_a);
+
+  auto *runtime_a = get_runtime_value(insert_point, val_a);
+  auto *runtime_b = get_runtime_value(insert_point, val_b);
+
+  if (runtime_a && runtime_b) {
+    IRBuilder<> builder = IRBuilder<>(insert_point);
+    // TODO does this work with ptr as well?
+    return builder.CreateICmpNE(runtime_a, runtime_b);
+  }
+
+  errs() << "This instruction can not be analyzed: ";
+  inst_a->dump();
 
   return ConstantInt::get(IntegerType::getInt8Ty(val_a->getContext()), 0);
 }
@@ -367,7 +454,7 @@ llvm::Value *PersistentMPIInitCall::compute_conflict_result(
     return combine_runtime_checks(init_call, tag_runtime_result,
                                   src_runtime_result, comm_runtime_result);
   } // else no call was determined to be before the other: we dont know where to
-    // insert the runtime check
+  // insert the runtime check
   return get_runtime_check_result_false(init_call);
 }
 

@@ -326,7 +326,7 @@ combine_runtime_checks(llvm::CallBase *call,
     return ConstantInt::get(IntegerType::getInt8Ty(context), 0);
   }
 
-  for (auto r : check_results) {
+  for (auto r : no_null_vec) {
     assert(r->getType() == Type::getInt8Ty(context));
   }
 
