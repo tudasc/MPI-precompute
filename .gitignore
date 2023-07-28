@@ -1,12 +1,16 @@
 # objis
 *.o
-*.out
-#
-build/*
+# executables
 
-#executable
+# cmake build dirs
+build/*
+cmake-build-debug/*
+
+#executables
 example
 a.out
+*.out
+*.out_original
 IMB-ASYNC/src_cpp/IMB-ASYNC
 IMB-ASYNC/IMB-ASYNC
 IMB-ASYNC/IMB-ASYNC_orig
@@ -19,9 +23,14 @@ job.out
 IMB-ASYNC/err/
 IMB-ASYNC/output/
 
+# from ctest
+*LastTest.log
+
 # backupo data from older measurements
 visualization/mearurement_2022_05_16.tar.gz
-
+# more in visualization
+cache.csv
+*.pdf
 
 #IDE specific
 .project
