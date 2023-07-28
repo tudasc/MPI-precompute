@@ -333,51 +333,17 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
                            .getCallee()
                            ->stripPointerCasts());
   }
-
-  // gather all MPI send and recv calls
-  /*
-   // currenty unused:
-          auto temp = gather_all_calls(result->mpi_send);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Bsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Ssend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Rsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Isend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Ibsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Irsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Sendrecv);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_send_init);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-
-           temp = gather_all_calls(result->mpi_recv);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Irecv);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_recv_init);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Sendrecv);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-                          */
+  auto *ftype = FunctionType::get(Type::getInt32Ty(M.getContext()), {
+    Type::getInt32Ty(M.getContext()), Type::getInt32Ty(M.getContext())
+  } false);
+  result->optimized.register_send_tag = cast<Function>(
+      M.getOrInsertFunction("MPIOPT_Register_send_envelope", ftype, {})
+          .getCallee()
+          ->stripPointerCasts());
+  result->optimized.register_recv_tag = cast<Function>(
+      M.getOrInsertFunction("MPIOPT_Register_recv_envelope", ftype, {})
+          .getCallee()
+          ->stripPointerCasts());
 
   return result;
 }

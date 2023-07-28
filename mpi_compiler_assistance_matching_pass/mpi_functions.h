@@ -47,6 +47,8 @@ struct mpiopt_functions {
   llvm::Function *mpi_request_free = nullptr;
   llvm::Function *init = nullptr;
   llvm::Function *finalize = nullptr;
+  llvm::Function *register_send_tag = nullptr;
+  llvm::Function *register_recv_tag = nullptr;
 };
 
 struct mpi_functions {
