@@ -18,6 +18,15 @@
 // dummy int to create some mpi win on
 int dummy_int = 0;
 
+struct envelope_list_entry {
+  int tag;
+  int dest;
+  struct envelope_list_entry *nxt;
+};
+
+struct list_entry *send_envelopes;
+struct list_entry *recv_envelopes;
+
 void MPIOPT_INIT() {
   // create the global win used for rdma transfers
   // TODO maybe we need less initialization to initialize the RDMA component?
@@ -29,6 +38,14 @@ void MPIOPT_INIT() {
   to_free_list_head = malloc(sizeof(struct list_elem));
   to_free_list_head->elem = NULL;
   to_free_list_head->next = NULL;
+  send_envelopes = malloc(sizeof(struct envelope_list_entry));
+  send_envelopes->nxt = NULL;
+  send_envelopes->tag = -1;
+  send_envelopes->dest = -1;
+  recv_envelopes = malloc(sizeof(struct envelope_list_entry));
+  recv_envelopes->nxt = NULL;
+  recv_envelopes->tag = -1;
+  recv_envelopes->dest = -1;
 
   communicator_array =
       malloc(sizeof(struct communicator_info) * MAX_NUM_OF_COMMUNICATORS);
@@ -37,6 +54,59 @@ void MPIOPT_INIT() {
   crosstalk_counter = 0;
 #endif
   MPIOPT_Register_Communicator(MPI_COMM_WORLD);
+}
+
+int MPIOPT_Register_send_envelope(int dest, int tag) {
+  struct list_entry *new_elem = malloc(sizeof(struct envelope_list_entry));
+  new_elem->nxt = send_envelopes;
+  new_elem->tag = tag;
+  new_elem->dest = dest;
+  send_envelopes = new_elem;
+}
+
+int MPIOPT_Register_recv_envelope(int dest, int tag) {
+  struct list_entry *new_elem = malloc(sizeof(struct envelope_list_entry));
+  new_elem->nxt = recv_envelopes;
+  new_elem->tag = tag;
+  new_elem->dest = dest;
+  recv_envelopes = new_elem;
+}
+
+int check_if_send_envelope_was_registered(int dest, int tag, bool is_send) {
+
+  struct list_to_use * = recv_envelopes;
+  if (is_send) {
+    list_to_use = send_envelopes;
+  }
+  if (list_to_use->nxt == NULL) {
+    printf("Empty registration list\n")
+  }
+
+  // find last elem
+  struct list_entry *prev_elem = NULL;
+  struct list_entry *current_elem = list_to_use;
+  struct list_entry *nxt_elem = list_to_use->nxt;
+
+  while (nxt_elem->nxt != NULL) {
+    prev_elem = current_elem;
+    current_elem = nxt_elem;
+    nxt_elem = current_elem->nxt;
+  }
+
+  if (current_elem->tag == tag && current_elem->dest == detst) {
+    printf("matching registered envelope\n");
+  } else {
+    printf("NOT matching registered envelope\n");
+  }
+
+  // remove from list
+
+  if (prev_elem == NULL) {
+    printf("End of registered tag list");
+  } else {
+    prev_elem->nxt = nxt_elem;
+    free(current_elem);
+  }
 }
 
 struct communicator_info *find_comm(MPI_Comm comm) {
@@ -269,6 +339,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   MPI_Count type_size, type_extent, lb;
   MPI_Type_size_x(datatype, &type_size);
   MPI_Type_get_extent_x(datatype, &lb, &type_extent);
+
+  check_if_send_envelope_was_registered(dest, tag, is_send_request);
 #ifndef NDEBUG
   // only if assertion checking is on
 #endif

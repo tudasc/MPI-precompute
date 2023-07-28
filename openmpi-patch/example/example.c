@@ -186,7 +186,10 @@ void use_self_implemented_comm() {
   MPI_Info_set(info, "nc_mixed_threshold", "3");
   MPI_Info_set(info, "skip_matching", "1");
 
+  MPIOPT_Register_send_envelope(0, 42);
+  MPIOPT_Register_recv_envelope(1, 42);
   if (rank == 1) {
+
     // MPI_Info_set(info, "nc_send_strategy", "PACK"); // not matching info for
     // testing
 

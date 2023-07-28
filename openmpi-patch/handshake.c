@@ -112,6 +112,7 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
       // indicate that this request has finished
       request->flag = 4;
     } else {
+      // payload arrived but no handshake
       // post the matching receive, blocking as we have probed
       MPI_Recv(request->buf, request->count, request->dtype, request->dest,
                request->tag, request->communicators->original_communicator,
