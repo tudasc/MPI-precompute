@@ -57,7 +57,8 @@ void MPIOPT_INIT() {
 }
 
 int MPIOPT_Register_send_envelope(int dest, int tag) {
-  struct list_entry *new_elem = malloc(sizeof(struct envelope_list_entry));
+  struct envelope_list_entry *new_elem =
+      malloc(sizeof(struct envelope_list_entry));
   new_elem->nxt = send_envelopes;
   new_elem->tag = tag;
   new_elem->dest = dest;
@@ -65,7 +66,8 @@ int MPIOPT_Register_send_envelope(int dest, int tag) {
 }
 
 int MPIOPT_Register_recv_envelope(int dest, int tag) {
-  struct list_entry *new_elem = malloc(sizeof(struct envelope_list_entry));
+  struct envelope_list_entry *new_elem =
+      malloc(sizeof(struct envelope_list_entry));
   new_elem->nxt = recv_envelopes;
   new_elem->tag = tag;
   new_elem->dest = dest;
@@ -74,18 +76,18 @@ int MPIOPT_Register_recv_envelope(int dest, int tag) {
 
 int check_if_send_envelope_was_registered(int dest, int tag, bool is_send) {
 
-  struct list_to_use * = recv_envelopes;
+  struct envelope_list_entry *list_to_use = recv_envelopes;
   if (is_send) {
     list_to_use = send_envelopes;
   }
   if (list_to_use->nxt == NULL) {
-    printf("Empty registration list\n")
+    printf("Empty registration list\n");
   }
 
   // find last elem
-  struct list_entry *prev_elem = NULL;
-  struct list_entry *current_elem = list_to_use;
-  struct list_entry *nxt_elem = list_to_use->nxt;
+  struct envelope_list_entry *prev_elem = NULL;
+  struct envelope_list_entry *current_elem = list_to_use;
+  struct envelope_list_entry *nxt_elem = list_to_use->nxt;
 
   while (nxt_elem->nxt != NULL) {
     prev_elem = current_elem;
@@ -93,7 +95,7 @@ int check_if_send_envelope_was_registered(int dest, int tag, bool is_send) {
     nxt_elem = current_elem->nxt;
   }
 
-  if (current_elem->tag == tag && current_elem->dest == detst) {
+  if (current_elem->tag == tag && current_elem->dest == dest) {
     printf("matching registered envelope\n");
   } else {
     printf("NOT matching registered envelope\n");
