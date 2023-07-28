@@ -24,8 +24,8 @@ struct envelope_list_entry {
   struct envelope_list_entry *nxt;
 };
 
-struct list_entry *send_envelopes;
-struct list_entry *recv_envelopes;
+struct envelope_list_entry *send_envelopes;
+struct envelope_list_entry *recv_envelopes;
 
 void MPIOPT_INIT() {
   // create the global win used for rdma transfers
