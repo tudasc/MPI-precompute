@@ -1,21 +1,23 @@
 add_library(mpi_compiler_assistance_matching_pass MODULE
-    # List your source files here.
-    mpi_compiler_assistance_matching_pass.cpp
-    mpi_functions.h
-    mpi_functions.cpp
-    conflict_detection.h
-    conflict_detection.cpp
-    implementation_specific.h
-    implementation_specific.cpp
+        # List your source files here.
+        mpi_compiler_assistance_matching_pass.cpp
+        mpi_functions.h
+        mpi_functions.cpp
+        conflict_detection.h
+        conflict_detection.cpp
+        implementation_specific.h
+        implementation_specific.cpp
         debug.h
-    analysis_results.h
-    analysis_results.cpp
-    replacement.h
-    replacement.cpp
-    nc_settings.h
+        analysis_results.h
+        analysis_results.cpp
+        replacement.h
+        replacement.cpp
+        nc_settings.h
         json.hpp
         frontend_plugin_data.h
-        frontend_plugin_data.cpp)
+        frontend_plugin_data.cpp
+        precalculation.h
+        precalculations.cpp)
 
 # if one wants to use mpi
 #find_package(MPI REQUIRED)
@@ -37,6 +39,6 @@ add_dependencies(mpi_compiler_assistance_matching_pass ompi)
 # LLVM is (typically) built with no C++ RTTI. We need to match that;
 # otherwise, we'll get linker errors about missing RTTI data.
 set_target_properties(mpi_compiler_assistance_matching_pass PROPERTIES
-    COMPILE_FLAGS "-fno-rtti -Wall -Wextra -Wno-unused-parameter"
+        COMPILE_FLAGS "-fno-rtti -Wall -Wextra -Wno-unused-parameter"
 )
 
