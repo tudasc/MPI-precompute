@@ -46,19 +46,20 @@ void Precalculations::add_precalculations(
   }
 
   find_all_tainted_vals();
-  for (auto f : functions_to_include) {
+  for (const auto &f : functions_to_include) {
     f->initialize_copy();
   }
   // dont fuse this loops we first need to initialize the copy before changing
   // calls
-  for (auto f : functions_to_include) {
+  for (const auto &f : functions_to_include) {
     replace_calls_in_copy(f);
   }
   // one MAY be able to fuse these 2 loops though
   // TODO evaluate if true
-  for (auto f : functions_to_include) {
+  for (const auto &f : functions_to_include) {
     f->prune_copy(tainted_values);
   }
+  add_call_to_precalculation_to_main();
 }
 
 void Precalculations::find_all_tainted_vals() {
@@ -483,4 +484,50 @@ void FunctionToPrecalculate::prune_copy(
   // TODO remove all unreachable blocks that may be left over
 
   // one can now also combine blocks
+}
+
+void Precalculations::add_call_to_precalculation_to_main() {
+
+  // TODO code duplication wir auto pos=
+  auto pos = std::find_if(
+      functions_to_include.begin(), functions_to_include.end(),
+      [this](const auto p) { return p->F_orig == this->entry_point; });
+  assert(pos != functions_to_include.end());
+  const auto &function_info = *pos;
+  auto entry_to_precalc = function_info->F_copy;
+
+  // search for MPI_init orInit Thread as precalc may only take place after that
+  CallBase *call_to_init = nullptr;
+  if (mpi_func->mpi_init != nullptr) {
+    for (auto u : mpi_func->mpi_init->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
+        assert(call_to_init == nullptr && "MPI_Init is only allowed once");
+        call_to_init = call;
+      }
+    }
+  }
+  if (mpi_func->mpi_init_thread != nullptr) {
+    for (auto u : mpi_func->mpi_init_thread->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
+        assert(call_to_init == nullptr && "MPI_Init is only allowed once");
+        call_to_init = call;
+      }
+    }
+  }
+
+  assert(call_to_init != nullptr && "Did Not Found MPI_Init_Call");
+
+  assert(call_to_init->getFunction() == entry_point &&
+         "MPI_Init is not in main");
+
+  // insert after init
+  // MPIOPT_Init will later be inserted between this 2 calls
+  IRBuilder<> builder(call_to_init->getNextNode());
+
+  // forward args of main
+  std::vector<Value *> args;
+  for (auto &arg : entry_point->args()) {
+    args.push_back(&arg);
+  }
+  builder.CreateCall(function_info->F_copy, args);
 }

@@ -75,6 +75,8 @@ public:
   void visit_ptr(llvm::Value *ptr);
 
   void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
+
+  void add_call_to_precalculation_to_main();
 };
 
 #endif // MACH_PRECALCULATIONS_H_
