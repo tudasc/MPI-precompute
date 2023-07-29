@@ -18,9 +18,6 @@ if (CMAKE_BUILD_TYPE EQUAL "DEBUG")
 endif(CMAKE_BUILD_TYPE EQUAL "DEBUG")
 
 #TODO assert that generator is makefiles
-
-#TODO fix dependency: mpi implementation is not automatically rebuild if persistent implementation changes
-
 #or also support ninja
 
 ExternalProject_Add(
@@ -76,7 +73,7 @@ set(PERSISTENT_IMPLEMENTATION_FILES debug.c debug.h finalization.c finalization.
 add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
         COMMAND ${CMAKE_C_COMPILER} -E ${CFLAGS} ${persistent_implementation-include} -DLINKAGE_TYPE=static ${CMAKE_CURRENT_SOURCE_DIR}/one-sided-persistent.h -o ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
-        COMMENT "rebuild one sided persistent implementation"
+        COMMENT "build one sided persistent implementation"
         DEPENDS ompi-build ${PERSISTENT_IMPLEMENTATION_FILES}
         )
 

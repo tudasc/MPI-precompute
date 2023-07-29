@@ -10,7 +10,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 message("Build Type: ${CMAKE_BUILD_TYPE}")
 
 
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM 16 REQUIRED CONFIG)
 
 add_definitions(${LLVM_DEFINITIONS})
 include_directories(${LLVM_INCLUDE_DIRS})
