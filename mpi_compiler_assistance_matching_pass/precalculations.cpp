@@ -23,6 +23,7 @@
 #include "mpi_functions.h"
 
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "debug.h"
@@ -330,5 +331,66 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
 }
 
 void FunctionToPrecalculate::initialize_copy() {
+  assert(F_copy == nullptr);
   F_copy = CloneFunction(F_orig, old_new_map, cloned_code_info);
+}
+
+void Precalculations::replace_calls_in_copy(
+    std::shared_ptr<FunctionToPrecalculate> func) {
+
+  for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
+       ++I) {
+    if (auto *call = dyn_cast<CallBase>(&*I)) {
+      auto callee = call->getCalledFunction();
+      if (callee == mpi_func->mpi_comm_rank ||
+          callee == mpi_func->mpi_comm_size) {
+        continue; // noting to do, keep original call
+      }
+      if (callee == mpi_func->mpi_send_init) {
+        auto tag = get_tag_value(call, true);
+        auto src = get_src_value(call, true);
+        // dest, tag
+        IRBuilder<> builder = IRBuilder<>(call);
+        auto new_call = builder.CreateCall(
+            mpi_func->optimized.register_send_tag, {src, tag});
+        ReplaceInstWithInst(call, new_call);
+        continue;
+      }
+      if (callee == mpi_func->mpi_recv_init) {
+        auto tag = get_tag_value(call, true);
+        auto src = get_src_value(call, true);
+        // dest, tag
+        IRBuilder<> builder = IRBuilder<>(call);
+        auto new_call = builder.CreateCall(
+            mpi_func->optimized.register_recv_tag, {src, tag});
+        ReplaceInstWithInst(call, new_call);
+        continue;
+      }
+      // end handling calls to MPI
+
+      auto pos =
+          std::find_if(functions_to_include.begin(), functions_to_include.end(),
+                       [&call](const auto p) {
+                         return p->F_orig == call->getCalledFunction();
+                       });
+      if (pos != functions_to_include.end()) {
+
+        const auto &function_information = *pos;
+
+        call->setCalledFunction(function_information->F_copy);
+        // null all not used args
+        for (unsigned int i = 0; i < call->arg_size(); ++i) {
+          if (function_information->args_to_use.find(i) ==
+              function_information->args_to_use.end()) {
+            call->setArgOperand(
+                i, Constant::getNullValue(call->getArgOperand(i)->getType()));
+          } // else pass arg normally
+        }
+        continue;
+      } else {
+        // callee not in functions_to_include
+        assert(tainted_values.find(callee) == tainted_values.end());
+      }
+    }
+  }
 }

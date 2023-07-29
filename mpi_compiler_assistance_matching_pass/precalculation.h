@@ -34,7 +34,7 @@ public:
 
   std::set<unsigned int> args_to_use = {};
   llvm::Function *F_orig;
-  llvm::Function *F_copy;
+  llvm::Function *F_copy = nullptr;
   llvm::ValueToValueMapTy old_new_map;
   llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we dont need it
 
@@ -71,6 +71,8 @@ public:
   void visit_val(llvm::CallBase *call);
   void visit_call_from_ptr(llvm::CallBase *call, llvm::Value *ptr);
   void visit_ptr(llvm::Value *ptr);
+
+  void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
 };
 
 #endif // MACH_PRECALCULATIONS_H_
