@@ -42,6 +42,8 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 
+#include "precalculation.h"
+
 #include <assert.h>
 // #include <mpi.h>
 #include <cstring>
@@ -104,6 +106,7 @@ struct MPICompilerAssistanceMatchingPass
     // collect all Persistent Comm Operations
     std::vector<std::shared_ptr<PersistentMPIInitCall>> send_init_list;
     std::vector<std::shared_ptr<PersistentMPIInitCall>> recv_init_list;
+    std::vector<CallBase *> combined_init_list;
 
     if (mpi_func->mpi_send_init) {
       for (auto *u : mpi_func->mpi_send_init->users()) {
@@ -113,6 +116,7 @@ struct MPICompilerAssistanceMatchingPass
             // func, but better save than sorry
             send_init_list.push_back(
                 PersistentMPIInitCall::get_PersistentMPIInitCall(call));
+            combined_init_list.push_back(call);
           }
         }
       }
@@ -123,10 +127,17 @@ struct MPICompilerAssistanceMatchingPass
           if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
             recv_init_list.push_back(
                 PersistentMPIInitCall::get_PersistentMPIInitCall(call));
+            combined_init_list.push_back(call);
           }
         }
       }
     }
+
+    auto *main_func = M.getFunction("main");
+    assert(main_func);
+
+    auto precalcuation = Precalculations(M, main_func);
+    precalcuation.add_precalculations(combined_init_list);
 
     errs() << "gathered " << send_init_list.size() << " send Operations \nand "
            << recv_init_list.size() << " receive Operations\n";
@@ -159,7 +170,7 @@ struct MPICompilerAssistanceMatchingPass
     assert(!has_error);
 #endif
 
-    M.dump();
+    // M.dump();
 
     if (replacement) {
       return PreservedAnalyses::none();

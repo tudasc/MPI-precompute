@@ -80,6 +80,10 @@ bool check_mpi_recv_conflicts(llvm::CallBase *send_init_call);
 
 bool check_mpi_send_conflicts(llvm::CallBase *recv_init_call);
 
+llvm::Value *get_tag_value(llvm::CallBase *mpi_call, bool is_send);
+llvm::Value *get_src_value(llvm::CallBase *mpi_call, bool is_send);
+llvm::Value *get_comm_value(llvm::CallBase *mpi_call, bool is_send);
+
 // llvm::Value *get_communicator(llvm::CallBase *mpi_call);
 // llvm::Value *get_src(llvm::CallBase *mpi_call, bool is_send);
 // llvm::Value *get_tag(llvm::CallBase *mpi_call, bool is_send);

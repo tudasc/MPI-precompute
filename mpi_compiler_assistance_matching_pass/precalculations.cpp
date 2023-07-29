@@ -16,6 +16,7 @@
 
 #include "analysis_results.h"
 #include "conflict_detection.h"
+#include "mpi_functions.h"
 #include "precalculation.h"
 
 #include "implementation_specific.h"
@@ -26,3 +27,49 @@
 
 #include "debug.h"
 using namespace llvm;
+
+void Precalculations::add_precalculations(
+    const std::vector<llvm::CallBase *> &to_precompute) {
+  to_replace_with_envelope_register = to_precompute;
+
+  for (auto call : to_precompute) {
+    bool is_send = call->getCalledFunction() == mpi_func->mpi_send_init;
+    auto *tag = get_tag_value(call, is_send);
+    auto *src = get_src_value(call, is_send);
+
+    tainted_values.insert(tag);
+    tainted_values.insert(src);
+    // TODO precompute comm as well?
+    tainted_values.insert(call);
+    visited_values.insert(call);
+  }
+
+  find_all_tainted_vals();
+}
+
+void Precalculations::find_all_tainted_vals() {
+  auto prev_set_size = tainted_values.size();
+
+  while (tainted_values.size() > visited_values.size()) {
+    std::set<Value *> not_visited;
+    std::set_difference(tainted_values.begin(), tainted_values.end(),
+                        visited_values.begin(), visited_values.end(),
+                        std::inserter(not_visited, not_visited.begin()));
+
+    for (auto v : not_visited) {
+      visit_val(v);
+    }
+  }
+
+  std::set<Value *> not_visited_assert;
+  std::set_difference(
+      tainted_values.begin(), tainted_values.end(), visited_values.begin(),
+      visited_values.end(),
+      std::inserter(not_visited_assert, not_visited_assert.begin()));
+  assert(not_visited_assert.size() == 0);
+}
+
+void Precalculations::visit_val(llvm::Value *v) {
+  visited_values.insert(v);
+  // TODO IMPLEMENT doing something
+}

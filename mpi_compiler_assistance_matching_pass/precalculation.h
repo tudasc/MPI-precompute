@@ -14,23 +14,46 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 
+#include <utility>
+
 #include "llvm/IR/Module.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #ifndef MACH_PRECALCULATIONS_H_
 #define MACH_PRECALCULATIONS_H_
+
+class FunctionToPrecalculate {
+public:
+  FunctionToPrecalculate(llvm::Function *F, std::set<unsigned int> args_to_use)
+      : args_to_use(std::move(args_to_use)), F_orig(F){};
+  void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
+    std::copy(new_args_to_use.begin(), new_args_to_use.end(),
+              std::inserter(args_to_use, args_to_use.begin()));
+  }
+
+private:
+  std::set<unsigned int> args_to_use;
+  llvm::Function *F_orig;
+};
 
 class Precalculations {
 public:
   Precalculations(llvm::Module &M, llvm::Function *entry_point)
       : M(M), entry_point(entry_point){};
 
-  void add_precalculations(std::vector<llvm::Value *> to_precompute);
+  void add_precalculations(const std::vector<llvm::CallBase *> &to_precompute);
 
 private:
   llvm::Module &M;
   llvm::Function *entry_point;
-};
 
-void add_precalculations(llvm::Module &M, llvm::Function *entry_point);
+  std::vector<llvm::CallBase *> to_replace_with_envelope_register;
+  std::set<std::unique_ptr<FunctionToPrecalculate>> functions_to_include;
+  std::set<llvm::Value *> tainted_values;
+  std::set<llvm::Value *> visited_values;
+
+  void find_all_tainted_vals();
+  void visit_val(llvm::Value *v);
+};
 
 #endif // MACH_PRECALCULATIONS_H_

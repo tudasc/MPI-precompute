@@ -333,9 +333,10 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
                            .getCallee()
                            ->stripPointerCasts());
   }
-  auto *ftype = FunctionType::get(Type::getInt32Ty(M.getContext()), {
-    Type::getInt32Ty(M.getContext()), Type::getInt32Ty(M.getContext())
-  } false);
+  auto *ftype = FunctionType::get(
+      Type::getInt32Ty(M.getContext()),
+      {Type::getInt32Ty(M.getContext()), Type::getInt32Ty(M.getContext())},
+      false);
   result->optimized.register_send_tag = cast<Function>(
       M.getOrInsertFunction("MPIOPT_Register_send_envelope", ftype, {})
           .getCallee()
