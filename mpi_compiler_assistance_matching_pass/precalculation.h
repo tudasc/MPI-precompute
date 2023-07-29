@@ -52,6 +52,7 @@ public:
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
   std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
   std::set<llvm::Value *> tainted_values;
+  std::set<llvm::BasicBlock *> tainted_blocks;
   std::set<llvm::Value *> visited_values;
 
   void insert_tainted_value(llvm::Value *v);

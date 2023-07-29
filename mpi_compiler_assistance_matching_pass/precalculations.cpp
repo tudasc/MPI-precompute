@@ -65,6 +65,22 @@ void Precalculations::find_all_tainted_vals() {
       visited_values.end(),
       std::inserter(not_visited_assert, not_visited_assert.begin()));
   assert(not_visited_assert.empty());
+  // taint all the blocks that are relevant
+  std::transform(tainted_values.begin(), tainted_values.end(),
+                 std::inserter(tainted_blocks, tainted_blocks.begin()),
+                 [](auto v) -> BasicBlock * {
+                   if (auto *inst = dyn_cast<Instruction>(v))
+                     return inst->getParent();
+                   else
+                     return nullptr;
+                 });
+  tainted_blocks.erase(nullptr);
+  // assert CFG is valid
+  for (auto bb : tainted_blocks) {
+    for (auto pred = pred_begin(bb); pred != pred_end(bb); ++pred) {
+      assert(tainted_blocks.find(*pred) != tainted_blocks.end());
+    }
+  }
 }
 
 void Precalculations::visit_val(llvm::Value *v) {
