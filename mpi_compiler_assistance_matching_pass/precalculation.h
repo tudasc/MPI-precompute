@@ -22,17 +22,17 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MACH_PRECALCULATIONS_H_
 #define MACH_PRECALCULATIONS_H_
 
+class Precalculations;
+
 class FunctionToPrecalculate {
 public:
-  FunctionToPrecalculate(llvm::Function *F, std::set<unsigned int> args_to_use)
-      : args_to_use(std::move(args_to_use)), F_orig(F){};
+  FunctionToPrecalculate(llvm::Function *F) : F_orig(F){};
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
               std::inserter(args_to_use, args_to_use.begin()));
   }
 
-private:
-  std::set<unsigned int> args_to_use;
+  std::set<unsigned int> args_to_use = {};
   llvm::Function *F_orig;
 };
 
@@ -48,12 +48,15 @@ private:
   llvm::Function *entry_point;
 
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
-  std::set<std::unique_ptr<FunctionToPrecalculate>> functions_to_include;
+  std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
   std::set<llvm::Value *> tainted_values;
   std::set<llvm::Value *> visited_values;
 
   void find_all_tainted_vals();
   void visit_val(llvm::Value *v);
+  void visit_val(llvm::AllocaInst *alloca);
+  void visit_val(llvm::StoreInst *store);
+  void visit_val(llvm::Argument *arg);
 };
 
 #endif // MACH_PRECALCULATIONS_H_

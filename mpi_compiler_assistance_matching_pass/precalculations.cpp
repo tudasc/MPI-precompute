@@ -48,8 +48,6 @@ void Precalculations::add_precalculations(
 }
 
 void Precalculations::find_all_tainted_vals() {
-  auto prev_set_size = tainted_values.size();
-
   while (tainted_values.size() > visited_values.size()) {
     std::set<Value *> not_visited;
     std::set_difference(tainted_values.begin(), tainted_values.end(),
@@ -66,10 +64,106 @@ void Precalculations::find_all_tainted_vals() {
       tainted_values.begin(), tainted_values.end(), visited_values.begin(),
       visited_values.end(),
       std::inserter(not_visited_assert, not_visited_assert.begin()));
-  assert(not_visited_assert.size() == 0);
+  assert(not_visited_assert.empty());
 }
 
 void Precalculations::visit_val(llvm::Value *v) {
+  errs() << "Visit\n";
+  v->dump();
   visited_values.insert(v);
-  // TODO IMPLEMENT doing something
+
+  if (auto *c = dyn_cast<Constant>(v)) {
+    return;
+  }
+  if (auto *l = dyn_cast<LoadInst>(v)) {
+    tainted_values.insert(l->getPointerOperand());
+    return;
+  }
+  if (auto *a = dyn_cast<AllocaInst>(v)) {
+    visit_val(a);
+    return;
+  }
+  if (auto *s = dyn_cast<StoreInst>(v)) {
+    visit_val(s);
+    return;
+  }
+  if (auto *op = dyn_cast<BinaryOperator>(v)) {
+    // arithmetic
+    // TODO do we need to exclude some opcodes?
+    tainted_values.insert(op->getOperand(0));
+    tainted_values.insert(op->getOperand(1));
+    return;
+  }
+  if (auto *arg = dyn_cast<Argument>(v)) {
+    visit_val(arg);
+    return;
+  }
+
+  errs() << "Support for analyzing this Value is not implemented yet\n";
+  v->dump();
+  assert(false);
+}
+
+void Precalculations::visit_val(llvm::AllocaInst *alloca) {
+  assert(visited_values.find(alloca) != visited_values.end());
+
+  for (auto u : alloca->users()) {
+    if (auto *s = dyn_cast<StoreInst>(u)) {
+      tainted_values.insert(s);
+      continue;
+    }
+    if (auto *l = dyn_cast<LoadInst>(u)) {
+      continue; // no need to take care about this
+    }
+    errs() << "Support for analyzing this Value is not implemented yet\n";
+    u->dump();
+    assert(false);
+  }
+}
+
+void Precalculations::visit_val(llvm::StoreInst *store) {
+  assert(visited_values.find(store) != visited_values.end());
+
+  assert(tainted_values.find(store->getPointerOperand()) !=
+         tainted_values.end());
+  tainted_values.insert(store->getValueOperand());
+}
+
+void Precalculations::visit_val(llvm::Argument *arg) {
+  assert(visited_values.find(arg) != visited_values.end());
+
+  auto *func = arg->getParent();
+
+  auto pos =
+      std::find_if(functions_to_include.begin(), functions_to_include.end(),
+                   [&func](const auto p) { return p->F_orig == func; });
+
+  std::shared_ptr<FunctionToPrecalculate> fun_to_precalc = nullptr;
+  if (pos == functions_to_include.end()) {
+    fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
+    functions_to_include.insert(fun_to_precalc);
+  } else {
+    fun_to_precalc = *pos;
+  }
+
+  if (fun_to_precalc->args_to_use.find(arg->getArgNo()) ==
+      fun_to_precalc->args_to_use.end()) {
+    // else: nothing to do, this was already visited
+    for (auto u : func->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
+        errs() << "Visit\n";
+        call->dump();
+        tainted_values.insert(call);
+        visited_values.insert(call); // no need to do something with it just
+                                     // make shure to visit the args
+        auto *operand = call->getArgOperand(arg->getArgNo());
+        tainted_values.insert(operand);
+        continue;
+      }
+      errs() << "Support for analyzing this Value is not implemented yet\n";
+      u->dump();
+      assert(false);
+    }
+    fun_to_precalc->args_to_use.insert(arg->getArgNo());
+  }
 }
