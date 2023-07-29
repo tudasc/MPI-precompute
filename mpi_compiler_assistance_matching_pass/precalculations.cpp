@@ -45,6 +45,9 @@ void Precalculations::add_precalculations(
   }
 
   find_all_tainted_vals();
+  for (auto f : functions_to_include) {
+    f->initialize_copy();
+  }
 }
 
 void Precalculations::find_all_tainted_vals() {
@@ -165,33 +168,48 @@ void Precalculations::visit_val(llvm::StoreInst *store) {
   insert_tainted_value(store->getValueOperand());
 }
 
-void Precalculations::visit_val(llvm::Argument *arg) {
-  assert(visited_values.find(arg) != visited_values.end());
-
-  auto *func = arg->getParent();
+std::shared_ptr<FunctionToPrecalculate>
+Precalculations::insert_functions_to_include(llvm::Function *func) {
 
   auto pos =
       std::find_if(functions_to_include.begin(), functions_to_include.end(),
                    [&func](const auto p) { return p->F_orig == func; });
 
-  std::shared_ptr<FunctionToPrecalculate> fun_to_precalc = nullptr;
   if (pos == functions_to_include.end()) {
-    fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
+    auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
     functions_to_include.insert(fun_to_precalc);
-  } else {
-    fun_to_precalc = *pos;
-  }
-
-  if (fun_to_precalc->args_to_use.find(arg->getArgNo()) ==
-      fun_to_precalc->args_to_use.end()) {
-    // else: nothing to do, this was already visited
     for (auto u : func->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
         insert_tainted_value(call);
         visited_values.insert(call); // no need to do something with it just
-                                     // make shure to visit the args
+                                     // make shure it is included
+        continue;
+      }
+      errs() << "Support for analyzing this Value is not implemented yet\n";
+      u->dump();
+      assert(false);
+    }
+
+    return fun_to_precalc;
+  } else {
+    return *pos;
+  }
+}
+
+void Precalculations::visit_val(llvm::Argument *arg) {
+  assert(visited_values.find(arg) != visited_values.end());
+
+  auto *func = arg->getParent();
+
+  auto fun_to_precalc = insert_functions_to_include(func);
+
+  if (fun_to_precalc->args_to_use.find(arg->getArgNo()) ==
+      fun_to_precalc->args_to_use.end()) {
+    // else: nothing to do, this was already visited
+    for (auto u : func->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
         auto *operand = call->getArgOperand(arg->getArgNo());
         insert_tainted_value(operand);
         continue;
@@ -303,7 +321,14 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
             insert_tainted_value(term);
           }
         }
+      } else {
+        // BB is function entry block
+        insert_functions_to_include(bb->getParent());
       }
     }
   }
+}
+
+void FunctionToPrecalculate::initialize_copy() {
+  F_copy = CloneFunction(F_orig, old_new_map, cloned_code_info);
 }

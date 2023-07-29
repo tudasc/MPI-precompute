@@ -35,6 +35,10 @@ public:
   std::set<unsigned int> args_to_use = {};
   llvm::Function *F_orig;
   llvm::Function *F_copy;
+  llvm::ValueToValueMapTy old_new_map;
+  llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we dont need it
+
+  void initialize_copy();
 };
 
 // TODO different interface
@@ -56,6 +60,8 @@ public:
   std::set<llvm::Value *> visited_values;
 
   void insert_tainted_value(llvm::Value *v);
+  std::shared_ptr<FunctionToPrecalculate>
+  insert_functions_to_include(llvm::Function *func);
 
   void find_all_tainted_vals();
   void visit_val(llvm::Value *v);
