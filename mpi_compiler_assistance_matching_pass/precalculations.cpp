@@ -98,16 +98,19 @@ void Precalculations::visit_val(llvm::Value *v) {
     visit_val(arg);
     return;
   }
+  if (auto *call = dyn_cast<CallBase>(v)) {
+    visit_val(call);
+    return;
+  }
 
   errs() << "Support for analyzing this Value is not implemented yet\n";
   v->dump();
   assert(false);
 }
 
-void Precalculations::visit_val(llvm::AllocaInst *alloca) {
-  assert(visited_values.find(alloca) != visited_values.end());
-
-  for (auto u : alloca->users()) {
+void Precalculations::visit_ptr(llvm::Value *ptr) {
+  assert(ptr->getType()->isPointerTy());
+  for (auto u : ptr->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
       tainted_values.insert(s);
       continue;
@@ -115,10 +118,18 @@ void Precalculations::visit_val(llvm::AllocaInst *alloca) {
     if (auto *l = dyn_cast<LoadInst>(u)) {
       continue; // no need to take care about this
     }
+    if (auto *call = dyn_cast<CallBase>(u)) {
+      visit_call_from_ptr(call, ptr);
+    }
     errs() << "Support for analyzing this Value is not implemented yet\n";
     u->dump();
     assert(false);
   }
+}
+
+void Precalculations::visit_val(llvm::AllocaInst *alloca) {
+  assert(visited_values.find(alloca) != visited_values.end());
+  visit_ptr(alloca);
 }
 
 void Precalculations::visit_val(llvm::StoreInst *store) {
@@ -165,5 +176,76 @@ void Precalculations::visit_val(llvm::Argument *arg) {
       assert(false);
     }
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
+  }
+}
+
+void Precalculations::visit_val(llvm::CallBase *call) {
+  assert(visited_values.find(call) != visited_values.end());
+
+  // check if this is tainted as the ret val is used
+
+  std::set<Value *> users_of_retval;
+  std::transform(call->use_begin(), call->use_end(),
+                 std::inserter(users_of_retval, users_of_retval.begin()),
+                 [](const auto &u) { return dyn_cast<Value>(&u); });
+  std::set<Value *> tainred_users_of_retval;
+  std::set_union(
+      users_of_retval.begin(), users_of_retval.end(), tainted_values.begin(),
+      tainted_values.end(),
+      std::inserter(tainred_users_of_retval, tainred_users_of_retval.begin()));
+  bool need_return_val = not tainred_users_of_retval.empty();
+  assert(need_return_val);
+
+  assert(call->getCalledFunction()->willReturn());
+  for (auto bb = call->getCalledFunction()->begin();
+       bb != call->getCalledFunction()->end(); ++bb) {
+    if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
+      tainted_values.insert(ret);
+    }
+  }
+}
+
+void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
+                                          llvm::Value *ptr) {
+  assert(visited_values.find(ptr) != visited_values.end());
+
+  errs() << "Visit\n";
+  call->dump();
+
+  std::set<unsigned int> ptr_given_as_arg;
+  for (unsigned int i = 0; i < call->arg_size(); ++i) {
+    if (call->getArgOperand(i) == ptr) {
+      ptr_given_as_arg.insert(i);
+    }
+  }
+  assert(not ptr_given_as_arg.empty());
+
+  auto *func = call->getCalledFunction();
+
+  if (func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank) {
+    // we know it is save to execute these "readonly" funcs
+    if (*ptr_given_as_arg.begin() == 0 && ptr_given_as_arg.size() == 1) {
+      // nothing to do only reads the communicator
+    } else {
+      visited_values.insert(call);
+      tainted_values.insert(call);
+    }
+  }
+
+  for (auto arg_num : ptr_given_as_arg) {
+    auto *arg = func->getArg(arg_num);
+    if (arg->hasAttribute(Attribute::NoCapture) &&
+        arg->hasAttribute(Attribute::ReadOnly)) {
+      continue; // nothing to do reading the val is allowed
+    }
+    if (func->isDeclaration()) {
+      errs() << "Can not analyze usage of external function:\n";
+      func->dump();
+      assert(false);
+    } else {
+      tainted_values.insert(arg);
+      visited_values.insert(arg);
+      visit_ptr(arg);
+    }
   }
 }

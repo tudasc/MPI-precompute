@@ -57,6 +57,9 @@ private:
   void visit_val(llvm::AllocaInst *alloca);
   void visit_val(llvm::StoreInst *store);
   void visit_val(llvm::Argument *arg);
+  void visit_val(llvm::CallBase *call);
+  void visit_call_from_ptr(llvm::CallBase *call, llvm::Value *ptr);
+  void visit_ptr(llvm::Value *ptr);
 };
 
 #endif // MACH_PRECALCULATIONS_H_
