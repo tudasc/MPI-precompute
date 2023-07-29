@@ -39,6 +39,8 @@ public:
   llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we dont need it
 
   void initialize_copy();
+
+  void prune_copy(const std::set<llvm::Value *> &tainted_values);
 };
 
 // TODO different interface

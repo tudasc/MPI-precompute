@@ -49,10 +49,15 @@ void Precalculations::add_precalculations(
   for (auto f : functions_to_include) {
     f->initialize_copy();
   }
-  // dont fuse this loops we first need to initialize the copb before changing
+  // dont fuse this loops we first need to initialize the copy before changing
   // calls
   for (auto f : functions_to_include) {
     replace_calls_in_copy(f);
+  }
+  // one MAY be able to fuse these 2 loops though
+  // TODO evaluate if true
+  for (auto f : functions_to_include) {
+    f->prune_copy(tainted_values);
   }
 }
 
@@ -425,4 +430,57 @@ void Precalculations::replace_calls_in_copy(
       } // else pass arg normally
     }
   }
+}
+
+// remove all unnecessary instruction
+void FunctionToPrecalculate::prune_copy(
+    const std::set<llvm::Value *> &tainted_values) {
+
+  // we neet to get the reverse mapping
+  std::map<Value *, Value *> new_to_old_map;
+
+  for (auto v : old_new_map) {
+    Value *old_v = const_cast<Value *>(v.first);
+    Value *new_v = v.second;
+    new_to_old_map.insert(std::make_pair(new_v, old_v));
+  }
+
+  std::vector<Instruction *> to_prune;
+
+  // first  gather all so that the iterator does not get broken if we remove
+  // stuff
+
+  for (auto I = inst_begin(F_copy), E = inst_end(F_copy); I != E; ++I) {
+
+    Instruction *inst = &*I;
+    auto old_v = new_to_old_map[inst];
+    if (tainted_values.find(old_v) == tainted_values.end()) {
+      to_prune.push_back(inst);
+    }
+  }
+
+  // remove stuff
+  for (auto inst : to_prune) {
+    if (inst->isTerminator()) {
+      // if this terminatro was not tainted: we an immediately return from this
+      // function
+      IRBuilder<> builder = IRBuilder<>(inst);
+      if (inst->getFunction()->getReturnType()->isVoidTy()) {
+        builder.CreateRetVoid();
+      } else {
+        builder.CreateRet(
+            Constant::getNullValue(inst->getFunction()->getReturnType()));
+      }
+    }
+    inst->eraseFromParent();
+  }
+  /*
+    // and erase
+    for (auto inst : to_prune) {
+      inst->eraseFromParent();
+    }
+    */
+  // TODO remove all unreachable blocks that may be left over
+
+  // one can now also combine blocks
 }
