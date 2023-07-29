@@ -14,7 +14,23 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 
+#include "llvm/IR/Module.h"
+
 #ifndef MACH_PRECALCULATIONS_H_
 #define MACH_PRECALCULATIONS_H_
+
+class Precalculations {
+public:
+  Precalculations(llvm::Module &M, llvm::Function *entry_point)
+      : M(M), entry_point(entry_point){};
+
+  void add_precalculations(std::vector<llvm::Value *> to_precompute);
+
+private:
+  llvm::Module &M;
+  llvm::Function *entry_point;
+};
+
+void add_precalculations(llvm::Module &M, llvm::Function *entry_point);
 
 #endif // MACH_PRECALCULATIONS_H_

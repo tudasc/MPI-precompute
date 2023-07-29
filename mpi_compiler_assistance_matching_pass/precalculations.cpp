@@ -14,9 +14,9 @@
  limitations under the License.
  */
 
-#include "precalculation.h"
 #include "analysis_results.h"
 #include "conflict_detection.h"
+#include "precalculation.h"
 
 #include "implementation_specific.h"
 #include "mpi_functions.h"
@@ -26,5 +26,3 @@
 
 #include "debug.h"
 using namespace llvm;
-
-
