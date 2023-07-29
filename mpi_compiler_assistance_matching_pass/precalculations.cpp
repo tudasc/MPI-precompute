@@ -37,10 +37,10 @@ void Precalculations::add_precalculations(
     auto *tag = get_tag_value(call, is_send);
     auto *src = get_src_value(call, is_send);
 
-    tainted_values.insert(tag);
-    tainted_values.insert(src);
+    insert_tainted_value(tag);
+    insert_tainted_value(src);
     // TODO precompute comm as well?
-    tainted_values.insert(call);
+    insert_tainted_value(call);
     visited_values.insert(call);
   }
 
@@ -76,7 +76,7 @@ void Precalculations::visit_val(llvm::Value *v) {
     return;
   }
   if (auto *l = dyn_cast<LoadInst>(v)) {
-    tainted_values.insert(l->getPointerOperand());
+    insert_tainted_value(l->getPointerOperand());
     return;
   }
   if (auto *a = dyn_cast<AllocaInst>(v)) {
@@ -90,8 +90,16 @@ void Precalculations::visit_val(llvm::Value *v) {
   if (auto *op = dyn_cast<BinaryOperator>(v)) {
     // arithmetic
     // TODO do we need to exclude some opcodes?
-    tainted_values.insert(op->getOperand(0));
-    tainted_values.insert(op->getOperand(1));
+    assert(op->getNumOperands() == 2);
+    insert_tainted_value(op->getOperand(0));
+    insert_tainted_value(op->getOperand(1));
+    return;
+  }
+  if (auto *op = dyn_cast<CmpInst>(v)) {
+    // cmp
+    assert(op->getNumOperands() == 2);
+    insert_tainted_value(op->getOperand(0));
+    insert_tainted_value(op->getOperand(1));
     return;
   }
   if (auto *arg = dyn_cast<Argument>(v)) {
@@ -112,7 +120,7 @@ void Precalculations::visit_ptr(llvm::Value *ptr) {
   assert(ptr->getType()->isPointerTy());
   for (auto u : ptr->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
-      tainted_values.insert(s);
+      insert_tainted_value(s);
       continue;
     }
     if (auto *l = dyn_cast<LoadInst>(u)) {
@@ -138,7 +146,7 @@ void Precalculations::visit_val(llvm::StoreInst *store) {
 
   assert(tainted_values.find(store->getPointerOperand()) !=
          tainted_values.end());
-  tainted_values.insert(store->getValueOperand());
+  insert_tainted_value(store->getValueOperand());
 }
 
 void Precalculations::visit_val(llvm::Argument *arg) {
@@ -165,11 +173,11 @@ void Precalculations::visit_val(llvm::Argument *arg) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
-        tainted_values.insert(call);
+        insert_tainted_value(call);
         visited_values.insert(call); // no need to do something with it just
                                      // make shure to visit the args
         auto *operand = call->getArgOperand(arg->getArgNo());
-        tainted_values.insert(operand);
+        insert_tainted_value(operand);
         continue;
       }
       errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -201,7 +209,7 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   for (auto bb = call->getCalledFunction()->begin();
        bb != call->getCalledFunction()->end(); ++bb) {
     if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
-      tainted_values.insert(ret);
+      insert_tainted_value(ret);
     }
   }
 }
@@ -229,7 +237,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       // nothing to do only reads the communicator
     } else {
       visited_values.insert(call);
-      tainted_values.insert(call);
+      insert_tainted_value(call);
     }
     return;
   }
@@ -245,9 +253,41 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       func->dump();
       assert(false);
     } else {
-      tainted_values.insert(arg);
+      insert_tainted_value(arg);
       visited_values.insert(arg);
       visit_ptr(arg);
+    }
+  }
+}
+
+void Precalculations::insert_tainted_value(llvm::Value *v) {
+  if (tainted_values.insert(v).second) {
+    // only if not already in set
+    if (auto *inst = dyn_cast<Instruction>(v)) {
+      auto bb = inst->getParent();
+      if (not bb->isEntryBlock()) {
+        for (auto pred_bb : predecessors(bb)) {
+          auto *term = pred_bb->getTerminator();
+          if (term->getNumSuccessors() > 1) {
+            if (auto *branch = dyn_cast<BranchInst>(term)) {
+              assert(branch->isConditional());
+              insert_tainted_value(branch->getCondition());
+              insert_tainted_value(branch);
+              visited_values.insert(branch);
+            } else {
+              errs() << "Error analyzing CFG:\n";
+              term->dump();
+              assert(false);
+            }
+          } else {
+            assert(dyn_cast<BranchInst>(term));
+            assert(dyn_cast<BranchInst>(term)->isConditional() == false);
+            assert(term->getSuccessor(0) == bb);
+            visited_values.insert(term);
+            insert_tainted_value(term);
+          }
+        }
+      }
     }
   }
 }

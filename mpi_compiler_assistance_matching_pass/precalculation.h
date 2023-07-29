@@ -34,8 +34,10 @@ public:
 
   std::set<unsigned int> args_to_use = {};
   llvm::Function *F_orig;
+  llvm::Function *F_copy;
 };
 
+// TODO different interface
 class Precalculations {
 public:
   Precalculations(llvm::Module &M, llvm::Function *entry_point)
@@ -43,7 +45,7 @@ public:
 
   void add_precalculations(const std::vector<llvm::CallBase *> &to_precompute);
 
-private:
+public:
   llvm::Module &M;
   llvm::Function *entry_point;
 
@@ -51,6 +53,8 @@ private:
   std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
   std::set<llvm::Value *> tainted_values;
   std::set<llvm::Value *> visited_values;
+
+  void insert_tainted_value(llvm::Value *v);
 
   void find_all_tainted_vals();
   void visit_val(llvm::Value *v);
