@@ -64,6 +64,10 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 
     } else if (f->getName().equals("MPI_Init_thread")) {
       result->mpi_init_thread = f;
+    } else if (f->getName().equals("MPI_Comm_rank")) {
+      result->mpi_comm_rank = f;
+    } else if (f->getName().equals("MPI_Comm_size")) {
+      result->mpi_comm_size = f;
 
       // sync functions:
     } else if (f->getName().equals("MPI_Finalize")) {

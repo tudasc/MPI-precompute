@@ -55,6 +55,8 @@ struct mpi_functions {
   llvm::Function *mpi_init = nullptr;
   llvm::Function *mpi_init_thread = nullptr;
   llvm::Function *mpi_finalize = nullptr;
+  llvm::Function *mpi_comm_rank = nullptr;
+  llvm::Function *mpi_comm_size = nullptr;
 
   llvm::Function *mpi_send = nullptr;
   llvm::Function *mpi_Bsend = nullptr;

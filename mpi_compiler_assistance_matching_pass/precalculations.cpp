@@ -230,6 +230,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       visited_values.insert(call);
       tainted_values.insert(call);
     }
+    return;
   }
 
   for (auto arg_num : ptr_given_as_arg) {
