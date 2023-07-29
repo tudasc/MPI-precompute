@@ -120,6 +120,7 @@ void Precalculations::visit_ptr(llvm::Value *ptr) {
     }
     if (auto *call = dyn_cast<CallBase>(u)) {
       visit_call_from_ptr(call, ptr);
+      continue;
     }
     errs() << "Support for analyzing this Value is not implemented yet\n";
     u->dump();
