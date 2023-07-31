@@ -141,6 +141,10 @@ void Precalculations::visit_val(llvm::Value *v) {
     visit_val(call);
     return;
   }
+  if (auto *phi = dyn_cast<PHINode>(v)) {
+    visit_val(phi);
+    return;
+  }
 
   errs() << "Support for analyzing this Value is not implemented yet\n";
   v->dump();
@@ -170,6 +174,15 @@ void Precalculations::visit_ptr(llvm::Value *ptr) {
 void Precalculations::visit_val(llvm::AllocaInst *alloca) {
   assert(visited_values.find(alloca) != visited_values.end());
   visit_ptr(alloca);
+}
+
+void Precalculations::visit_val(llvm::PHINode *phi) {
+  assert(visited_values.find(phi) != visited_values.end());
+
+  for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
+    auto v = phi->getIncomingValue(i);
+    tainted_values.insert(v);
+  }
 }
 
 void Precalculations::visit_val(llvm::StoreInst *store) {
@@ -288,6 +301,13 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
     return;
   }
 
+  if (func->isIntrinsic() &&
+      (func->getIntrinsicID() == Intrinsic::lifetime_start ||
+       func->getIntrinsicID() == Intrinsic::lifetime_end)) {
+    // ignore lifetime intrinsics
+    return;
+  }
+
   for (auto arg_num : ptr_given_as_arg) {
     auto *arg = func->getArg(arg_num);
     if (arg->hasAttribute(Attribute::NoCapture) &&
@@ -398,7 +418,9 @@ void Precalculations::replace_calls_in_copy(
       IRBuilder<> builder = IRBuilder<>(call);
       auto new_call =
           builder.CreateCall(mpi_func->optimized.register_send_tag, {src, tag});
-      ReplaceInstWithInst(call, new_call);
+      call->replaceAllUsesWith(new_call);
+      call->eraseFromParent();
+
       continue;
     }
     if (callee == mpi_func->mpi_recv_init) {
@@ -408,7 +430,9 @@ void Precalculations::replace_calls_in_copy(
       IRBuilder<> builder = IRBuilder<>(call);
       auto new_call =
           builder.CreateCall(mpi_func->optimized.register_recv_tag, {src, tag});
-      ReplaceInstWithInst(call, new_call);
+      call->replaceAllUsesWith(new_call);
+      call->eraseFromParent();
+
       continue;
     }
     // end handling calls to MPI
@@ -482,7 +506,6 @@ void FunctionToPrecalculate::prune_copy(
     }
     */
   // TODO remove all unreachable blocks that may be left over
-
   // one can now also combine blocks
 }
 

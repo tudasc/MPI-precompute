@@ -68,6 +68,7 @@ public:
   void find_all_tainted_vals();
   void visit_val(llvm::Value *v);
   void visit_val(llvm::AllocaInst *alloca);
+  void visit_val(llvm::PHINode *phi);
   void visit_val(llvm::StoreInst *store);
   void visit_val(llvm::Argument *arg);
   void visit_val(llvm::CallBase *call);
