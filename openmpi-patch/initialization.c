@@ -94,11 +94,15 @@ int check_if_send_envelope_was_registered(int dest, int tag, bool is_send) {
     current_elem = nxt_elem;
     nxt_elem = current_elem->nxt;
   }
+  int my_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
   if (current_elem->tag == tag && current_elem->dest == dest) {
     printf("matching registered envelope\n");
   } else {
     printf("NOT matching registered envelope\n");
+    printf("Rank: %d : registered (%d,%d) , used: (%d,%d)\n", my_rank,
+           current_elem->tag, current_elem->dest, tag, dest);
   }
 
   // remove from list
