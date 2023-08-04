@@ -291,12 +291,16 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   auto *func = call->getCalledFunction();
 
   if (func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank) {
-    // we know it is save to execute these "readonly" funcs
+    // we know it is safe to execute these "readonly" funcs
     if (*ptr_given_as_arg.begin() == 0 && ptr_given_as_arg.size() == 1) {
       // nothing to do only reads the communicator
     } else {
+      // the needed value is the result of reading the comm
+      assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
       visited_values.insert(call);
       insert_tainted_value(call);
+      insert_tainted_value(
+          call->getArgOperand(0)); // we also need to keep the comm
     }
     return;
   }
@@ -371,7 +375,7 @@ void Precalculations::replace_calls_in_copy(
 
   std::vector<CallBase *> to_replace;
 
-  // first  gather calls that need replacement so that the iteration does not
+  // first  gather calls that need replacement so that the iterator does not
   // get broken if we remove stuff
 
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
@@ -414,7 +418,6 @@ void Precalculations::replace_calls_in_copy(
     if (callee == mpi_func->mpi_send_init) {
       auto tag = get_tag_value(call, true);
       auto src = get_src_value(call, true);
-      // dest, tag
       IRBuilder<> builder = IRBuilder<>(call);
       auto new_call =
           builder.CreateCall(mpi_func->optimized.register_send_tag, {src, tag});
@@ -426,7 +429,6 @@ void Precalculations::replace_calls_in_copy(
     if (callee == mpi_func->mpi_recv_init) {
       auto tag = get_tag_value(call, true);
       auto src = get_src_value(call, true);
-      // dest, tag
       IRBuilder<> builder = IRBuilder<>(call);
       auto new_call =
           builder.CreateCall(mpi_func->optimized.register_recv_tag, {src, tag});
@@ -461,7 +463,7 @@ void Precalculations::replace_calls_in_copy(
 void FunctionToPrecalculate::prune_copy(
     const std::set<llvm::Value *> &tainted_values) {
 
-  // we neet to get the reverse mapping
+  // we need to get the reverse mapping
   std::map<Value *, Value *> new_to_old_map;
 
   for (auto v : old_new_map) {
@@ -472,8 +474,8 @@ void FunctionToPrecalculate::prune_copy(
 
   std::vector<Instruction *> to_prune;
 
-  // first  gather all so that the iterator does not get broken if we remove
-  // stuff
+  // first  gather all instructions, so that the iterator does not get broken if
+  // we remove// stuff
 
   for (auto I = inst_begin(F_copy), E = inst_end(F_copy); I != E; ++I) {
 
@@ -487,7 +489,7 @@ void FunctionToPrecalculate::prune_copy(
   // remove stuff
   for (auto inst : to_prune) {
     if (inst->isTerminator()) {
-      // if this terminatro was not tainted: we an immediately return from this
+      // if this terminator was not tainted: we can immediately return from this
       // function
       IRBuilder<> builder = IRBuilder<>(inst);
       if (inst->getFunction()->getReturnType()->isVoidTy()) {
@@ -506,6 +508,7 @@ void FunctionToPrecalculate::prune_copy(
     }
     */
   // TODO remove all unreachable blocks that may be left over
+  // this should be done later by a dead Code elimination pass
   // one can now also combine blocks
 }
 
