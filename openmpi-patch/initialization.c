@@ -112,6 +112,8 @@ int check_envelope_list_for_conflicts(bool is_send) {
                 0; // ends inner while as we have found a conflict
           }
         }
+        current_elem_inner = nxt_elem_inner;
+        nxt_elem_inner = current_elem_inner->nxt;
       }
 
       current_elem->is_conflict_free = is_conflict_free;
