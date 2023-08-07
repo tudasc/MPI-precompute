@@ -89,12 +89,8 @@ int check_envelope_list_for_conflicts(bool is_send) {
 
   struct envelope_list_entry *current_elem = list_to_use;
   struct envelope_list_entry *nxt_elem = list_to_use->nxt;
-  // correct abort of while loop without dereferencing null:
-  if (list_to_use->nxt == NULL) {
-    nxt_elem = list_to_use;
-  }
 
-  while (nxt_elem->nxt != NULL) {
+  while (nxt_elem != NULL) {
     if (current_elem->is_conflict_free == -1) {
       int is_conflict_free = 1;
       // inner loop:
@@ -102,7 +98,7 @@ int check_envelope_list_for_conflicts(bool is_send) {
       struct envelope_list_entry *current_elem_inner = list_to_use;
       struct envelope_list_entry *nxt_elem_inner = list_to_use->nxt;
 
-      while (nxt_elem_inner->nxt != NULL && is_conflict_free) {
+      while (nxt_elem_inner != NULL && is_conflict_free) {
         if (current_elem_inner != current_elem) {
           // check for conflict
           if (current_elem->dest == current_elem_inner->dest &&
@@ -118,6 +114,7 @@ int check_envelope_list_for_conflicts(bool is_send) {
 
       current_elem->is_conflict_free = is_conflict_free;
     }
+    assert(current_elem->is_conflict_free != -1);
     current_elem = nxt_elem;
     nxt_elem = current_elem->nxt;
   }
