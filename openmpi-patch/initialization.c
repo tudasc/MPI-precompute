@@ -407,7 +407,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   MPI_Type_size_x(datatype, &type_size);
   MPI_Type_get_extent_x(datatype, &lb, &type_extent);
 
-  check_if_envelope_was_registered(dest, tag, is_send_request);
+  int conflicts = check_if_envelope_was_registered(dest, tag, is_send_request);
+  assert(conflicts != -1);
 #ifndef NDEBUG
   // only if assertion checking is on
 #endif
@@ -546,22 +547,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->chekcking_request = MPI_REQUEST_NULL;
 #endif
 
-  // only skip matching if the user provided the corresponding info
-  int conflicts = 1;
-  char info_send_strategy[MPI_MAX_INFO_VAL];
-  int info_flag;
-  if (info != MPI_INFO_NULL) {
-    MPI_Info_get(info, "skip_matching", MPI_MAX_INFO_VAL, info_send_strategy,
-                 &info_flag);
-  } else {
-    info_flag = 0;
-  }
-  if (info_flag) {
-    // in case of 0: empty string
-    conflicts = info_send_strategy[0] == 0 || info_send_strategy[0] == '0' ||
-                info_send_strategy == "FALSE" || info_send_strategy == "false";
-    // all other characters are considered true
-  }
 
 #ifdef CHECK_FOR_MATCHING_CONFLICTS
   conflicts = conflicts || check_for_conflicting_request(request);
