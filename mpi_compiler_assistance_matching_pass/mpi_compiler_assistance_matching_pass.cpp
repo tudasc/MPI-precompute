@@ -101,11 +101,11 @@ struct MPICompilerAssistanceMatchingPass
 
     analysis_results = new RequiredAnalysisResults(AM, M);
 
-    FrontendPluginData::create_instance(M);
+    // FrontendPluginData::create_instance(M);
 
     // collect all Persistent Comm Operations
-    std::vector<std::shared_ptr<PersistentMPIInitCall>> send_init_list;
-    std::vector<std::shared_ptr<PersistentMPIInitCall>> recv_init_list;
+    // std::vector<std::shared_ptr<PersistentMPIInitCall>> send_init_list;
+    // std::vector<std::shared_ptr<PersistentMPIInitCall>> recv_init_list;
     std::vector<CallBase *> combined_init_list;
 
     if (mpi_func->mpi_send_init) {
@@ -114,8 +114,8 @@ struct MPICompilerAssistanceMatchingPass
           if (call->getCalledFunction() == mpi_func->mpi_send_init) {
             // not that I think anyone will pass a ptr to MPI func into another
             // func, but better save than sorry
-            send_init_list.push_back(
-                PersistentMPIInitCall::get_PersistentMPIInitCall(call));
+            // send_init_list.push_back(
+            //    PersistentMPIInitCall::get_PersistentMPIInitCall(call));
             combined_init_list.push_back(call);
           }
         }
@@ -125,8 +125,8 @@ struct MPICompilerAssistanceMatchingPass
       for (auto *u : mpi_func->mpi_recv_init->users()) {
         if (auto *call = dyn_cast<CallBase>(u)) {
           if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
-            recv_init_list.push_back(
-                PersistentMPIInitCall::get_PersistentMPIInitCall(call));
+            // recv_init_list.push_back(
+            //     PersistentMPIInitCall::get_PersistentMPIInitCall(call));
             combined_init_list.push_back(call);
           }
         }
@@ -139,18 +139,17 @@ struct MPICompilerAssistanceMatchingPass
     auto precalcuation = Precalculations(M, main_func);
     precalcuation.add_precalculations(combined_init_list);
 
-    errs() << "gathered " << send_init_list.size() << " send Operations \nand "
-           << recv_init_list.size() << " receive Operations\n";
-
-    bool replacement = !send_init_list.empty() && !recv_init_list.empty();
+    bool replacement = !combined_init_list.empty();
     // otherwise nothing should be done
     if (replacement) {
 
-      for (auto c : send_init_list) {
-        c->perform_replacement();
-      }
-      for (auto c : recv_init_list) {
-        c->perform_replacement();
+      for (auto c : combined_init_list) {
+        if (c->getCalledFunction() == mpi_func->mpi_recv_init) {
+          replace_init_call(c, mpi_func->optimized.mpi_recv_init_info);
+        }
+        if (c->getCalledFunction() == mpi_func->mpi_send_init) {
+          replace_init_call(c, mpi_func->optimized.mpi_send_init_info);
+        }
       }
 
       replace_request_handling_calls(M);
@@ -158,19 +157,20 @@ struct MPICompilerAssistanceMatchingPass
       add_finalize(M);
     }
 
-    errs() << "Successfully executed the pass\n\n";
     delete mpi_func;
     ImplementationSpecifics::delete_instance();
-    FrontendPluginData::delete_instance();
+    // FrontendPluginData::delete_instance();
 
     delete analysis_results;
+
+    M.dump();
 
 #ifndef NDEBUG
     auto has_error = verifyModule(M, &errs(), nullptr);
     assert(!has_error);
 #endif
 
-    // M.dump();
+    errs() << "Successfully executed the pass\n\n";
 
     if (replacement) {
       return PreservedAnalyses::none();

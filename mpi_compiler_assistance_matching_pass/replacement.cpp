@@ -103,8 +103,7 @@ void replace_call(CallBase *call, Function *func) {
   // call->eraseFromParent();
 }
 
-void replace_init_call(llvm::CallBase *call, llvm::Function *func,
-                       llvm::Value *runtime_check_result) {
+void replace_init_call(llvm::CallBase *call, llvm::Function *func) {
 
   // one could assert that the only addition is the info object
   assert(call->getFunctionType() != func->getFunctionType());
@@ -141,11 +140,12 @@ void replace_init_call(llvm::CallBase *call, llvm::Function *func,
                      mpi_func->mpi_info_set, {info_obj, key, value});
 
   // enable skipping of matching
+  /*
   key = strings->get_string_ptr("skip_matching");
   builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
                      mpi_func->mpi_info_set,
                      {info_obj, key, runtime_check_result});
-
+*/
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
     args.push_back(call->getArgOperand(i));
   }

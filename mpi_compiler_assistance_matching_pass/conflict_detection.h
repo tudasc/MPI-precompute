@@ -17,6 +17,8 @@
 #ifndef MACH_CONFLICT_DETECTION_H_
 #define MACH_CONFLICT_DETECTION_H_
 
+// TODO DEPRECATED
+
 #include "frontend_plugin_data.h"
 #include "llvm/IR/InstrTypes.h"
 

@@ -64,6 +64,9 @@ public:
   void insert_tainted_value(llvm::Value *v);
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
+  // TODO we need some kind of heuristic to check if precalculation of all msg
+  // tags seems to be worth it
+  //  or if e.g. for some reason a compute heavy loop was included as well
 
   void find_all_tainted_vals();
   void visit_val(llvm::Value *v);

@@ -56,8 +56,7 @@ bool add_finalize(llvm::Module &M);
 
 void replace_request_handling_calls(llvm::Module &M);
 
-void replace_init_call(llvm::CallBase *call, llvm::Function *func,
-                       llvm::Value *runtime_check_result);
+void replace_init_call(llvm::CallBase *call, llvm::Function *func);
 
 // returns the llvm value that represents is the result of the runtime check
 llvm::Value *insert_runtime_check(llvm::Value *val_a, llvm::Value *val_b);
