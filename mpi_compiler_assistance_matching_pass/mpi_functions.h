@@ -49,6 +49,7 @@ struct mpiopt_functions {
   llvm::Function *finalize = nullptr;
   llvm::Function *register_send_tag = nullptr;
   llvm::Function *register_recv_tag = nullptr;
+  llvm::Function *check_registered_conflicts = nullptr;
 };
 
 struct mpi_functions {

@@ -49,6 +49,8 @@ OMPI_DECLSPEC int MPIOPT_Request_free(MPI_Request *request);
 OMPI_DECLSPEC int MPIOPT_Register_send_envelope(int dest, int tag);
 OMPI_DECLSPEC int MPIOPT_Register_recv_envelope(int dest, int tag);
 
+OMPI_DECLSPEC void MPIOPT_check_registered_envelopes_for_conflict();
+
 OMPI_DECLSPEC void MPIOPT_INIT();
 OMPI_DECLSPEC void MPIOPT_FINALIZE();
 OMPI_DECLSPEC void MPIOPT_Register_Communicator(MPI_Comm comm);

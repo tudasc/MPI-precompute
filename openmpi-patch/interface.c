@@ -30,6 +30,7 @@ int MPIOPT_Send_init_x(const void *buf, int count, MPI_Datatype datatype,
                        MPI_Info info) {
 
   if (dest == MPI_PROC_NULL || comm == MPI_COMM_NULL || comm == MPI_COMM_SELF) {
+    check_if_envelope_was_registered(dest, tag, true);
     return MPI_Send_init(buf, count, datatype, dest, tag, comm, request);
   } else {
 
@@ -51,6 +52,7 @@ int MPIOPT_Recv_init_x(void *buf, int count, MPI_Datatype datatype, int source,
                        MPI_Info info) {
   if (source == MPI_PROC_NULL || comm == MPI_COMM_NULL ||
       comm == MPI_COMM_SELF) {
+    check_if_envelope_was_registered(source, tag, false);
     return MPI_Recv_init(buf, count, datatype, source, tag, comm, request);
   } else {
     *request = malloc(sizeof(MPIOPT_Request));

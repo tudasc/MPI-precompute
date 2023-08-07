@@ -336,6 +336,11 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
         cast<Function>(M.getOrInsertFunction("MPIOPT_FINALIZE", ftype, {})
                            .getCallee()
                            ->stripPointerCasts());
+    result->optimized.check_registered_conflicts = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_check_registered_envelopes_for_conflict",
+                              ftype, {})
+            .getCallee()
+            ->stripPointerCasts());
   }
   auto *ftype = FunctionType::get(
       Type::getInt32Ty(M.getContext()),

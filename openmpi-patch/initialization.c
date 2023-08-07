@@ -21,6 +21,7 @@ int dummy_int = 0;
 struct envelope_list_entry {
   int tag;
   int dest;
+  int is_conflict_free;
   struct envelope_list_entry *nxt;
 };
 
@@ -62,6 +63,7 @@ int MPIOPT_Register_send_envelope(int dest, int tag) {
   new_elem->nxt = send_envelopes;
   new_elem->tag = tag;
   new_elem->dest = dest;
+  new_elem->is_conflict_free = -1;
   send_envelopes = new_elem;
 }
 
@@ -71,10 +73,64 @@ int MPIOPT_Register_recv_envelope(int dest, int tag) {
   new_elem->nxt = recv_envelopes;
   new_elem->tag = tag;
   new_elem->dest = dest;
+  new_elem->is_conflict_free = -1;
   recv_envelopes = new_elem;
 }
 
-int check_if_send_envelope_was_registered(int dest, int tag, bool is_send) {
+int check_envelope_list_for_conflicts(bool is_send) {
+
+  struct envelope_list_entry *list_to_use = recv_envelopes;
+  if (is_send) {
+    list_to_use = send_envelopes;
+  }
+  if (list_to_use->nxt == NULL) {
+    printf("Empty registration list\n");
+  }
+
+  struct envelope_list_entry *current_elem = list_to_use;
+  struct envelope_list_entry *nxt_elem = list_to_use->nxt;
+  // correct abort of while loop without dereferencing null:
+  if (list_to_use->nxt == NULL) {
+    nxt_elem = list_to_use;
+  }
+
+  while (nxt_elem->nxt != NULL) {
+    if (current_elem->is_conflict_free == -1) {
+      int is_conflict_free = 1;
+      // inner loop:
+      // observe if there is a conflict
+      struct envelope_list_entry *current_elem_inner = list_to_use;
+      struct envelope_list_entry *nxt_elem_inner = list_to_use->nxt;
+
+      while (nxt_elem_inner->nxt != NULL && is_conflict_free) {
+        if (current_elem_inner != current_elem) {
+          // check for conflict
+          if (current_elem->dest == current_elem_inner->dest &&
+              current_elem->tag && current_elem_inner->tag) {
+            current_elem_inner->is_conflict_free = 0;
+            is_conflict_free =
+                0; // ends inner while as we have found a conflict
+          }
+        }
+      }
+
+      current_elem->is_conflict_free = is_conflict_free;
+    }
+    current_elem = nxt_elem;
+    nxt_elem = current_elem->nxt;
+  }
+}
+
+void MPIOPT_check_registered_envelopes_for_conflict() {
+
+  // TODO if any tag or any source are used: all calls are conflicting
+
+  printf("checking for conflicts at runtime\n");
+  check_envelope_list_for_conflicts(false);
+  check_envelope_list_for_conflicts(true);
+}
+
+int check_if_envelope_was_registered(int dest, int tag, bool is_send) {
 
   struct envelope_list_entry *list_to_use = recv_envelopes;
   if (is_send) {
@@ -97,22 +153,27 @@ int check_if_send_envelope_was_registered(int dest, int tag, bool is_send) {
   int my_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
+  int is_conflict_free = current_elem->is_conflict_free;
+
   if (current_elem->tag == tag && current_elem->dest == dest) {
     printf("matching registered envelope\n");
   } else {
     printf("NOT matching registered envelope\n");
     printf("Rank: %d : registered (%d,%d) , used: (%d,%d)\n", my_rank,
            current_elem->tag, current_elem->dest, tag, dest);
+    is_conflict_free = false;
+    assert(false);
   }
 
   // remove from list
 
   if (prev_elem == NULL) {
-    printf("End of registered tag list");
+    printf("End of registered tag list\n");
   } else {
     prev_elem->nxt = nxt_elem;
     free(current_elem);
   }
+  return is_conflict_free;
 }
 
 struct communicator_info *find_comm(MPI_Comm comm) {
@@ -346,7 +407,7 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   MPI_Type_size_x(datatype, &type_size);
   MPI_Type_get_extent_x(datatype, &lb, &type_extent);
 
-  check_if_send_envelope_was_registered(dest, tag, is_send_request);
+  check_if_envelope_was_registered(dest, tag, is_send_request);
 #ifndef NDEBUG
   // only if assertion checking is on
 #endif

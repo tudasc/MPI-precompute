@@ -16,4 +16,6 @@ LINKAGE_TYPE int MPIOPT_Recv_init_internal(void *buf, int count,
                                            MPIOPT_Request *request,
                                            MPI_Info info);
 
+int check_if_envelope_was_registered(int dest, int tag, bool is_send);
+
 #endif /* MPIOPT_INIT_H_ */

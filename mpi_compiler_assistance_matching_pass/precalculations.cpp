@@ -556,4 +556,5 @@ void Precalculations::add_call_to_precalculation_to_main() {
     args.push_back(&arg);
   }
   builder.CreateCall(function_info->F_copy, args);
+  builder.CreateCall(mpi_func->optimized.check_registered_conflicts);
 }
