@@ -104,7 +104,7 @@ int check_envelope_list_for_conflicts(bool is_send) {
         if (current_elem_inner != current_elem) {
           // check for conflict
           if (current_elem->dest == current_elem_inner->dest &&
-              current_elem->tag && current_elem_inner->tag) {
+              current_elem->tag == current_elem_inner->tag) {
             current_elem_inner->is_conflicting = 1;
             is_conflicting = 1; // ends inner while as we have found a conflict
           }
@@ -156,7 +156,8 @@ int check_if_envelope_was_registered(int dest, int tag, bool is_send) {
   int is_conflicting = current_elem->is_conflicting;
 
   if (current_elem->tag == tag && current_elem->dest == dest) {
-    printf("matching registered envelope\n");
+    printf("matching registered envelope: (%d,%d) conflicting: %d\n",
+           current_elem->tag, current_elem->dest, is_conflicting);
   } else {
     printf("NOT matching registered envelope\n");
     printf("Rank: %d : registered (%d,%d) , used: (%d,%d)\n", my_rank,
