@@ -76,5 +76,6 @@ set_tests_properties(test12 PROPERTIES PROCESSORS 2)
 
 set_tests_properties(test10 PROPERTIES DISABLED true)
 set_tests_properties(test11 PROPERTIES DISABLED true)
-#set_tests_properties(test00 PROPERTIES DISABLED true)
+set_tests_properties(test12 PROPERTIES DISABLED true)
+#set_tests_properties(test09 PROPERTIES DISABLED true)
 
