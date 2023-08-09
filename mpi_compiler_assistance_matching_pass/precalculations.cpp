@@ -133,6 +133,12 @@ void Precalculations::visit_val(llvm::Value *v) {
     insert_tainted_value(op->getOperand(1));
     return;
   }
+  if (auto *select = dyn_cast<SelectInst>(v)) {
+    insert_tainted_value(select->getCondition());
+    insert_tainted_value(select->getTrueValue());
+    insert_tainted_value(select->getFalseValue());
+    return;
+  }
   if (auto *arg = dyn_cast<Argument>(v)) {
     visit_val(arg);
     return;
