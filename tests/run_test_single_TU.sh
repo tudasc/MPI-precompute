@@ -18,7 +18,7 @@ cd $TEST_DIR
 
 $RUN_SCRIPT *.c
 
-#check if compiler analysis cas successfull
+#check if compiler analysis was successfull
 
 EXPECT_MPIOPT=1
 
