@@ -48,26 +48,25 @@ goods and services.
  ***************************************************************************
 */
 
-#include "benchmark_suites_collection.h"
-#include "benchmark_suite.h"
-#include "utils.h"
-#include <assert.h>
-#include <map>
-#include <set>
-#include <string>
 #include <vector>
+#include <string>
+#include <set>
+#include <map>
+#include <assert.h>
+#include "benchmark_suites_collection.h"
+#include "utils.h"
+#include "benchmark_suite.h"
 
 using namespace std;
 
-map<const string, BenchmarkSuiteBase *> *BenchmarkSuitesCollection::pnames =
-    NULL;
+map<const string, BenchmarkSuiteBase*> *BenchmarkSuitesCollection::pnames = NULL;
 
 DECLARE_BENCHMARK_SUITE_STUFF(BS_GENERIC, __generic__)
 
-namespace {
-struct Dummy : public Benchmark {
-  void run(const scope_item &) {}
-  DEFINE_INHERITED(Dummy, BenchmarkSuite<BS_GENERIC>)
-};
-DECLARE_INHERITED(Dummy, Dummy)
-} // namespace
+namespace { 
+    struct Dummy : public Benchmark {
+        void run(const scope_item &) {}
+        DEFINE_INHERITED(Dummy, BenchmarkSuite<BS_GENERIC>)
+    };
+    DECLARE_INHERITED(Dummy, Dummy)
+}

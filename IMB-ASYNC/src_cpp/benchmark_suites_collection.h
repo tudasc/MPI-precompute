@@ -57,106 +57,92 @@ goods and services.
 #include <iostream>
 
 enum benchmark_suite_t {
-  BS_MPI1,
-  BS_NBC,
-  BS_MT,
-  BS_RMA,
-  BS_EXT,
-  BS_IO,
-  BS_GENERIC
+    BS_MPI1,
+    BS_NBC,
+    BS_MT,
+    BS_RMA,
+    BS_EXT,
+    BS_IO,
+    BS_GENERIC
 };
 
 class BenchmarkSuitesCollection {
-  static std::map<const std::string, BenchmarkSuiteBase *> *pnames;
-
-public:
-  static void register_elem(BenchmarkSuiteBase *elem) {
-    assert(elem != NULL);
-    const std::string name = elem->get_name();
-    if (pnames == NULL) {
-      pnames = new std::map<const std::string, BenchmarkSuiteBase *>();
+    static std::map<const std::string, BenchmarkSuiteBase*> *pnames;
+    public:
+    static void register_elem(BenchmarkSuiteBase *elem) {
+        assert(elem != NULL);
+        const std::string name = elem->get_name();
+        if (pnames == NULL) {
+            pnames = new std::map<const std::string, BenchmarkSuiteBase*>();
+        }
+        if (pnames->find(name) == pnames->end()) {
+            (*pnames)[name] = elem;
+        }
     }
-    if (pnames->find(name) == pnames->end()) {
-      (*pnames)[name] = elem;
+    static void get_full_list(std::vector<std::string> &all_benchmarks, 
+                              std::map<std::string, std::set<std::string> > &by_suite) {
+        assert(pnames != NULL);
+        for (std::map<const std::string, BenchmarkSuiteBase*>::iterator it = pnames->begin();
+             it != pnames->end(); ++it) {
+            std::set<std::string> &benchmarks = by_suite[it->second->get_name()];
+            it->second->get_bench_list(benchmarks, BenchmarkSuiteBase::ALL_BENCHMARKS);
+            set_operations::combine(all_benchmarks, benchmarks);
+        }
     }
-  }
-  static void
-  get_full_list(std::vector<std::string> &all_benchmarks,
-                std::map<std::string, std::set<std::string>> &by_suite) {
-    assert(pnames != NULL);
-    for (std::map<const std::string, BenchmarkSuiteBase *>::iterator it =
-             pnames->begin();
-         it != pnames->end(); ++it) {
-      std::set<std::string> &benchmarks = by_suite[it->second->get_name()];
-      it->second->get_bench_list(benchmarks,
-                                 BenchmarkSuiteBase::ALL_BENCHMARKS);
-      set_operations::combine(all_benchmarks, benchmarks);
+    static void get_default_list(std::vector<std::string> &default_benchmarks) {
+        assert(pnames != NULL);
+        for (std::map<const std::string, BenchmarkSuiteBase*>::iterator it = pnames->begin();
+             it != pnames->end(); ++it) {
+            it->second->get_bench_list(default_benchmarks, BenchmarkSuiteBase::DEFAULT_BENCHMARKS);
+        }
     }
-  }
-  static void get_default_list(std::vector<std::string> &default_benchmarks) {
-    assert(pnames != NULL);
-    for (std::map<const std::string, BenchmarkSuiteBase *>::iterator it =
-             pnames->begin();
-         it != pnames->end(); ++it) {
-      it->second->get_bench_list(default_benchmarks,
-                                 BenchmarkSuiteBase::DEFAULT_BENCHMARKS);
+    static void init_registered_suites() {
+       assert(pnames != NULL);
+        for (std::map<const std::string, BenchmarkSuiteBase*>::iterator it = pnames->begin();
+             it != pnames->end(); ++it) {
+                it->second->init();
+        }
     }
-  }
-  static void init_registered_suites() {
-    assert(pnames != NULL);
-    for (std::map<const std::string, BenchmarkSuiteBase *>::iterator it =
-             pnames->begin();
-         it != pnames->end(); ++it) {
-      it->second->init();
+    static bool declare_args(args_parser &parser, std::ostream &output) {
+        assert(pnames != NULL);
+        for (std::map<const std::string, BenchmarkSuiteBase*>::iterator it = pnames->begin();
+             it != pnames->end(); ++it) {
+                if (!it->second->declare_args(parser, output))
+                    return false;
+        }
+        return true;
     }
-  }
-  static bool declare_args(args_parser &parser, std::ostream &output) {
-    assert(pnames != NULL);
-    for (std::map<const std::string, BenchmarkSuiteBase *>::iterator it =
-             pnames->begin();
-         it != pnames->end(); ++it) {
-      if (!it->second->declare_args(parser, output))
-        return false;
+    static bool prepare(args_parser &parser, const std::vector<std::string> &benchs,
+                        const std::vector<std::string> &unknown_args, std::ostream &output) {
+        assert(pnames != NULL);
+        std::vector<std::string> suites_to_remove;
+        for (std::map<const std::string, BenchmarkSuiteBase*>::iterator it = pnames->begin();
+             it != pnames->end(); ++it) {
+                if (!it->second->prepare(parser, benchs, unknown_args, output)) {
+                    suites_to_remove.push_back(it->first);
+                }
+        }
+        for (std::vector<std::string>::iterator it = suites_to_remove.begin();
+                it != suites_to_remove.end(); ++it) {
+            pnames->erase(*it);
+        }
+        return true;
     }
-    return true;
-  }
-  static bool prepare(args_parser &parser,
-                      const std::vector<std::string> &benchs,
-                      const std::vector<std::string> &unknown_args,
-                      std::ostream &output) {
-    assert(pnames != NULL);
-    std::vector<std::string> suites_to_remove;
-    for (std::map<const std::string, BenchmarkSuiteBase *>::iterator it =
-             pnames->begin();
-         it != pnames->end(); ++it) {
-      if (!it->second->prepare(parser, benchs, unknown_args, output)) {
-        suites_to_remove.push_back(it->first);
-      }
+    static std::shared_ptr<Benchmark> create(const std::string &name) {
+        assert(pnames != NULL);
+        std::shared_ptr<Benchmark> b;
+        for (std::map<const std::string, BenchmarkSuiteBase*>::iterator it = pnames->begin();
+             it != pnames->end(); ++it) {
+            b = it->second->create(name);
+            if (b.get() != NULL)
+                break;
+        }
+        return b;
     }
-    for (std::vector<std::string>::iterator it = suites_to_remove.begin();
-         it != suites_to_remove.end(); ++it) {
-      pnames->erase(*it);
-    }
-    return true;
-  }
-  static std::shared_ptr<Benchmark> create(const std::string &name) {
-    assert(pnames != NULL);
-    std::shared_ptr<Benchmark> b;
-    for (std::map<const std::string, BenchmarkSuiteBase *>::iterator it =
-             pnames->begin();
-         it != pnames->end(); ++it) {
-      b = it->second->create(name);
-      if (b.get() != NULL)
-        break;
-    }
-    return b;
-  }
-  static void finalize(const std::vector<std::string> &benchs,
-                       std::ostream &output, int rank = 0) {
-    assert(pnames != NULL);
-    for (std::map<const std::string, BenchmarkSuiteBase *>::iterator it =
-             pnames->begin();
-         it != pnames->end(); ++it)
-      it->second->finalize(benchs, output, rank);
-  }
+    static void finalize(const std::vector<std::string> &benchs, std::ostream &output, int rank = 0) {
+        assert(pnames != NULL);
+        for (std::map<const std::string, BenchmarkSuiteBase*>::iterator it = pnames->begin();
+             it != pnames->end(); ++it) 
+                it->second->finalize(benchs, output, rank);
+    }    
 };

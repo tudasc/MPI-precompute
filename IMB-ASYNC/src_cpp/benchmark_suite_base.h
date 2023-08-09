@@ -50,45 +50,33 @@ goods and services.
 
 #pragma once
 
-#include "benchmark.h"
 #include <memory>
+#include "benchmark.h"
 
 class args_parser;
 class Benchmark;
 
 struct BenchmarkSuiteBase {
-  enum BenchListFilter { ALL_BENCHMARKS, DEFAULT_BENCHMARKS };
-  virtual void init() {}
-  virtual bool declare_args(args_parser &,
-                            std::ostream &output = std::cout) const {
-    UNUSED(output);
-    return true;
-  }
-  virtual bool prepare(const args_parser &, const std::vector<std::string> &,
-                       const std::vector<std::string> &,
-                       std::ostream &output = std::cout) {
-    UNUSED(output);
-    return true;
-  }
-  virtual void finalize(const std::vector<std::string> &,
-                        std::ostream &output = std::cout, int rank = 0) {
-    UNUSED(output);
-    UNUSED(rank);
-  }
-  virtual void get_bench_list(std::set<std::string> &,
-                              BenchListFilter filter = ALL_BENCHMARKS) const {
-    UNUSED(filter);
-  }
-  virtual void get_bench_list(std::vector<std::string> &,
-                              BenchListFilter filter = ALL_BENCHMARKS) const {
-    UNUSED(filter);
-  }
-  virtual std::shared_ptr<Benchmark> create(const std::string &) {
-    return std::shared_ptr<Benchmark>();
-  }
-  virtual const std::string get_name() const = 0;
-  virtual any get_parameter(const std::string &key) {
-    UNUSED(key);
-    return any();
-  }
+    enum BenchListFilter { ALL_BENCHMARKS, DEFAULT_BENCHMARKS };
+    virtual void init() {}
+    virtual bool declare_args(args_parser &,
+                              std::ostream &output = std::cout) const {
+        UNUSED(output);
+        return true;
+    }
+    virtual bool prepare(const args_parser &, const std::vector<std::string> &,
+                         const std::vector<std::string> &, std::ostream &output = std::cout) {
+        UNUSED(output);
+        return true;
+    }
+    virtual void finalize(const std::vector<std::string> &, std::ostream &output = std::cout, int rank = 0) {
+        UNUSED(output);
+        UNUSED(rank);
+    }
+    virtual void get_bench_list(std::set<std::string> &, BenchListFilter filter = ALL_BENCHMARKS) const { UNUSED(filter); }
+    virtual void get_bench_list(std::vector<std::string> &, BenchListFilter filter = ALL_BENCHMARKS) const { UNUSED(filter); }
+    virtual std::shared_ptr<Benchmark> create(const std::string &) { return std::shared_ptr<Benchmark>(); }
+    virtual const std::string get_name() const = 0;
+    virtual any get_parameter(const std::string &key) { UNUSED(key); return any(); }
 };
+

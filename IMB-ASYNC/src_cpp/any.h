@@ -49,38 +49,43 @@ goods and services.
 */
 
 #pragma once
-#include <memory>
 #include <typeinfo>
+#include <memory>
 
-class any {
-  struct holder_base {
-    virtual void *get() const { return NULL; }
-    virtual const std::type_info &get_type_id() const { return typeid(void); }
-    virtual ~holder_base() {}
-    int dummy;
-  };
-  template <class type> struct holder : holder_base {
-    std::shared_ptr<type> storedObject;
-    holder(std::shared_ptr<type> pobject) : storedObject(pobject) {}
-    virtual void *get() const { return storedObject.get(); }
-    virtual const std::type_info &get_type_id() const { return typeid(type); }
-  };
-  std::shared_ptr<holder_base> held;
-
+class any
+{
+    struct holder_base
+    {
+        virtual void *get() const { return NULL; }
+        virtual const std::type_info &get_type_id() const { return typeid(void); }
+        virtual ~holder_base() {}
+        int dummy;
+    };
+    template <class type>
+    struct holder : holder_base
+    {
+        std::shared_ptr<type> storedObject;
+        holder(std::shared_ptr<type> pobject) : storedObject(pobject) {}
+        virtual void *get() const { return storedObject.get(); }
+        virtual const std::type_info &get_type_id() const { return typeid(type); }
+    };
+    std::shared_ptr<holder_base> held;
 public:
-  any() {}
-  template <class type>
-  any(std::shared_ptr<type> objectToStore)
-      : held(new holder<type>(objectToStore)) {}
-  template <class type> type *as() const {
-    if (held.get() == NULL)
-      return NULL;
-    if (typeid(type) == held->get_type_id())
-      return static_cast<type *>(held->get());
-    else
-      return NULL;
-  }
+    any() {}
+    template <class type>
+    any(std::shared_ptr<type> objectToStore) : held(new holder<type>(objectToStore))
+  {}
+    template <class type>
+    type *as() const { 
+        if (held.get() == NULL)
+            return NULL;
+        if (typeid(type) == held->get_type_id()) 
+            return static_cast<type *>(held->get()); 
+        else 
+            return NULL;
+    }
 };
+
 
 /*
 #include <iostream>
@@ -108,7 +113,7 @@ int main()
     for (size_t i = 0; i < collection.size(); i++) {
         A *A_ptr = collection[i].as<A>();
         B *B_ptr = collection[i].as<B>();
-        if (A_ptr) A_ptr->say();
+        if (A_ptr) A_ptr->say();        
         if (B_ptr) B_ptr->say();
     }
     return 0;
