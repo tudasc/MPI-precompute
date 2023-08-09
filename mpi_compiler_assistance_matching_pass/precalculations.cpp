@@ -218,6 +218,8 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
                                      // make shure it is included
         continue;
       }
+      errs() << "Error analyzing usage of function: " << func->getName()
+             << "\n";
       errs() << "Support for analyzing this Value is not implemented yet\n";
       u->dump();
       assert(false);
