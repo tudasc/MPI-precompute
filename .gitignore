@@ -1,5 +1,6 @@
 # objis
 *.o
+*.bc
 # executables
 
 # cmake build dirs
