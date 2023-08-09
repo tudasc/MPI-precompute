@@ -22,6 +22,8 @@ SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
 
+  make clean
+
 if [[ "$MPIRUN_STATUS" != 0 ]]; then
   echo "Crash of ORIGINAL result application - testcase probably broken"
   exit 1
@@ -35,7 +37,6 @@ if [[ "$NO_MPI_OPT" != 1 ]]; then
 fi
 
 # rebuild with our compiler pass enabled
-make clean
 export LFLAGS="-Og -g -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
 make
 #check if compiler analysis was successfull
@@ -46,6 +47,8 @@ mpirun -n 2 ./a.out | grep "Usage of MPIOPT optimized communication sceme"
 SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
+
+  make clean
 
 if [[ "$MPIRUN_STATUS" != 0 ]]; then
   echo "Crash of result application"
@@ -60,9 +63,4 @@ if [[ "$EXPECT_MPIOPT" == 0 && "$NO_MPI_OPT" != 1 ]]; then
   echo "Expected NO MPIOPT usage but found usage"
   exit 1
 fi
-
-make clean
-
-
-
 

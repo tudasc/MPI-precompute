@@ -27,6 +27,8 @@ SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
 
+rm a.out_original
+
 if [[ "$MPIRUN_STATUS" != 0 ]]; then
   echo "Crash of ORIGINAL result application - testcase probably broken"
   exit 1
@@ -44,6 +46,8 @@ SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
 
+rm a.out
+
 if [[ "$MPIRUN_STATUS" != 0 ]]; then
   echo "Crash of result application"
   exit 1
@@ -57,9 +61,3 @@ if [[ "$EXPECT_MPIOPT" == 0 && "$NO_MPI_OPT" != 1 ]]; then
   echo "Expected NO MPIOPT usage but found usage"
   exit 1
 fi
-
-rm a.out a.out_original
-
-
-
-
