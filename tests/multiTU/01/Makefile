@@ -18,7 +18,7 @@ all.bc: $(OBJSBC)
 	llvm-link -o $@ $(OBJSBC)
 
 %.bc: %.c
-	$(MPICC) -c -emit-llvm $(CFLAGS) $<
+	$(MPICC) -c -emit-llvm $(CFLAGS) -o $@ $<
 
 clean:
 	$(RM) *.bc

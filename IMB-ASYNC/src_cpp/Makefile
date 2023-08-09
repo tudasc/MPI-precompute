@@ -126,10 +126,10 @@ $(BINARY): $(IMB_OBJBC) $(BECHMARK_SUITE_OBJBC) $(ADDITIONAL_OBJ)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ all.bc $(LDFLAGS)
 
 %.bc: %.cpp
-	$(CXX) $(CPPFLAGS) -emit-llvm $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CPPFLAGS) -c -emit-llvm $(CXXFLAGS) -o $@ $<
 
 %.bc: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -emit-llvm -o $@ $<
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -emit-llvm -o $@ $<
 
 clean: announce
 	rm -f $(IMB_OBJBC) $(BECHMARK_SUITE_OBJBC) $(ADDITIONAL_OBJBC) $(BINARY) all.bc

@@ -11,7 +11,8 @@ if [ ! -d "$TEST_DIR" ]; then
   exit 1
 fi
 
-export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="$TEST_DIR/plugin_data.json"
+export OMPI_CC=clang
+export OMPI_CXX=clang++
 
 cd $TEST_DIR
 
