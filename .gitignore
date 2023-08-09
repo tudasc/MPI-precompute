@@ -25,6 +25,7 @@ IMB-ASYNC/output/
 
 # from ctest
 *LastTest.log
+Testing/Temporary
 
 # backupo data from older measurements
 visualization/mearurement_2022_05_16.tar.gz
@@ -37,3 +38,4 @@ cache.csv
 .cproject
 .settings
 .idea
+
