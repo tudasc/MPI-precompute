@@ -107,6 +107,9 @@ void Precalculations::visit_val(llvm::Value *v) {
   }
   if (auto *l = dyn_cast<LoadInst>(v)) {
     insert_tainted_value(l->getPointerOperand());
+    if (l->getType()->isPointerTy()) {
+      visit_ptr(l);
+    }
     return;
   }
   if (auto *a = dyn_cast<AllocaInst>(v)) {
@@ -163,17 +166,36 @@ void Precalculations::visit_val(llvm::Value *v) {
 }
 
 void Precalculations::visit_ptr(llvm::Value *ptr) {
+  insert_tainted_value(ptr);
+  visited_values.insert(ptr);
   assert(ptr->getType()->isPointerTy());
   for (auto u : ptr->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
       insert_tainted_value(s);
+      if (s->getValueOperand() == ptr) {
+        visit_ptr(s->getPointerOperand());
+      }
       continue;
     }
     if (auto *l = dyn_cast<LoadInst>(u)) {
-      continue; // no need to take care about this
+      if (l->getType()->isPointerTy()) {
+        // if a ptr is loaded we need to trace its usages
+        insert_tainted_value(l);
+      } // else no need to take care about this
+      continue;
     }
     if (auto *call = dyn_cast<CallBase>(u)) {
       visit_call_from_ptr(call, ptr);
+      continue;
+    }
+    if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
+      visit_ptr(gep);
+      continue;
+    }
+    if (auto *compare = dyn_cast<ICmpInst>(u)) {
+      // nothing to do
+      // the compare will be tainted if it is necessary for control flow else we
+      // can ignore it
       continue;
     }
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -320,6 +342,11 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
                                           llvm::Value *ptr) {
   assert(visited_values.find(ptr) != visited_values.end());
 
+  if (call->getCalledOperand() == ptr) {
+    // visit from the function ptr: nothing to check
+    return;
+  }
+
   errs() << "Visit\n";
   call->dump();
 
@@ -352,6 +379,12 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
     // modify them otherwise
     return;
   }
+  if (func == mpi_func->mpi_send_init || func == mpi_func->mpi_recv_init) {
+    // skip: these functions will be managed seperately anyway
+    // it may be the case, that e.g. the buffer or request aliases with
+    // something important
+    return;
+  }
 
   if (func->isIntrinsic() &&
       (func->getIntrinsicID() == Intrinsic::lifetime_start ||
@@ -365,6 +398,8 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
     if (arg->hasAttribute(Attribute::NoCapture) &&
         arg->hasAttribute(Attribute::ReadOnly)) {
       continue; // nothing to do reading the val is allowed
+      // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as first
+      // ptr lvl is only read
     }
     if (func->isDeclaration()) {
       errs() << "Can not analyze usage of external function:\n";
@@ -750,6 +785,23 @@ void Precalculations::replace_usages_of_func_in_copy(
           instructions_to_change.push_back(inst);
         }
       } // else: a use in the original version of a function
+      continue;
+    }
+    if (isa<ArrayType>(u->getType())) {
+      // an array of function ptrs  e.g. a vtable for objects
+
+      auto *val = dyn_cast<Value>(u);
+      assert(val);
+
+      errs() << "VTABLE Currently not implemented:\n";
+      for (auto &uu : val->uses()) {
+        uu->dump();
+      }
+      for (auto uu : val->users()) {
+        uu->dump();
+      }
+      assert(false);
+
       continue;
     }
     errs() << "This usage is currently not supported:\n";
