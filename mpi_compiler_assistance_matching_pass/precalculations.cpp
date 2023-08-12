@@ -370,6 +370,11 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
               insert_tainted_value(branch->getCondition());
               insert_tainted_value(branch);
               visited_values.insert(branch);
+            } else if (auto *invoke = dyn_cast<InvokeInst>(term)) {
+              // TODO
+              errs() << "TODO: invokeInst is not yet supported:\n";
+              term->dump();
+              assert(false);
             } else {
               errs() << "Error analyzing CFG:\n";
               term->dump();
