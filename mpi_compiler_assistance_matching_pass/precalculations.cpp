@@ -545,6 +545,7 @@ void FunctionToPrecalculate::prune_copy(
 
   // remove stuff
   for (auto inst : to_prune) {
+
     if (inst->isTerminator()) {
       // if this terminator was not tainted: we can immediately return from this
       // function
@@ -556,7 +557,15 @@ void FunctionToPrecalculate::prune_copy(
             Constant::getNullValue(inst->getFunction()->getReturnType()));
       }
     }
-    inst->eraseFromParent();
+    // we keep the exception handling instructions so that the module is still
+    // correct if they are not tainted and an exception occurs we abort anyway
+    // (otherwise we would have tainted the exception handling code)
+    if (auto lp = dyn_cast<LandingPadInst>(inst)) {
+      // lp->setCleanup(false);
+      lp->dump();
+    } else {
+      inst->eraseFromParent();
+    }
   }
   /*
     // and erase
