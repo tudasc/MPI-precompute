@@ -24,6 +24,25 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 class Precalculations;
 
+class VtableManager {
+  // manages the vtables to use in function copies
+public:
+  VtableManager(llvm::Module &M) : M(M){};
+
+  void register_function_copy(llvm::Function *old_F, llvm::Function *new_F);
+  // once all functions have been registered
+  void perform_vtable_change_in_copies();
+
+private:
+  llvm::Module &M;
+
+  std::map<llvm::Function *, llvm::Function *> old_new_func_map;
+  // just for ease of programming, it is also contained in the map above
+  std::set<llvm::Function *> new_funcs;
+
+  static llvm::GlobalValue *get_vtable_from_ptr_user(llvm::User *vtable_value);
+};
+
 class FunctionToPrecalculate {
 public:
   FunctionToPrecalculate(llvm::Function *F) : F_orig(F){};
