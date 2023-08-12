@@ -95,9 +95,6 @@ void replace_init_call(llvm::CallBase *call, llvm::Function *func) {
   // one could assert that the only addition is the info object
   assert(call->getFunctionType() != func->getFunctionType());
 
-  assert(not isa<InvokeInst>(call) &&
-         "Currently not implemented to replace invoke of Send/Recv Init");
-
   IRBuilder<> builder(call->getContext());
 
   // before the original call
@@ -141,8 +138,16 @@ void replace_init_call(llvm::CallBase *call, llvm::Function *func) {
   }
   args.push_back(info_obj);
 
-  auto new_call = builder.CreateCall(func->getFunctionType(), func, args);
+  CallBase *new_call = nullptr;
+  if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+    new_call = builder.CreateInvoke(func->getFunctionType(), func,
+                                    invoke->getNormalDest(),
+                                    invoke->getUnwindDest(), args);
 
+    builder.SetInsertPoint(invoke->getNormalDest()->getFirstNonPHI());
+  } else {
+    new_call = builder.CreateCall(func->getFunctionType(), func, args);
+  }
   // also free the info
   builder.CreateCall(mpi_func->mpi_info_free->getFunctionType(),
                      mpi_func->mpi_info_free, info_obj_ptr);
