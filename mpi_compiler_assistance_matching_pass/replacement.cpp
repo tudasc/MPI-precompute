@@ -87,26 +87,16 @@ void replace_call(CallBase *call, Function *func) {
 
   assert(call->getFunctionType() == func->getFunctionType());
 
-  IRBuilder<> builder(call->getContext());
-
-  std::vector<Value *> args;
-
-  for (unsigned int i = 0; i < call->arg_size(); ++i) {
-    args.push_back(call->getArgOperand(i));
-  }
-
-  auto *new_call = builder.CreateCall(func->getFunctionType(), func, args);
-
-  ReplaceInstWithInst(call, new_call);
-
-  // call->replaceAllUsesWith(new_call);
-  // call->eraseFromParent();
+  call->setCalledFunction(func);
 }
 
 void replace_init_call(llvm::CallBase *call, llvm::Function *func) {
 
   // one could assert that the only addition is the info object
   assert(call->getFunctionType() != func->getFunctionType());
+
+  assert(not isa<InvokeInst>(call) &&
+         "Currently not implemented to replace invoke of Send/Recv Init");
 
   IRBuilder<> builder(call->getContext());
 
