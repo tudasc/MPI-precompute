@@ -80,7 +80,11 @@ set_tests_properties(test11 PROPERTIES PROCESSORS 2)
 set_tests_properties(test12 PROPERTIES PROCESSORS 2)
 set_tests_properties(test13 PROPERTIES PROCESSORS 2)
 
+# currently not implemented feature: other comm than comm world
+set_tests_properties(test04 PROPERTIES DISABLED true)
+# currently not implemented feature: reading input data
 set_tests_properties(test10 PROPERTIES DISABLED true)
+# currently not implemented feature: reading input data
 set_tests_properties(test11 PROPERTIES DISABLED true)
 #set_tests_properties(test00 PROPERTIES DISABLED true)
 
