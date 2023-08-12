@@ -462,6 +462,8 @@ void Precalculations::replace_calls_in_copy(
           builder.CreateCall(mpi_func->optimized.register_send_tag, {src, tag});
       call->replaceAllUsesWith(new_call);
       call->eraseFromParent();
+      auto old_call_v = func->new_to_old_map[call];
+      func->new_to_old_map[new_call] = old_call_v;
 
       continue;
     }
@@ -473,6 +475,8 @@ void Precalculations::replace_calls_in_copy(
           builder.CreateCall(mpi_func->optimized.register_recv_tag, {src, tag});
       call->replaceAllUsesWith(new_call);
       call->eraseFromParent();
+      auto old_call_v = func->new_to_old_map[call];
+      func->new_to_old_map[new_call] = old_call_v;
 
       continue;
     }
@@ -482,8 +486,7 @@ void Precalculations::replace_calls_in_copy(
                             functions_to_include.end(), [&call](const auto p) {
                               if (call->isIndirectCall()) {
                                 // indirect call: any function with same
-                                // signature (all such functions will keep the
-                                // same args)
+                                // signature
                                 return p->F_orig->getFunctionType() ==
                                        call->getFunctionType();
                               } else {
