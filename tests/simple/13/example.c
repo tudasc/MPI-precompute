@@ -8,7 +8,7 @@ MPI_Request comm_requests[4];
 
 int global_tag = 42;
 
-void init_communication_static(int rank_param, int size_param {
+void init_communication_static(int rank_param, int size_param) {
   printf("Static\n");
   // static will ignore the given parameters
   int rank, size;
