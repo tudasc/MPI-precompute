@@ -218,11 +218,21 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
                                      // make shure it is included
         continue;
       }
-      errs() << "Error analyzing usage of function: " << func->getName()
-             << "\n";
-      errs() << "Support for analyzing this Value is not implemented yet\n";
-      u->dump();
-      assert(false);
+      /*
+            errs() << "Error analyzing usage of function: " << func->getName()
+                   << "\n";
+            errs() << "Support for analyzing this Value is not implemented
+         yet\n"; u->dump(); assert(false);
+            */
+      // uses that will result in indirect calls will be handled from the call
+      // site (see visit_all_indirect_calls_for_FnType)
+    }
+
+    if (fn_types_with_indirect_calls.find(func->getFunctionType()) !=
+        fn_types_with_indirect_calls.end()) {
+      // this func may be called indirect we need to also include all other
+      // funcs with the same type
+      visit_all_indirect_calls_for_FnType(func->getFunctionType());
     }
 
     return fun_to_precalc;
@@ -247,11 +257,15 @@ void Precalculations::visit_val(llvm::Argument *arg) {
         insert_tainted_value(operand);
         continue;
       }
-      errs() << "Support for analyzing this Value is not implemented yet\n";
-      u->dump();
-      assert(false);
     }
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
+    if (fn_types_with_indirect_calls.find(func->getFunctionType()) !=
+        fn_types_with_indirect_calls.end()) {
+      // this func may be called indirect we need to also include all other
+      // funcs with the same type
+      visit_all_indirect_call_args_for_FnType(func->getFunctionType(),
+                                              arg->getArgNo());
+    }
   }
 }
 
@@ -310,6 +324,11 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       insert_tainted_value(
           call->getArgOperand(0)); // we also need to keep the comm
     }
+    return;
+  }
+  if (func == mpi_func->mpi_init || func == mpi_func->mpi_init_thread) {
+    // skip: MPI_Init will only transfer the cmd line args to all processes, not
+    // modify them otherwise
     return;
   }
 
@@ -565,4 +584,65 @@ void Precalculations::add_call_to_precalculation_to_main() {
   }
   builder.CreateCall(function_info->F_copy, args);
   builder.CreateCall(mpi_func->optimized.check_registered_conflicts);
+}
+
+void Precalculations::find_functionTypes_called_indirect() {
+
+  for (auto &f : M.functions()) {
+    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+
+      Instruction *inst = &*I;
+      if (auto call = dyn_cast<CallBase>(inst)) {
+        if (call->isIndirectCall()) {
+          // we do need to visit all indirect calls
+          if (fn_types_with_indirect_calls.insert(call->getFunctionType())
+                  .second) {
+            // only if not already in set
+            // errs() << "Function Type that needs to be visited:\n";
+            // call->getFunctionType()->dump();
+          }
+        }
+      }
+    }
+  }
+}
+
+void Precalculations::visit_all_indirect_calls_for_FnType(
+    llvm::FunctionType *fntype) {
+  for (auto &f : M.functions()) {
+    if (f.getFunctionType() == fntype) {
+      insert_functions_to_include(&f);
+    }
+    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+
+      Instruction *inst = &*I;
+      if (auto call = dyn_cast<CallBase>(inst)) {
+        if (call->isIndirectCall()) {
+          if (call->getFunctionType() == fntype) {
+            insert_tainted_value(call);
+            visited_values.insert(call);
+            insert_tainted_value(call->getCalledOperand());
+          }
+        }
+      }
+    }
+  }
+}
+
+void Precalculations::visit_all_indirect_call_args_for_FnType(
+    llvm::FunctionType *fntype, unsigned int argNo) {
+
+  for (auto &f : M.functions()) {
+    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+
+      Instruction *inst = &*I;
+      if (auto call = dyn_cast<CallBase>(inst)) {
+        if (call->isIndirectCall()) {
+          if (call->getFunctionType() == fntype) {
+            insert_tainted_value(call->getArgOperand(argNo));
+          }
+        }
+      }
+    }
+  }
 }

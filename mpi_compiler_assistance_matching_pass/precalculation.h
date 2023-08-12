@@ -47,7 +47,9 @@ public:
 class Precalculations {
 public:
   Precalculations(llvm::Module &M, llvm::Function *entry_point)
-      : M(M), entry_point(entry_point){};
+      : M(M), entry_point(entry_point) {
+    find_functionTypes_called_indirect();
+  };
 
   void add_precalculations(const std::vector<llvm::CallBase *> &to_precompute);
 
@@ -68,7 +70,13 @@ public:
   // tags seems to be worth it
   //  or if e.g. for some reason a compute heavy loop was included as well
 
+  std::set<llvm::FunctionType *> fn_types_with_indirect_calls;
+
   void find_all_tainted_vals();
+  void find_functionTypes_called_indirect();
+  void visit_all_indirect_calls_for_FnType(llvm::FunctionType *fntype);
+  void visit_all_indirect_call_args_for_FnType(llvm::FunctionType *fntype,
+                                               unsigned int argNo);
   void visit_val(llvm::Value *v);
   void visit_val(llvm::AllocaInst *alloca);
   void visit_val(llvm::PHINode *phi);

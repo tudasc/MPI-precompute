@@ -86,7 +86,7 @@ struct MPICompilerAssistanceMatchingPass
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
 
-    // Debug(M.dump(););
+    Debug(M.dump(););
 
     ImplementationSpecifics::create_instance(M);
 
