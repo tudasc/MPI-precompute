@@ -49,13 +49,12 @@ void Precalculations::add_precalculations(
   for (const auto &f : functions_to_include) {
     f->initialize_copy();
   }
-  // dont fuse this loops we first need to initialize the copy before changing
+  // dont fuse this loops! we first need to initialize the copy before changing
   // calls
   for (const auto &f : functions_to_include) {
     replace_calls_in_copy(f);
   }
-  // one MAY be able to fuse these 2 loops though
-  // TODO evaluate if true
+
   for (const auto &f : functions_to_include) {
     f->prune_copy(tainted_values);
   }
@@ -434,8 +433,15 @@ void Precalculations::replace_calls_in_copy(
         to_replace.push_back(call);
         continue;
       } else {
-        // callee not in functions_to_include
-        assert(tainted_values.find(callee) == tainted_values.end());
+        // indirect call
+        if (call->isIndirectCall() &&
+            fn_types_with_indirect_calls.find(call->getFunctionType()) !=
+                fn_types_with_indirect_calls.end()) {
+          to_replace.push_back(call);
+        } else {
+          // callee not in functions_to_include, we will later remove it
+          assert(tainted_values.find(callee) == tainted_values.end());
+        }
       }
     }
   }
@@ -468,13 +474,24 @@ void Precalculations::replace_calls_in_copy(
 
     auto pos = std::find_if(functions_to_include.begin(),
                             functions_to_include.end(), [&call](const auto p) {
-                              return p->F_orig == call->getCalledFunction();
+                              if (call->isIndirectCall()) {
+                                // indirect call: any function with same
+                                // signature (all such functions will keep the
+                                // same args)
+                                return p->F_orig->getFunctionType() ==
+                                       call->getFunctionType();
+                              } else {
+                                // direct call
+                                return p->F_orig == call->getCalledFunction();
+                              }
                             });
     assert(pos != functions_to_include.end());
 
     const auto &function_information = *pos;
 
-    call->setCalledFunction(function_information->F_copy);
+    if (not call->isIndirectCall()) {
+      call->setCalledFunction(function_information->F_copy);
+    }
     // null all not used args
     for (unsigned int i = 0; i < call->arg_size(); ++i) {
       if (function_information->args_to_use.find(i) ==
@@ -484,6 +501,8 @@ void Precalculations::replace_calls_in_copy(
       } // else pass arg normally
     }
   }
+
+  replace_usages_of_func_in_copy(func);
 }
 
 // remove all unnecessary instruction
@@ -644,5 +663,33 @@ void Precalculations::visit_all_indirect_call_args_for_FnType(
         }
       }
     }
+  }
+}
+
+void Precalculations::replace_usages_of_func_in_copy(
+    std::shared_ptr<FunctionToPrecalculate> func) {
+
+  std::vector<Instruction *> instructions_to_change;
+  for (auto u : func->F_orig->users()) {
+    if (auto *inst = dyn_cast<Instruction>(u)) {
+
+      auto pos = std::find_if(
+          functions_to_include.begin(), functions_to_include.end(),
+          [&inst](const auto p) { return p->F_copy == inst->getFunction(); });
+      if (pos != functions_to_include.end()) {
+        assert(not isa<CallBase>(inst));
+        // calls are replaced by a different function
+        instructions_to_change.push_back(inst);
+      } // else: a use in the original version of a function
+      continue;
+    }
+    errs() << "This usage is currently not supported:\n";
+    u->dump();
+    assert(false);
+  }
+
+  for (auto *inst : instructions_to_change) {
+    bool has_replaced = inst->replaceUsesOfWith(func->F_orig, func->F_copy);
+    assert(has_replaced);
   }
 }
