@@ -478,8 +478,16 @@ void Precalculations::replace_calls_in_copy(
       auto tag = get_tag_value(call, true);
       auto src = get_src_value(call, true);
       IRBuilder<> builder = IRBuilder<>(call);
-      auto new_call =
-          builder.CreateCall(mpi_func->optimized.register_send_tag, {src, tag});
+
+      CallBase *new_call = nullptr;
+      if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+        new_call = builder.CreateInvoke(mpi_func->optimized.register_send_tag,
+                                        invoke->getNormalDest(),
+                                        invoke->getUnwindDest(), {src, tag});
+      } else {
+        new_call = builder.CreateCall(mpi_func->optimized.register_send_tag,
+                                      {src, tag});
+      }
       call->replaceAllUsesWith(new_call);
       call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
@@ -491,8 +499,15 @@ void Precalculations::replace_calls_in_copy(
       auto tag = get_tag_value(call, true);
       auto src = get_src_value(call, true);
       IRBuilder<> builder = IRBuilder<>(call);
-      auto new_call =
-          builder.CreateCall(mpi_func->optimized.register_recv_tag, {src, tag});
+      CallBase *new_call = nullptr;
+      if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+        new_call = builder.CreateInvoke(mpi_func->optimized.register_recv_tag,
+                                        invoke->getNormalDest(),
+                                        invoke->getUnwindDest(), {src, tag});
+      } else {
+        new_call = builder.CreateCall(mpi_func->optimized.register_recv_tag,
+                                      {src, tag});
+      }
       call->replaceAllUsesWith(new_call);
       call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
@@ -521,7 +536,7 @@ void Precalculations::replace_calls_in_copy(
       assert(invoke);
       IRBuilder<> builder = IRBuilder<>(invoke);
       builder.CreateBr(invoke->getNormalDest());
-      invoke->removeFromParent();
+      invoke->eraseFromParent();
       // if there were an exception, or the result value is used, the callee
       // would have been tainted
       continue;
