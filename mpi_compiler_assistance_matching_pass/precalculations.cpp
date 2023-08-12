@@ -677,9 +677,11 @@ void Precalculations::replace_usages_of_func_in_copy(
           functions_to_include.begin(), functions_to_include.end(),
           [&inst](const auto p) { return p->F_copy == inst->getFunction(); });
       if (pos != functions_to_include.end()) {
-        assert(not isa<CallBase>(inst));
-        // calls are replaced by a different function
-        instructions_to_change.push_back(inst);
+        if (not isa<CallBase>(inst)) {
+          // calls are replaced by a different function
+          // where we also take care about the arguments
+          instructions_to_change.push_back(inst);
+        }
       } // else: a use in the original version of a function
       continue;
     }
