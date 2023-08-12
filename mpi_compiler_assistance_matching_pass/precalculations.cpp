@@ -529,7 +529,7 @@ void Precalculations::replace_calls_in_copy(
                                 return p->F_orig == call->getCalledFunction();
                               }
                             });
-    if (pos != functions_to_include.end()) {
+    if (pos == functions_to_include.end() && not call->isIndirectCall()) {
       // special case: it is a invoke inst and we later find out that it
       // actually has no resume -> meaning no exception and retval is not used
       auto *invoke = dyn_cast<InvokeInst>(call);
