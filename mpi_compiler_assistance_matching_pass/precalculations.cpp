@@ -150,6 +150,12 @@ void Precalculations::visit_val(llvm::Value *v) {
     visit_val(phi);
     return;
   }
+  if (auto *gep = dyn_cast<GetElementPtrInst>(v)) {
+    for (unsigned int i = 0; i < gep->getNumOperands(); ++i) {
+      insert_tainted_value(gep->getOperand(i));
+    }
+    return;
+  }
 
   errs() << "Support for analyzing this Value is not implemented yet\n";
   v->dump();
