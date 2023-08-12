@@ -65,6 +65,7 @@ public:
   std::set<llvm::Value *> visited_values;
 
   void insert_tainted_value(llvm::Value *v);
+
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
   // TODO we need some kind of heuristic to check if precalculation of all msg

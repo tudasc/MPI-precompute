@@ -283,13 +283,29 @@ void Precalculations::visit_val(llvm::CallBase *call) {
       tainted_values.end(),
       std::inserter(tainred_users_of_retval, tainred_users_of_retval.begin()));
   bool need_return_val = not tainred_users_of_retval.empty();
-  assert(need_return_val);
 
-  assert(call->getCalledFunction()->willReturn());
-  for (auto bb = call->getCalledFunction()->begin();
-       bb != call->getCalledFunction()->end(); ++bb) {
-    if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
-      insert_tainted_value(ret);
+  if (need_return_val) {
+    assert(not call->isIndirectCall() && "TODO not implemented\n");
+    // TODO
+    for (auto bb = call->getCalledFunction()->begin();
+         bb != call->getCalledFunction()->end(); ++bb) {
+      if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
+        insert_tainted_value(ret);
+      }
+    }
+  }
+
+  // we need to check the control flow if a exception is raised
+  // if there are no resumes in called function: no need to do anything as an
+  // exception cannot be raised
+  if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+    assert(not call->isIndirectCall() && "TODO not implemented\n");
+    // TODO
+    for (auto bb = call->getCalledFunction()->begin();
+         bb != call->getCalledFunction()->end(); ++bb) {
+      if (auto *res = dyn_cast<ResumeInst>(bb->getTerminator())) {
+        insert_tainted_value(res);
+      }
     }
   }
 }
@@ -362,6 +378,7 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
     if (auto *inst = dyn_cast<Instruction>(v)) {
       auto bb = inst->getParent();
       if (not bb->isEntryBlock()) {
+        // we need to insert the instruction that lets the control flow go here
         for (auto pred_bb : predecessors(bb)) {
           auto *term = pred_bb->getTerminator();
           if (term->getNumSuccessors() > 1) {
@@ -371,10 +388,8 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
               insert_tainted_value(branch);
               visited_values.insert(branch);
             } else if (auto *invoke = dyn_cast<InvokeInst>(term)) {
-              // TODO
-              errs() << "TODO: invokeInst is not yet supported:\n";
-              term->dump();
-              assert(false);
+              insert_tainted_value(invoke);
+              // we will later visit it
             } else {
               errs() << "Error analyzing CFG:\n";
               term->dump();
@@ -499,7 +514,18 @@ void Precalculations::replace_calls_in_copy(
                                 return p->F_orig == call->getCalledFunction();
                               }
                             });
-    assert(pos != functions_to_include.end());
+    if (pos != functions_to_include.end()) {
+      // special case: it is a invoke inst and we later find out that it
+      // actually has no resume -> meaning no exception and retval is not used
+      auto *invoke = dyn_cast<InvokeInst>(call);
+      assert(invoke);
+      IRBuilder<> builder = IRBuilder<>(invoke);
+      builder.CreateBr(invoke->getNormalDest());
+      invoke->removeFromParent();
+      // if there were an exception, or the result value is used, the callee
+      // would have been tainted
+      continue;
+    }
 
     const auto &function_information = *pos;
 
