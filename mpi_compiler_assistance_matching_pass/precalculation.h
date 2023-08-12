@@ -36,6 +36,7 @@ public:
   llvm::Function *F_orig;
   llvm::Function *F_copy = nullptr;
   llvm::ValueToValueMapTy old_new_map;
+  std::map<llvm::Value *, llvm::Value *> new_to_old_map;
   llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we dont need it
 
   void initialize_copy();

@@ -394,6 +394,12 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
 void FunctionToPrecalculate::initialize_copy() {
   assert(F_copy == nullptr);
   F_copy = CloneFunction(F_orig, old_new_map, cloned_code_info);
+
+  for (auto v : old_new_map) {
+    Value *old_v = const_cast<Value *>(v.first);
+    Value *new_v = v.second;
+    new_to_old_map.insert(std::make_pair(new_v, old_v));
+  }
 }
 
 void Precalculations::replace_calls_in_copy(
@@ -493,9 +499,15 @@ void Precalculations::replace_calls_in_copy(
       call->setCalledFunction(function_information->F_copy);
     }
     // null all not used args
+
+    Value *orig_call_v = func->new_to_old_map[call];
+    auto *orig_call = dyn_cast<CallBase>(orig_call_v);
+    assert(orig_call);
+
     for (unsigned int i = 0; i < call->arg_size(); ++i) {
-      if (function_information->args_to_use.find(i) ==
-          function_information->args_to_use.end()) {
+      if (tainted_values.find(orig_call->getArgOperand(i)) ==
+          tainted_values.end()) {
+        // set unused arg to 0 (so we dont need to compute it)
         call->setArgOperand(
             i, Constant::getNullValue(call->getArgOperand(i)->getType()));
       } // else pass arg normally
@@ -508,15 +520,6 @@ void Precalculations::replace_calls_in_copy(
 // remove all unnecessary instruction
 void FunctionToPrecalculate::prune_copy(
     const std::set<llvm::Value *> &tainted_values) {
-
-  // we need to get the reverse mapping
-  std::map<Value *, Value *> new_to_old_map;
-
-  for (auto v : old_new_map) {
-    Value *old_v = const_cast<Value *>(v.first);
-    Value *new_v = v.second;
-    new_to_old_map.insert(std::make_pair(new_v, old_v));
-  }
 
   std::vector<Instruction *> to_prune;
 
