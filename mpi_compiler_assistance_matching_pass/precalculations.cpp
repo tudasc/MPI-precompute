@@ -311,16 +311,17 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   std::transform(call->use_begin(), call->use_end(),
                  std::inserter(users_of_retval, users_of_retval.begin()),
                  [](const auto &u) { return dyn_cast<Value>(&u); });
-  std::set<Value *> tainred_users_of_retval;
-  std::set_union(
+  std::set<Value *> tainted_users_of_retval;
+  std::set_intersection(
       users_of_retval.begin(), users_of_retval.end(), tainted_values.begin(),
       tainted_values.end(),
-      std::inserter(tainred_users_of_retval, tainred_users_of_retval.begin()));
-  bool need_return_val = not tainred_users_of_retval.empty();
+      std::inserter(tainted_users_of_retval, tainted_users_of_retval.begin()));
+  bool need_return_val = not tainted_users_of_retval.empty();
 
   if (need_return_val) {
     assert(not call->isIndirectCall() && "TODO not implemented\n");
     // TODO
+    assert(not call->getCalledFunction()->isDeclaration());
     for (auto bb = call->getCalledFunction()->begin();
          bb != call->getCalledFunction()->end(); ++bb) {
       if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
@@ -335,10 +336,17 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     assert(not call->isIndirectCall() && "TODO not implemented\n");
     // TODO
-    for (auto bb = call->getCalledFunction()->begin();
-         bb != call->getCalledFunction()->end(); ++bb) {
-      if (auto *res = dyn_cast<ResumeInst>(bb->getTerminator())) {
-        insert_tainted_value(res);
+    if (not call->getCalledFunction()->willReturn()) {
+      // if it will return, there is no need to have an invoke
+      // in this case control flow will not break if we just skip this function,
+      // as we know that it does not make the flow go away due to an exception
+      call->getCalledFunction()->dump();
+      assert(not call->getCalledFunction()->isDeclaration());
+      for (auto bb = call->getCalledFunction()->begin();
+           bb != call->getCalledFunction()->end(); ++bb) {
+        if (auto *res = dyn_cast<ResumeInst>(bb->getTerminator())) {
+          insert_tainted_value(res);
+        }
       }
     }
   }
@@ -937,6 +945,7 @@ void VtableManager::perform_vtable_change_in_copies() {
       auto *from = std::get<1>(triple);
       auto *to = std::get<2>(triple);
       inst->replaceUsesOfWith(from, to);
+      inst->dump();
     }
 
   } // end for each vtable
