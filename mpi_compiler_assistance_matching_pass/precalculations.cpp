@@ -839,7 +839,7 @@ VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
     }
     // these special llvm magic globals are not touched
     // we will just use the normal initializers
-    // as everything of this will be called before main actually starts MPI_Init
+    // as everything of this will be called before main actually starts
     assert(current_level_of_definition->getName().equals("llvm.global_ctors") ||
            current_level_of_definition->getName().equals("llvm.global_dtors"));
     return nullptr;
@@ -978,8 +978,13 @@ VtableManager::get_replaced_vtable(llvm::User *vtable_value_as_use) {
 
   auto *new_vtable_value =
       ConstantArray::get(vtable_value->getType(), new_vtable);
-  // TODO set correct initializer!
-  new_vtable_global->setInitializer(new_vtable_value);
+  auto *old_vtable_initializer =
+      cast<ConstantStruct>(vtable_value->getUniqueUndroppableUser());
+  assert(old_vtable_initializer->getType()->getNumElements() ==
+         1); // only the vtable array itself is the element
+  auto *new_vtable_initializer =
+      ConstantStruct::get(old_vtable_initializer->getType(), new_vtable_value);
+  new_vtable_global->setInitializer(new_vtable_initializer);
   errs() << "new vtable:\n";
   new_vtable_global->dump();
 
