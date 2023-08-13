@@ -22,6 +22,7 @@
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -794,11 +795,11 @@ void Precalculations::replace_usages_of_func_in_copy(
     }
     if (isa<ArrayType>(u->getType())) {
       // an array of function ptrs -- aka a vtable for objects
-
-      // nothing to do the vtable manager will take care of this
+      // nothing to do, the vtable manager will take care of this
       continue;
     }
     errs() << "This usage is currently not supported:\n";
+    errs() << func->F_orig->getName() << "\n";
     u->dump();
     assert(false);
   }
@@ -901,25 +902,53 @@ void VtableManager::perform_vtable_change_in_copies() {
     // end creation of new vtable
 
     // collections of uses to replace
-    std::vector<Instruction *> to_replace;
+    std::vector<std::tuple<Instruction *, Value *, Value *>> to_replace;
     for (auto *u : vtable_global->users()) {
       // only replace if in copy
       if (auto *inst = dyn_cast<Instruction>(u)) {
         if (new_funcs.find(inst->getFunction()) != new_funcs.end()) {
-          to_replace.push_back(inst);
+          to_replace.push_back(
+              std::make_tuple(inst, vtable_global, new_vtable_global));
+        }
+      } else if (auto *constant = dyn_cast<ConstantExpr>(u)) {
+        // a constant getelemptr - a use of a vtable entry
+        // we neet to replace teh first opoerand with the new vtable, all other
+        // operands stay the same
+        std::vector<Constant *> operands;
+        for (auto &op : constant->operands()) {
+          operands.push_back(cast<Constant>(&op));
+        }
+        assert(operands[0] == vtable_global);
+        operands[0] = new_vtable_global;
+        Value *getelemptr_copy = constant->getWithOperands(operands);
+        // all usages of this in copied functions
+        for (auto uu : constant->users()) {
+          if (auto *inst = dyn_cast<Instruction>(uu)) {
+            if (new_funcs.find(inst->getFunction()) != new_funcs.end()) {
+              to_replace.push_back(
+                  std::make_tuple(inst, constant, getelemptr_copy));
+            }
+          } else {
+            errs() << "unknown use of vtable access :\n";
+            u->dump();
+            uu->dump();
+            assert(false);
+          }
         }
       } else {
-        // TODO is this inside of an inst?
         errs() << "unknown use of vtable:\n";
         u->dump();
         assert(false);
       }
     }
     // and replace
-    for (auto *inst : to_replace) {
-      inst->replaceUsesOfWith(vtable_global, new_vtable_global);
+    for (auto triple : to_replace) {
+      auto *inst = std::get<0>(triple);
+      auto *from = std::get<1>(triple);
+      auto *to = std::get<2>(triple);
+      inst->replaceUsesOfWith(from, to);
     }
 
   } // end for each vtable
-  assert(false && "DEBUG");
+  // assert(false && "DEBUG");
 }
