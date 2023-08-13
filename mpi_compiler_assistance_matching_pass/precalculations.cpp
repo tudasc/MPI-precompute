@@ -793,7 +793,7 @@ void Precalculations::replace_usages_of_func_in_copy(
       } // else: a use in the original version of a function
       continue;
     }
-    if (isa<ArrayType>(u->getType())) {
+    if (isa<ConstantAggregate>(u)) {
       // an array of function ptrs -- aka a vtable for objects
       // nothing to do, the vtable manager will take care of this
       continue;
@@ -811,19 +811,27 @@ void Precalculations::replace_usages_of_func_in_copy(
 }
 llvm::GlobalValue *
 VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
-  assert(isa<Constant>(vtable_value) && "non constant vtable for a class?");
+  assert(isa<ConstantAggregate>(vtable_value) &&
+         "non constant vtable for a class?");
   assert(vtable_value->hasOneUser() &&
          "What kind of vtable is defined multiple times?");
-
-  auto *vtable_initializer =
-      dyn_cast<Constant>(vtable_value->getUniqueUndroppableUser());
+  Constant *vtable_initializer = cast<Constant>(vtable_value);
+  if (isa<ConstantArray>(vtable_value)) {
+    vtable_initializer =
+        dyn_cast<Constant>(vtable_value->getUniqueUndroppableUser());
+  }
   assert(vtable_initializer && "Vtable with a non constant initializer?");
   assert(vtable_initializer->hasOneUser() &&
          "storing the vtable into several globals is not supported?");
   auto *vtable_global =
-      dyn_cast<GlobalValue>(vtable_initializer->getUniqueUndroppableUser());
-  assert(vtable_global && "Vtable is not defined as a global?");
-  return vtable_global;
+      dyn_cast<Value>(vtable_initializer->getUniqueUndroppableUser());
+
+  errs() << "Found Vtable:\n";
+  vtable_global->dump();
+  assert(dyn_cast<GlobalValue>(vtable_global) &&
+         "Vtable is not defined as a global?");
+
+  return dyn_cast<GlobalValue>(vtable_global);
 }
 
 void VtableManager::register_function_copy(llvm::Function *old_F,
@@ -834,7 +842,7 @@ void VtableManager::register_function_copy(llvm::Function *old_F,
 
 void VtableManager::perform_vtable_change_in_copies() {
 
-  std::map<GlobalValue *, Constant *> vtable_global_to_value;
+  std::map<GlobalValue *, GlobalValue *> old_new_vtable_map;
 
   // collect all the vtables that need some changes
   for (auto pair : old_new_func_map) {
@@ -843,83 +851,45 @@ void VtableManager::perform_vtable_change_in_copies() {
     auto new_func = pair.second;
 
     for (auto u : old_func->users()) {
-      if (isa<ArrayType>(u->getType())) {
+      if (isa<ConstantAggregate>(u)) {
         auto vtable_global = get_vtable_from_ptr_user(u);
         auto *vtable_value = dyn_cast<Constant>(u);
-        if (vtable_global_to_value.find(vtable_global) ==
-            vtable_global_to_value.end()) {
-          vtable_global_to_value.insert(
-              std::make_pair(vtable_global, vtable_value));
+        if (old_new_vtable_map.find(vtable_global) ==
+            old_new_vtable_map.end()) {
+          old_new_vtable_map.insert(
+              // get the new vtable
+              std::make_pair(vtable_global, get_replaced_vtable(vtable_value)));
         } else {
-          assert(vtable_global_to_value[vtable_global] == vtable_value);
+          // nothing to do, the first call will generate the full replaced
+          // vtable, even if multiple entries in it needs to be replaced
         }
       }
     }
   }
-  IRBuilder<> builder(M.getContext());
 
-  for (auto pair : vtable_global_to_value) {
-    auto vtable_global = pair.first;
-    auto *vtable_value = dyn_cast<ConstantArray>(pair.second);
-    assert(vtable_value && "The vtable is not a constant Array?");
-
-    std::string name_of_copy =
-        vtable_global->getName().str() + "_copy_for_precalc";
-
-    // copy the vtable
-    auto *new_vtable_global = cast<GlobalVariable>(
-        M.getOrInsertGlobal(name_of_copy, vtable_global->getType()));
-    new_vtable_global->setInitializer(nullptr);
-
-    std::vector<Constant *> new_vtable;
-    errs() << "old vtable:\n";
-    vtable_global->dump();
-
-    for (unsigned int i = 0; i < vtable_value->getNumOperands(); ++i) {
-      auto vtable_entry = vtable_value->getOperand(i);
-      if (auto *func = dyn_cast<Function>(vtable_entry)) {
-        if (old_new_func_map.find(func) != old_new_func_map.end()) {
-          new_vtable.push_back(old_new_func_map[func]);
-        } else {
-          // this function was not copied: it will not be called
-          new_vtable.push_back(Constant::getNullValue(vtable_entry->getType()));
-        }
-
-      } else {
-        // keep old value (may be null or a special pure virtual value)
-
-        new_vtable.push_back(vtable_entry);
-      }
-    }
-
-    // collect uses to replace
-    auto *new_vtable_value =
-        ConstantArray::get(vtable_value->getType(), new_vtable);
-    // TODO set correct initializer!
-    new_vtable_global->setInitializer(new_vtable_value);
-    errs() << "new vtable:\n";
-    new_vtable_global->dump();
-    // end creation of new vtable
+  for (auto pair : old_new_vtable_map) {
+    auto vtable_global_old = pair.first;
+    auto *vtable_global_new = pair.second;
 
     // collections of uses to replace
     std::vector<std::tuple<Instruction *, Value *, Value *>> to_replace;
-    for (auto *u : vtable_global->users()) {
+    for (auto *u : vtable_global_old->users()) {
       // only replace if in copy
       if (auto *inst = dyn_cast<Instruction>(u)) {
         if (new_funcs.find(inst->getFunction()) != new_funcs.end()) {
           to_replace.push_back(
-              std::make_tuple(inst, vtable_global, new_vtable_global));
+              std::make_tuple(inst, vtable_global_old, vtable_global_new));
         }
       } else if (auto *constant = dyn_cast<ConstantExpr>(u)) {
-        // a constant getelemptr - a use of a vtable entry
-        // we neet to replace teh first opoerand with the new vtable, all other
+        //  a use of a vtable entry
+        // we need to replace the first operand with the new vtable, all other
         // operands stay the same
         std::vector<Constant *> operands;
         for (auto &op : constant->operands()) {
           operands.push_back(cast<Constant>(&op));
         }
-        assert(operands[0] == vtable_global);
-        operands[0] = new_vtable_global;
+        assert(operands[0] == vtable_global_old);
+        operands[0] = vtable_global_new;
         Value *getelemptr_copy = constant->getWithOperands(operands);
         // all usages of this in copied functions
         for (auto uu : constant->users()) {
@@ -951,4 +921,47 @@ void VtableManager::perform_vtable_change_in_copies() {
 
   } // end for each vtable
   // assert(false && "DEBUG");
+}
+GlobalVariable *
+VtableManager::get_replaced_vtable(llvm::User *vtable_value_as_use) {
+  auto vtable_global = get_vtable_from_ptr_user(vtable_value_as_use);
+
+  auto *vtable_value = dyn_cast<ConstantArray>(vtable_value_as_use);
+  assert(vtable_value && "The vtable is not a constant Array?");
+
+  std::string name_of_copy =
+      vtable_global->getName().str() + "_copy_for_precalc";
+
+  // copy the vtable
+  auto *new_vtable_global = cast<GlobalVariable>(
+      M.getOrInsertGlobal(name_of_copy, vtable_global->getType()));
+  new_vtable_global->setInitializer(nullptr);
+
+  std::vector<Constant *> new_vtable;
+  errs() << "old vtable:\n";
+  vtable_global->dump();
+
+  for (unsigned int i = 0; i < vtable_value->getNumOperands(); ++i) {
+    auto vtable_entry = vtable_value->getOperand(i);
+    if (auto *func = dyn_cast<Function>(vtable_entry)) {
+      if (old_new_func_map.find(func) != old_new_func_map.end()) {
+        new_vtable.push_back(old_new_func_map[func]);
+      } else {
+        // this function was not copied: it will not be called during precalc
+        new_vtable.push_back(Constant::getNullValue(vtable_entry->getType()));
+      }
+    } else {
+      // keep old value (may be null or a special pure virtual value)
+      new_vtable.push_back(vtable_entry);
+    }
+  }
+
+  auto *new_vtable_value =
+      ConstantArray::get(vtable_value->getType(), new_vtable);
+  // TODO set correct initializer!
+  new_vtable_global->setInitializer(new_vtable_value);
+  errs() << "new vtable:\n";
+  new_vtable_global->dump();
+
+  return new_vtable_global;
 }

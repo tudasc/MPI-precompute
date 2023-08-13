@@ -40,6 +40,8 @@ private:
   // just for ease of programming, it is also contained in the map above
   std::set<llvm::Function *> new_funcs;
 
+  llvm::GlobalVariable *get_replaced_vtable(llvm::User *vtable_value);
+
   static llvm::GlobalValue *get_vtable_from_ptr_user(llvm::User *vtable_value);
 };
 
