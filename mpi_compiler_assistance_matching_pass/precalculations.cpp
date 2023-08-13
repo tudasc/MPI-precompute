@@ -338,6 +338,9 @@ void Precalculations::visit_val(llvm::CallBase *call) {
     // TODO
     if (not call->getCalledFunction()->hasFnAttribute(
             Attribute::AttrKind::NoUnwind)) {
+      // TODO mark MPI funcs and some funcs of the stdlib as to have no
+      // exception for this purpose
+
       // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this function,
       // as we know that it does not make the flow go away due to an exception
