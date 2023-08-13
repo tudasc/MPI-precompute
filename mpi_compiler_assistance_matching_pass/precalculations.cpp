@@ -446,6 +446,10 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
             } else if (auto *invoke = dyn_cast<InvokeInst>(term)) {
               insert_tainted_value(invoke);
               // we will later visit it
+            } else if (auto *switch_inst = dyn_cast<SwitchInst>(term)) {
+              insert_tainted_value(switch_inst);
+              visited_values.insert(switch_inst);
+              insert_tainted_value(switch_inst->getCondition());
             } else {
               errs() << "Error analyzing CFG:\n";
               term->dump();
