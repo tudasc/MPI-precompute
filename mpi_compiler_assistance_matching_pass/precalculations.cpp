@@ -828,9 +828,25 @@ VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
 
   errs() << "Found Vtable:\n";
   vtable_global->dump();
+  if (not isa<GlobalValue>(vtable_global)) {
+
+    Constant *current_level_of_definition = cast<Constant>(vtable_global);
+    while (not isa<GlobalValue>(current_level_of_definition)) {
+      assert(current_level_of_definition->hasOneUser() &&
+             "storing the vtable into several globals is not supported?");
+      current_level_of_definition = cast<Constant>(
+          current_level_of_definition->getUniqueUndroppableUser());
+    }
+    // these special llvm magic globals are not touched
+    // we will just use the normal initializers
+    // as everything of this will be called before main actually starts MPI_Init
+    assert(current_level_of_definition->getName().equals("llvm.global_ctors") ||
+           current_level_of_definition->getName().equals("llvm.global_dtors"));
+    return nullptr;
+  }
+
   assert(dyn_cast<GlobalValue>(vtable_global) &&
          "Vtable is not defined as a global?");
-
   return dyn_cast<GlobalValue>(vtable_global);
 }
 
@@ -854,8 +870,12 @@ void VtableManager::perform_vtable_change_in_copies() {
       if (isa<ConstantAggregate>(u)) {
         auto vtable_global = get_vtable_from_ptr_user(u);
         auto *vtable_value = dyn_cast<Constant>(u);
-        if (old_new_vtable_map.find(vtable_global) ==
-            old_new_vtable_map.end()) {
+        // if get_vtable_from_ptr_user returns nullptr
+        // we found one of the llvm special "vtables" @llvm.global_ctors
+        // we will not change this (the application needs the full
+        // initialization not just the parts relevant for tag computing)
+        if (vtable_global && old_new_vtable_map.find(vtable_global) ==
+                                 old_new_vtable_map.end()) {
           old_new_vtable_map.insert(
               // get the new vtable
               std::make_pair(vtable_global, get_replaced_vtable(vtable_value)));
