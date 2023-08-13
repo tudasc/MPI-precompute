@@ -336,8 +336,9 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     assert(not call->isIndirectCall() && "TODO not implemented\n");
     // TODO
-    if (not call->getCalledFunction()->willReturn()) {
-      // if it will return, there is no need to have an invoke
+    if (not call->getCalledFunction()->hasFnAttribute(
+            Attribute::AttrKind::NoUnwind)) {
+      // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this function,
       // as we know that it does not make the flow go away due to an exception
       call->getCalledFunction()->dump();
