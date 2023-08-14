@@ -17,7 +17,9 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         frontend_plugin_data.h
         frontend_plugin_data.cpp
         precalculation.h
-        precalculations.cpp)
+        precalculations.cpp
+        devirt_analysis.h
+        devirt_analysis.cpp)
 
 # if one wants to use mpi
 #find_package(MPI REQUIRED)
