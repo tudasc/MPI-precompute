@@ -27,6 +27,8 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+// #include "llvm/Transforms/IPO/WholeProgramDevirt.h"
+
 #include "debug.h"
 using namespace llvm;
 
@@ -200,6 +202,10 @@ void Precalculations::visit_val(llvm::Value *v) {
   }
   if (auto *phi = dyn_cast<PHINode>(v)) {
     visit_val(phi);
+    return;
+  }
+  if (auto *cast = dyn_cast<CastInst>(v)) {
+    insert_tainted_value(cast->getOperand(0));
     return;
   }
   if (auto *gep = dyn_cast<GetElementPtrInst>(v)) {
@@ -822,7 +828,9 @@ void Precalculations::find_functionTypes_called_indirect() {
 void Precalculations::visit_all_indirect_calls_for_FnType(
     llvm::FunctionType *fntype) {
   for (auto &f : M.functions()) {
-    if (f.getFunctionType() == fntype) {
+    // TODO do proper analysis to check the external func is not part of any
+    // vtable
+    if (f.getFunctionType() == fntype && not f.isDeclaration()) {
       insert_functions_to_include(&f);
     }
     for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
