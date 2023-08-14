@@ -105,6 +105,9 @@
 #include <set>
 #include <string>
 
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
+
 using namespace llvm;
 using namespace wholeprogramdevirtAnalysis;
 
@@ -120,7 +123,7 @@ STATISTIC(NumVirtConstProp1Bit,
 STATISTIC(NumVirtConstProp, "Number of virtual constant propagations");
 
 static cl::opt<PassSummaryAction> ClSummaryAction(
-    "wholeprogramdevirt-summary-action",
+    "wholeprogramdevirt-analysis-summary-action",
     cl::desc("What to do with the summary when running this pass"),
     cl::values(clEnumValN(PassSummaryAction::None, "none", "Do nothing"),
                clEnumValN(PassSummaryAction::Import, "import",
@@ -130,26 +133,27 @@ static cl::opt<PassSummaryAction> ClSummaryAction(
     cl::Hidden);
 
 static cl::opt<std::string> ClReadSummary(
-    "wholeprogramdevirt-read-summary",
+    "wholeprogramdevirt-analysis-read-summary",
     cl::desc(
         "Read summary from given bitcode or YAML file before running pass"),
     cl::Hidden);
 
 static cl::opt<std::string> ClWriteSummary(
-    "wholeprogramdevirt-write-summary",
+    "wholeprogramdevirt-analysis-write-summary",
     cl::desc("Write summary to given bitcode or YAML file after running pass. "
              "Output file format is deduced from extension: *.bc means writing "
              "bitcode, otherwise YAML"),
     cl::Hidden);
 
 static cl::opt<unsigned>
-    ClThreshold("wholeprogramdevirt-branch-funnel-threshold", cl::Hidden,
-                cl::init(10),
+    ClThreshold("wholeprogramdevirt-analysis-branch-funnel-threshold",
+                cl::Hidden, cl::init(10),
                 cl::desc("Maximum number of call targets per "
                          "call site to enable branch funnels"));
 
 static cl::opt<bool>
-    PrintSummaryDevirt("wholeprogramdevirt-print-index-based", cl::Hidden,
+    PrintSummaryDevirt("wholeprogramdevirt-analysis-print-index-based",
+                       cl::Hidden,
                        cl::desc("Print index-based devirtualization messages"));
 
 /// Provide a way to force enable whole program visibility in tests.
@@ -157,18 +161,18 @@ static cl::opt<bool>
 /// !vcall_visibility metadata (the mere presense of type tests
 /// previously implied hidden visibility).
 static cl::opt<bool>
-    WholeProgramVisibility("whole-program-visibility", cl::Hidden,
+    WholeProgramVisibility("whole-program-visibility-analysis", cl::Hidden,
                            cl::desc("Enable whole program visibility"));
 
 /// Provide a way to force disable whole program for debugging or workarounds,
 /// when enabled via the linker.
 static cl::opt<bool> DisableWholeProgramVisibility(
-    "disable-whole-program-visibility", cl::Hidden,
+    "disable-whole-program-visibility-analysis", cl::Hidden,
     cl::desc("Disable whole program visibility (overrides enabling options)"));
 
 /// Provide way to prevent certain function from being devirtualized
 static cl::list<std::string>
-    SkipFunctionNames("wholeprogramdevirt-skip",
+    SkipFunctionNames("wholeprogramdevirt-skip-analysis",
                       cl::desc("Prevent function(s) from being devirtualized"),
                       cl::Hidden, cl::CommaSeparated);
 
@@ -179,7 +183,7 @@ static cl::list<std::string>
 /// visibility may be compromised.
 enum WPDCheckMode { None, Trap, Fallback };
 static cl::opt<WPDCheckMode> DevirtCheckMode(
-    "wholeprogramdevirt-check", cl::Hidden,
+    "wholeprogramdevirt-check-analysis", cl::Hidden,
     cl::desc("Type of checking for incorrect devirtualizations"),
     cl::values(clEnumValN(WPDCheckMode::None, "none", "No checking"),
                clEnumValN(WPDCheckMode::Trap, "trap", "Trap when incorrect"),
@@ -747,8 +751,12 @@ struct DevirtIndex {
 };
 } // end anonymous namespace
 
-PreservedAnalyses WholeProgramDevirtPass::run(Module &M,
-                                              ModuleAnalysisManager &AM) {
+PreservedAnalyses
+WholeProgramDevirtAnalysisPass::run(Module &M, ModuleAnalysisManager &AM) {
+
+  errs() << "DEVIRT\n";
+  // M.dump();
+
   auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
   auto AARGetter = [&](Function &F) -> AAResults & {
     return FAM.getResult<AAManager>(F);
@@ -2382,4 +2390,20 @@ void DevirtIndex::run() {
       errs() << "Devirtualized call to " << DT << "\n";
 
   NumDevirtTargets += DevirtTargets.size();
+}
+
+PassPluginLibraryInfo getPassPluginInfo() {
+  const auto callback = [](PassBuilder &PB) {
+    PB.registerOptimizerEarlyEPCallback([&](ModulePassManager &MPM, auto) {
+      MPM.addPass(WholeProgramDevirtAnalysisPass());
+      return true;
+    });
+  };
+
+  return {LLVM_PLUGIN_API_VERSION, "whole-programm-devirt-analysis", "1.0.0",
+          callback};
+};
+
+extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
+  return getPassPluginInfo();
 }

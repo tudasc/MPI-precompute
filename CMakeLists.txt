@@ -4,9 +4,9 @@ cmake_policy(SET CMP0118 NEW)
 
 project("MPI Assertion Checking")
 
-if(NOT CMAKE_BUILD_TYPE)
-set(CMAKE_BUILD_TYPE Debug)
-endif(NOT CMAKE_BUILD_TYPE)
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)
+endif (NOT CMAKE_BUILD_TYPE)
 message("Build Type: ${CMAKE_BUILD_TYPE}")
 
 
@@ -34,7 +34,8 @@ add_custom_target(setup_env.sh ALL
         echo "export CPATH=\\$$CPATH:${INSTALL_DIR}/include" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export LIBRARY_PATH=\\$$LIBRARY_PATH:${INSTALL_DIR}/lib" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export LD_LIBRARY_PATH=\\$$LD_LIBRARY_PATH:${INSTALL_DIR}/lib" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export MPI_COMPILER_ASSISTANCE_PASS=${PASS_LIB}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
+        echo "export MPI_COMPILER_ASSISTANCE_PASS=${PASS_LIB}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export WHOLE_PROGRAM_DEVIRT_ANALYSIS_PASS=${CMAKE_BINARY_DIR}/WholeProgramDevirtAnalysisPass/libwholeProgramDevirtAnalysisPass.so" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
 
         DEPENDS setup_env.sh.in)
 

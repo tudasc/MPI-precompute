@@ -219,16 +219,17 @@ void setAfterReturnValues(MutableArrayRef<VirtualCallTarget> Targets,
                           uint64_t AllocAfter, unsigned BitWidth,
                           int64_t &OffsetByte, uint64_t &OffsetBit);
 
-} // end namespace wholeprogramdevirt
+} // namespace wholeprogramdevirtAnalysis
 
-struct WholeProgramDevirtPass : public PassInfoMixin<WholeProgramDevirtPass> {
+struct WholeProgramDevirtAnalysisPass
+    : public PassInfoMixin<WholeProgramDevirtAnalysisPass> {
   ModuleSummaryIndex *ExportSummary;
   const ModuleSummaryIndex *ImportSummary;
   bool UseCommandLine = false;
-  WholeProgramDevirtPass()
+  WholeProgramDevirtAnalysisPass()
       : ExportSummary(nullptr), ImportSummary(nullptr), UseCommandLine(true) {}
-  WholeProgramDevirtPass(ModuleSummaryIndex *ExportSummary,
-                         const ModuleSummaryIndex *ImportSummary)
+  WholeProgramDevirtAnalysisPass(ModuleSummaryIndex *ExportSummary,
+                                 const ModuleSummaryIndex *ImportSummary)
       : ExportSummary(ExportSummary), ImportSummary(ImportSummary) {
     assert(!(ExportSummary && ImportSummary));
   }
