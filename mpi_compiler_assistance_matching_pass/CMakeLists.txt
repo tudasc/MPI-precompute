@@ -32,6 +32,7 @@ target_compile_features(mpi_compiler_assistance_matching_pass PRIVATE cxx_std_17
 
 ExternalProject_Get_property(ompi INSTALL_DIR)
 target_include_directories(mpi_compiler_assistance_matching_pass PUBLIC ${INSTALL_DIR}/include)
+target_include_directories(mpi_compiler_assistance_matching_pass PUBLIC ${CMAKE_SOURCE_DIR}/WholeProgramDevirtAnalysisPass)
 
 add_dependencies(mpi_compiler_assistance_matching_pass ompi)
 
