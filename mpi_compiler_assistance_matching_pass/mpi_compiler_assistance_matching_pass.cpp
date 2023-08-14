@@ -184,8 +184,7 @@ struct MPICompilerAssistanceMatchingPass
 
 PassPluginLibraryInfo getPassPluginInfo() {
   const auto callback = [](PassBuilder &PB) {
-    PB.registerPipelineEarlySimplificationEPCallback(
-        [&](ModulePassManager &MPM, auto) {
+    PB.registerOptimizerEarlyEPCallback([&](ModulePassManager &MPM, auto) {
           MPM.addPass(MPICompilerAssistanceMatchingPass());
           return true;
         });

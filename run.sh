@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #CFLAGS="-std=c11 -O3 ${INCLUDE}"
-CFLAGS="-std=c11 -O0 -g ${INCLUDE}"
+CFLAGS="-std=c11 -O1 -g ${INCLUDE}"
 LIBS="-lopen-pal -lucp -lm"
-CXXFLAGS="-std=c++17 -O0 -g ${INCLUDE}"
+CXXFLAGS="-std=c++17 -O1 -g ${INCLUDE}"
 
 
 export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="plugin_data.json"
