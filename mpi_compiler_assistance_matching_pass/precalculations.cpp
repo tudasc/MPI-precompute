@@ -30,6 +30,31 @@
 #include "debug.h"
 using namespace llvm;
 
+// True, if invoke->getcalledFuncion can rainse an exception that may be not
+// fatal for our analysis, we consider all MPI funcs and std::cout as having no
+// exceptions
+bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) {
+  auto *func = invoke->getCalledFunction();
+  if (func->hasFnAttribute(Attribute::AttrKind::NoUnwind)) {
+    return false;
+  }
+  if (is_mpi_function(func)) {
+    return false;
+  }
+
+  // operator << of std::basic_ostream
+  // and stream to use is stdout
+  if (func->getName() ==
+          "_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc" &&
+      invoke->getArgOperand(0)->getName() == "_ZSt4cout") {
+    assert(isa<GlobalVariable>(invoke->getArgOperand(0)));
+    return false;
+  }
+
+  // may yield an exception
+  return true;
+}
+
 void Precalculations::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;
@@ -321,7 +346,8 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   if (need_return_val) {
     assert(not call->isIndirectCall() && "TODO not implemented\n");
     // TODO
-    assert(not call->getCalledFunction()->isDeclaration());
+    assert(not call->getCalledFunction()->isDeclaration() &&
+           "cannot analyze if calling external function has side effects");
     for (auto bb = call->getCalledFunction()->begin();
          bb != call->getCalledFunction()->end(); ++bb) {
       if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
@@ -336,11 +362,8 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     assert(not call->isIndirectCall() && "TODO not implemented\n");
     // TODO
-    if (not call->getCalledFunction()->hasFnAttribute(
-            Attribute::AttrKind::NoUnwind)) {
-      // TODO mark MPI funcs and some funcs of the stdlib as to have no
-      // exception for this purpose
 
+    if (is_invoke_necessary_for_control_flow(invoke)) {
       // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this function,
       // as we know that it does not make the flow go away due to an exception

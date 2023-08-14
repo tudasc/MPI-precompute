@@ -17,7 +17,7 @@ public:
 class CommManagerStandard : public CommManager {
 public:
   CommManagerStandard(int tag_to_use) : tag_to_use(tag_to_use) {
-    // std::cout << "Standard Comm\n";
+    std::cout << "Standard Comm\n";
   }
   ~CommManagerStandard() {}
   void init(){};
@@ -76,7 +76,7 @@ private:
 class CommManagerPersistent : public CommManager {
 public:
   CommManagerPersistent(int tag_to_use) : tag_to_use(tag_to_use) {
-    // std::cout << "Persistent Comm\n";
+    std::cout << "Persistent Comm\n";
   }
   void init() {
     int rank, size;
