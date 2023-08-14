@@ -529,6 +529,7 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
 
 void FunctionToPrecalculate::initialize_copy() {
   assert(F_copy == nullptr);
+  assert(not F_orig->isDeclaration() && "Cannot copy external function");
   F_copy = CloneFunction(F_orig, old_new_map, cloned_code_info);
 
   for (auto v : old_new_map) {

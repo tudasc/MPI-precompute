@@ -48,7 +48,9 @@ private:
 
 class FunctionToPrecalculate {
 public:
-  FunctionToPrecalculate(llvm::Function *F) : F_orig(F){};
+  FunctionToPrecalculate(llvm::Function *F) : F_orig(F) {
+    assert(not F->isDeclaration() && "Cannot analyze external function");
+  };
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
               std::inserter(args_to_use, args_to_use.begin()));
