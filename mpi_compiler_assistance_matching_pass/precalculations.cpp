@@ -55,6 +55,24 @@ bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) {
   return true;
 }
 
+bool is_allocation(llvm::CallBase *call) {
+  // operator new
+  if (call->getCalledFunction()->getName() == "_Znwm") {
+    assert(isa<Constant>(call->getArgOperand(0)) &&
+           "Non constant allocation in new??");
+    return true;
+  }
+  return false;
+}
+
+bool is_free(llvm::CallBase *call) {
+  // operator new
+  if (call->getCalledFunction()->getName() == "_ZdlPv") {
+    return true;
+  }
+  return false;
+}
+
 void Precalculations::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;
@@ -87,7 +105,7 @@ void Precalculations::add_precalculations(
   }
 
   for (const auto &f : functions_to_include) {
-    f->prune_copy(tainted_values);
+    prune_function_copy(f);
   }
   add_call_to_precalculation_to_main();
 }
@@ -327,8 +345,7 @@ void Precalculations::visit_val(llvm::Argument *arg) {
   }
 }
 
-void Precalculations::visit_val(llvm::CallBase *call) {
-  assert(visited_values.find(call) != visited_values.end());
+bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) const {
 
   // check if this is tainted as the ret val is used
 
@@ -342,16 +359,28 @@ void Precalculations::visit_val(llvm::CallBase *call) {
       tainted_values.end(),
       std::inserter(tainted_users_of_retval, tainted_users_of_retval.begin()));
   bool need_return_val = not tainted_users_of_retval.empty();
+  return need_return_val;
+}
+
+void Precalculations::visit_val(llvm::CallBase *call) {
+  assert(visited_values.find(call) != visited_values.end());
+
+  bool need_return_val = is_retval_of_call_used(call);
 
   if (need_return_val) {
     assert(not call->isIndirectCall() && "TODO not implemented\n");
     // TODO
-    assert(not call->getCalledFunction()->isDeclaration() &&
-           "cannot analyze if calling external function has side effects");
-    for (auto bb = call->getCalledFunction()->begin();
-         bb != call->getCalledFunction()->end(); ++bb) {
-      if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
-        insert_tainted_value(ret);
+    if (is_allocation(call)) {
+      // nothing to do, just keep this call around, it will later be replaced
+    } else {
+      assert(not call->getCalledFunction()->isDeclaration() &&
+             "cannot analyze if calling external function for return value has "
+             "side effects");
+      for (auto bb = call->getCalledFunction()->begin();
+           bb != call->getCalledFunction()->end(); ++bb) {
+        if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
+          insert_tainted_value(ret);
+        }
       }
     }
   }
@@ -368,7 +397,8 @@ void Precalculations::visit_val(llvm::CallBase *call) {
       // in this case control flow will not break if we just skip this function,
       // as we know that it does not make the flow go away due to an exception
       call->getCalledFunction()->dump();
-      assert(not call->getCalledFunction()->isDeclaration());
+      assert(not call->getCalledFunction()->isDeclaration() &&
+             "cannot analyze if external function may throw an exception");
       for (auto bb = call->getCalledFunction()->begin();
            bb != call->getCalledFunction()->end(); ++bb) {
         if (auto *res = dyn_cast<ResumeInst>(bb->getTerminator())) {
@@ -404,7 +434,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   if (func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank) {
     // we know it is safe to execute these "readonly" funcs
     if (*ptr_given_as_arg.begin() == 0 && ptr_given_as_arg.size() == 1) {
-      // nothing to do only reads the communicator
+      // nothing to: do only reads the communicator
     } else {
       // the needed value is the result of reading the comm
       assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
@@ -653,20 +683,28 @@ void Precalculations::replace_calls_in_copy(
 }
 
 // remove all unnecessary instruction
-void FunctionToPrecalculate::prune_copy(
-    const std::set<llvm::Value *> &tainted_values) {
+void Precalculations::prune_function_copy(
+    const std::shared_ptr<FunctionToPrecalculate> &func) {
 
   std::vector<Instruction *> to_prune;
 
   // first  gather all instructions, so that the iterator does not get broken if
   // we remove// stuff
 
-  for (auto I = inst_begin(F_copy), E = inst_end(F_copy); I != E; ++I) {
+  for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
+       ++I) {
 
     Instruction *inst = &*I;
-    auto old_v = new_to_old_map[inst];
+    auto old_v = func->new_to_old_map[inst];
     if (tainted_values.find(old_v) == tainted_values.end()) {
       to_prune.push_back(inst);
+    } else if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
+      // an invoke because it may return an exception
+      // but it actually is exception free for our purpose
+      if (not is_invoke_necessary_for_control_flow(invoke) &&
+          not is_retval_of_call_used(invoke)) {
+        to_prune.push_back(inst);
+      }
     }
   }
 
@@ -674,14 +712,21 @@ void FunctionToPrecalculate::prune_copy(
   for (auto inst : to_prune) {
 
     if (inst->isTerminator()) {
-      // if this terminator was not tainted: we can immediately return from this
-      // function
-      IRBuilder<> builder = IRBuilder<>(inst);
-      if (inst->getFunction()->getReturnType()->isVoidTy()) {
-        builder.CreateRetVoid();
+
+      if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
+        // an invoke that was determined not necessary will just be skipped
+        IRBuilder<> builder = IRBuilder<>(inst);
+        builder.CreateBr(invoke->getNormalDest());
       } else {
-        builder.CreateRet(
-            Constant::getNullValue(inst->getFunction()->getReturnType()));
+        // if this terminator was not tainted: we can immediately return from
+        // this function
+        IRBuilder<> builder = IRBuilder<>(inst);
+        if (inst->getFunction()->getReturnType()->isVoidTy()) {
+          builder.CreateRetVoid();
+        } else {
+          builder.CreateRet(
+              Constant::getNullValue(inst->getFunction()->getReturnType()));
+        }
       }
     }
     // we keep the exception handling instructions so that the module is still

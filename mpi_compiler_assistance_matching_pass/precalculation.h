@@ -61,8 +61,6 @@ public:
   llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we dont need it
 
   void initialize_copy();
-
-  void prune_copy(const std::set<llvm::Value *> &tainted_values);
 };
 
 // TODO different interface
@@ -109,9 +107,12 @@ public:
   void visit_call_from_ptr(llvm::CallBase *call, llvm::Value *ptr);
   void visit_ptr(llvm::Value *ptr);
 
+  bool is_retval_of_call_used(llvm::CallBase *call) const;
+
   void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
   void
   replace_usages_of_func_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
+  void prune_function_copy(const std::shared_ptr<FunctionToPrecalculate> &func);
 
   void add_call_to_precalculation_to_main();
 };
