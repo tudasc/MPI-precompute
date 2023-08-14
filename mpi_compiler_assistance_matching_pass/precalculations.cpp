@@ -893,7 +893,7 @@ void Precalculations::replace_usages_of_func_in_copy(
     assert(has_replaced);
   }
 }
-llvm::GlobalValue *
+llvm::GlobalVariable *
 VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
   assert(isa<ConstantAggregate>(vtable_value) &&
          "non constant vtable for a class?");
@@ -910,8 +910,8 @@ VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
   auto *vtable_global =
       dyn_cast<Value>(vtable_initializer->getUniqueUndroppableUser());
 
-  errs() << "Found Vtable:\n";
-  vtable_global->dump();
+  // errs() << "Found Vtable:\n";
+  // vtable_global->dump();
   if (not isa<GlobalValue>(vtable_global)) {
 
     Constant *current_level_of_definition = cast<Constant>(vtable_global);
@@ -929,9 +929,9 @@ VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
     return nullptr;
   }
 
-  assert(dyn_cast<GlobalValue>(vtable_global) &&
+  assert(dyn_cast<GlobalVariable>(vtable_global) &&
          "Vtable is not defined as a global?");
-  return dyn_cast<GlobalValue>(vtable_global);
+  return dyn_cast<GlobalVariable>(vtable_global);
 }
 
 void VtableManager::register_function_copy(llvm::Function *old_F,
@@ -1038,13 +1038,14 @@ VtableManager::get_replaced_vtable(llvm::User *vtable_value_as_use) {
       vtable_global->getName().str() + "_copy_for_precalc";
 
   // copy the vtable
-  auto *new_vtable_global = cast<GlobalVariable>(
-      M.getOrInsertGlobal(name_of_copy, vtable_global->getType()));
-  new_vtable_global->setInitializer(nullptr);
+  // auto *new_vtable_global = cast<GlobalVariable>(
+  //    M.getOrInsertGlobal(name_of_copy, vtable_global->getType()));
+  // new_vtable_global->setInitializer(nullptr);
 
   std::vector<Constant *> new_vtable;
   errs() << "old vtable:\n";
   vtable_global->dump();
+  vtable_global->getType()->dump();
 
   for (unsigned int i = 0; i < vtable_value->getNumOperands(); ++i) {
     auto vtable_entry = vtable_value->getOperand(i);
@@ -1069,9 +1070,16 @@ VtableManager::get_replaced_vtable(llvm::User *vtable_value_as_use) {
          1); // only the vtable array itself is the element
   auto *new_vtable_initializer =
       ConstantStruct::get(old_vtable_initializer->getType(), new_vtable_value);
-  new_vtable_global->setInitializer(new_vtable_initializer);
+
+  auto *new_vtable_global = new GlobalVariable(
+      M, new_vtable_initializer->getType(), true, vtable_global->getLinkage(),
+      new_vtable_initializer, name_of_copy, vtable_global);
+
+  new_vtable_global->copyAttributesFrom(vtable_global);
+
   errs() << "new vtable:\n";
   new_vtable_global->dump();
+  new_vtable_global->getType()->dump();
 
   return new_vtable_global;
 }

@@ -42,7 +42,8 @@ private:
 
   llvm::GlobalVariable *get_replaced_vtable(llvm::User *vtable_value);
 
-  static llvm::GlobalValue *get_vtable_from_ptr_user(llvm::User *vtable_value);
+  static llvm::GlobalVariable *
+  get_vtable_from_ptr_user(llvm::User *vtable_value);
 };
 
 class FunctionToPrecalculate {
