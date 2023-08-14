@@ -698,8 +698,7 @@ void Precalculations::prune_function_copy(
   std::vector<Instruction *> to_prune;
 
   // first  gather all instructions, so that the iterator does not get broken if
-  // we remove// stuff
-
+  // we remove stuff
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
 
@@ -744,19 +743,21 @@ void Precalculations::prune_function_copy(
       // lp->setCleanup(false);
       lp->dump();
     } else {
+      inst->replaceAllUsesWith(UndefValue::get(inst->getType()));
       inst->eraseFromParent();
     }
   }
 
-  // perform DCE by removing now unused unused BBs
+  // perform DCE by removing now unused BBs
   std::set<BasicBlock *> to_remove_bb;
-  for (auto BB = func->F_copy->begin(); BB != func->F_copy->end(); ++BB) {
-    if (pred_empty(&*BB) && not BB->isEntryBlock()) {
-      to_remove_bb.insert(&*BB);
+  for (auto &BB : *func->F_copy) {
+    if (pred_empty(&BB) && not BB.isEntryBlock()) {
+      to_remove_bb.insert(&BB);
     }
   }
   // and remove BBs
   for (auto *BB : to_remove_bb) {
+    BB->dump();
     BB->eraseFromParent();
   }
 
@@ -773,7 +774,8 @@ void Precalculations::add_call_to_precalculation_to_main() {
   const auto &function_info = *pos;
   auto entry_to_precalc = function_info->F_copy;
 
-  // search for MPI_init orInit Thread as precalc may only take place after that
+  // search for MPI_init or Init Thread as precalc may only take place after
+  // that
   CallBase *call_to_init = nullptr;
   if (mpi_func->mpi_init != nullptr) {
     for (auto u : mpi_func->mpi_init->users()) {
