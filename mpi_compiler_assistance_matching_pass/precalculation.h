@@ -117,6 +117,8 @@ public:
   replace_usages_of_func_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
   void prune_function_copy(const std::shared_ptr<FunctionToPrecalculate> &func);
 
+  bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
+
   void add_call_to_precalculation_to_main();
 };
 

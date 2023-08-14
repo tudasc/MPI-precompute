@@ -34,27 +34,62 @@
 #include "debug.h"
 using namespace llvm;
 
-// True, if invoke->getcalledFuncion can rainse an exception that may be not
-// fatal for our analysis, we consider all MPI funcs and std::cout as having no
-// exceptions
-bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) {
+// from
+// https://stackoverflow.com/questions/1964150/c-test-if-2-sets-are-disjoint
+template <class Set1, class Set2>
+bool is_disjoint(const Set1 &set1, const Set2 &set2) {
+  if (set1.empty() || set2.empty())
+    return true;
+
+  typename Set1::const_iterator it1 = set1.begin(), it1End = set1.end();
+  typename Set2::const_iterator it2 = set2.begin(), it2End = set2.end();
+
+  if (*it1 > *set2.rbegin() || *it2 > *set1.rbegin())
+    return true;
+
+  while (it1 != it1End && it2 != it2End) {
+    if (*it1 == *it2)
+      return false;
+    if (*it1 < *it2) {
+      it1++;
+    } else {
+      it2++;
+    }
+  }
+
+  return true;
+}
+
+// True if callee can raise an exception and the exception handling code is
+// actually tainted if exception handling is not tainted, we dont need to handle
+// the exception anyway and abortion is fine in this case
+bool Precalculations::is_invoke_necessary_for_control_flow(
+    llvm::InvokeInst *invoke) const {
+
+  auto *unwindBB = invoke->getUnwindDest();
+
+  std::set<Instruction *> in_unwind;
+
+  for (auto &i : *unwindBB) {
+    in_unwind.insert(&i);
+    // need to put it into set for sorting
+  }
+  if (is_disjoint(tainted_values, in_unwind)) {
+    return false;
+    // exception handling is not needed;
+  }
+
+  unwindBB->dump();
+  for (auto &i : *unwindBB) {
+    i.dump();
+    errs() << "Tainted? " << (tainted_values.find(&i) != tainted_values.end())
+           << "\n";
+  }
+
   auto *func = invoke->getCalledFunction();
   if (func->hasFnAttribute(Attribute::AttrKind::NoUnwind)) {
     return false;
   }
-  if (is_mpi_function(func)) {
-    return false;
-  }
-
-  // operator << of std::basic_ostream
-  // and stream to use is stdout
-  if (func->getName() ==
-          "_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc" &&
-      invoke->getArgOperand(0)->getName() == "_ZSt4cout") {
-    assert(isa<GlobalVariable>(invoke->getArgOperand(0)));
-    return false;
-  }
-
   // may yield an exception
   return true;
 }
@@ -361,12 +396,7 @@ bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) const {
   std::transform(call->use_begin(), call->use_end(),
                  std::inserter(users_of_retval, users_of_retval.begin()),
                  [](const auto &u) { return dyn_cast<Value>(&u); });
-  std::set<Value *> tainted_users_of_retval;
-  std::set_intersection(
-      users_of_retval.begin(), users_of_retval.end(), tainted_values.begin(),
-      tainted_values.end(),
-      std::inserter(tainted_users_of_retval, tainted_users_of_retval.begin()));
-  bool need_return_val = not tainted_users_of_retval.empty();
+  bool need_return_val = not is_disjoint(tainted_values, users_of_retval);
   return need_return_val;
 }
 
