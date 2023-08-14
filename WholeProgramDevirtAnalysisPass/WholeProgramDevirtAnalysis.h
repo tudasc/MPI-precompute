@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TRANSFORMS_IPO_WHOLEPROGRAMDEVIRT_H
-#define LLVM_TRANSFORMS_IPO_WHOLEPROGRAMDEVIRT_H
+#ifndef WHOLEPROGRAMDEVIRT_H
+#define WHOLEPROGRAMDEVIRT_H
 
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/PassManager.h"
@@ -33,7 +33,7 @@ class GlobalVariable;
 class ModuleSummaryIndex;
 struct ValueInfo;
 
-namespace wholeprogramdevirt {
+namespace wholeprogramdevirtAnalysis {
 
 // A bit vector that keeps track of which bits are used. We use this to
 // pack constant values compactly before and after each virtual table.
@@ -269,4 +269,4 @@ void updateIndexWPDForExports(
 
 } // end namespace llvm
 
-#endif // LLVM_TRANSFORMS_IPO_WHOLEPROGRAMDEVIRT_H
+#endif // WHOLEPROGRAMDEVIRT_H

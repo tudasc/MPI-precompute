@@ -50,7 +50,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Transforms/IPO/WholeProgramDevirt.h"
+#include "WholeProgramDevirtAnalysis.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -106,7 +106,7 @@
 #include <string>
 
 using namespace llvm;
-using namespace wholeprogramdevirt;
+using namespace wholeprogramdevirtAnalysis;
 
 #define DEBUG_TYPE "wholeprogramdevirt"
 
@@ -206,9 +206,8 @@ struct PatternList {
 // Find the minimum offset that we may store a value of size Size bits at. If
 // IsAfter is set, look for an offset before the object, otherwise look for an
 // offset after the object.
-uint64_t
-wholeprogramdevirt::findLowestOffset(ArrayRef<VirtualCallTarget> Targets,
-                                     bool IsAfter, uint64_t Size) {
+uint64_t wholeprogramdevirtAnalysis::findLowestOffset(
+    ArrayRef<VirtualCallTarget> Targets, bool IsAfter, uint64_t Size) {
   // Find a minimum offset taking into account only vtable sizes.
   uint64_t MinByte = 0;
   for (const VirtualCallTarget &Target : Targets) {
@@ -279,7 +278,7 @@ wholeprogramdevirt::findLowestOffset(ArrayRef<VirtualCallTarget> Targets,
   }
 }
 
-void wholeprogramdevirt::setBeforeReturnValues(
+void wholeprogramdevirtAnalysis::setBeforeReturnValues(
     MutableArrayRef<VirtualCallTarget> Targets, uint64_t AllocBefore,
     unsigned BitWidth, int64_t &OffsetByte, uint64_t &OffsetBit) {
   if (BitWidth == 1)
@@ -296,7 +295,7 @@ void wholeprogramdevirt::setBeforeReturnValues(
   }
 }
 
-void wholeprogramdevirt::setAfterReturnValues(
+void wholeprogramdevirtAnalysis::setAfterReturnValues(
     MutableArrayRef<VirtualCallTarget> Targets, uint64_t AllocAfter,
     unsigned BitWidth, int64_t &OffsetByte, uint64_t &OffsetBit) {
   if (BitWidth == 1)

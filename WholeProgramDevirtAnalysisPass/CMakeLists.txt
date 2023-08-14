@@ -1,7 +1,7 @@
 add_library(wholeProgramDevirtAnalysisPass MODULE
         # List your source files here.
-        WholeProgramDevirt.h
-        WholeProgramDevirt.cpp)
+        WholeProgramDevirtAnalysis.h
+        WholeProgramDevirtAnalysis.cpp)
 
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Og -DDEBUG_MACH_PASS=1")
