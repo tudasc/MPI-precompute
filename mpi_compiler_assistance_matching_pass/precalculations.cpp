@@ -27,6 +27,8 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "llvm/IR/Verifier.h"
+
 // #include "llvm/Transforms/IPO/WholeProgramDevirt.h"
 
 #include "debug.h"
@@ -717,9 +719,7 @@ void Precalculations::prune_function_copy(
 
   // remove stuff
   for (auto inst : to_prune) {
-
     if (inst->isTerminator()) {
-
       if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
         // an invoke that was determined not necessary will just be skipped
         IRBuilder<> builder = IRBuilder<>(inst);
@@ -736,6 +736,7 @@ void Precalculations::prune_function_copy(
         }
       }
     }
+
     // we keep the exception handling instructions so that the module is still
     // correct if they are not tainted and an exception occurs we abort anyway
     // (otherwise we would have tainted the exception handling code)
@@ -746,14 +747,19 @@ void Precalculations::prune_function_copy(
       inst->eraseFromParent();
     }
   }
-  /*
-    // and erase
-    for (auto inst : to_prune) {
-      inst->eraseFromParent();
+
+  // perform DCE by removing now unused unused BBs
+  std::set<BasicBlock *> to_remove_bb;
+  for (auto BB = func->F_copy->begin(); BB != func->F_copy->end(); ++BB) {
+    if (pred_empty(&*BB) && not BB->isEntryBlock()) {
+      to_remove_bb.insert(&*BB);
     }
-    */
-  // TODO remove all unreachable blocks that may be left over
-  // this should be done later by a dead Code elimination pass
+  }
+  // and remove BBs
+  for (auto *BB : to_remove_bb) {
+    BB->eraseFromParent();
+  }
+
   // one can now also combine blocks
 }
 
