@@ -129,24 +129,37 @@ bool DevirtModule::tryFindVirtualCallTargets(
     std::vector<VirtualCallTarget> &TargetsForSlot,
     const std::set<TypeMemberInfo> &TypeMemberInfos, uint64_t ByteOffset,
     ModuleSummaryIndex *ExportSummary) {
-  for (const TypeMemberInfo &TM : TypeMemberInfos) {
-    if (!TM.Bits->GV->isConstant())
-      return false;
 
+  errs() << "tryFindVirtualCallTargets\n";
+  for (const TypeMemberInfo &TM : TypeMemberInfos) {
+    if (!TM.Bits->GV->isConstant()) {
+      errs() << "!TM.Bits->GV->isConstant()\n";
+      return false;
+    }
+    // TODO is this safe?
     // We cannot perform whole program devirtualization analysis on a vtable
     // with public LTO visibility.
-    if (TM.Bits->GV->getVCallVisibility() ==
+
+    /*if (TM.Bits->GV->getVCallVisibility() ==
         GlobalObject::VCallVisibilityPublic)
-      return false;
+    {
+      errs()<<"TM.Bits->GV->getVCallVisibility() ==
+    GlobalObject::VCallVisibilityPublic\n"; return false;
+    }*/
+    // we dont perform devirtualization we only need the analysis result
 
     Constant *Ptr = getPointerAtOffset(TM.Bits->GV->getInitializer(),
                                        TM.Offset + ByteOffset, M);
-    if (!Ptr)
+    if (!Ptr) {
+      errs() << "!Ptr\n";
       return false;
+    }
 
     auto Fn = dyn_cast<Function>(Ptr->stripPointerCasts());
-    if (!Fn)
+    if (!Fn) {
+      errs() << "!Fn\n";
       return false;
+    }
 
     /*
     if (FunctionsToSkip.match(Fn->getName()))
@@ -425,3 +438,8 @@ void DevirtModule::scanTypeCheckedLoadUsers(Function *TypeCheckedLoadFunc) {
     CI->eraseFromParent();
   }
 }
+
+VirtualCallTarget::VirtualCallTarget(Function *Fn, const TypeMemberInfo *TM)
+    : Fn(Fn), TM(TM),
+      IsBigEndian(Fn->getParent()->getDataLayout().isBigEndian()),
+      WasDevirt(false) {}
