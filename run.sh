@@ -3,7 +3,8 @@
 #CFLAGS="-std=c11 -O3 ${INCLUDE}"
 CFLAGS="-std=c11 -O1 -g ${INCLUDE}"
 LIBS="-lopen-pal -lucp -lm"
-CXXFLAGS="-std=c++17 -O1 -g ${INCLUDE}"
+CXXFLAGS="-std=c++17 -O1 -g ${INCLUDE} -fuse-ld=lld"
+#
 
 #PASS_FLAGS="-fwhole-program-vtables -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
 PASS_FLAGS="-flto -fwhole-program-vtables -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
