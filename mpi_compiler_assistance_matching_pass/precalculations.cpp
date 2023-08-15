@@ -33,37 +33,11 @@
 #include "debug.h"
 using namespace llvm;
 
-// from
-// https://stackoverflow.com/questions/1964150/c-test-if-2-sets-are-disjoint
-template <class Set1, class Set2>
-bool is_disjoint(const Set1 &set1, const Set2 &set2) {
-  if (set1.empty() || set2.empty())
-    return true;
-
-  typename Set1::const_iterator it1 = set1.begin(), it1End = set1.end();
-  typename Set2::const_iterator it2 = set2.begin(), it2End = set2.end();
-
-  if (*it1 > *set2.rbegin() || *it2 > *set1.rbegin())
-    return true;
-
-  while (it1 != it1End && it2 != it2End) {
-    if (*it1 == *it2)
-      return false;
-    if (*it1 < *it2) {
-      it1++;
-    } else {
-      it2++;
-    }
-  }
-
-  return true;
-}
-
 // True if callee can raise an exception and the exception handling code is
 // actually tainted if exception handling is not tainted, we dont need to handle
 // the exception anyway and abortion is fine in this case
 bool Precalculations::is_invoke_necessary_for_control_flow(
-    llvm::InvokeInst *invoke) const {
+    llvm::InvokeInst *invoke) {
 
   auto *unwindBB = invoke->getUnwindDest();
 
@@ -73,7 +47,8 @@ bool Precalculations::is_invoke_necessary_for_control_flow(
     in_unwind.insert(&i);
     // need to put it into set for sorting
   }
-  if (is_disjoint(tainted_values, in_unwind)) {
+
+  if (is_none_tainted(in_unwind)) {
     return false;
     // exception handling is not needed;
   }
@@ -81,8 +56,7 @@ bool Precalculations::is_invoke_necessary_for_control_flow(
   unwindBB->dump();
   for (auto &i : *unwindBB) {
     i.dump();
-    errs() << "Tainted? " << (tainted_values.find(&i) != tainted_values.end())
-           << "\n";
+    errs() << "Tainted? " << is_tainted(&i) << "\n";
   }
 
   auto *func = invoke->getCalledFunction();
@@ -123,8 +97,8 @@ void Precalculations::add_precalculations(
     insert_tainted_value(tag);
     insert_tainted_value(src);
     // TODO precompute comm as well?
-    insert_tainted_value(call);
-    visited_values.insert(call);
+    auto new_val = insert_tainted_value(call);
+    visited_values.insert(new_val);
   }
 
   find_all_tainted_vals();
@@ -150,7 +124,7 @@ void Precalculations::add_precalculations(
 
 void Precalculations::find_all_tainted_vals() {
   while (tainted_values.size() > visited_values.size()) {
-    std::set<Value *> not_visited;
+    std::set<std::shared_ptr<TaintedValue>> not_visited;
     std::set_difference(tainted_values.begin(), tainted_values.end(),
                         visited_values.begin(), visited_values.end(),
                         std::inserter(not_visited, not_visited.begin()));
@@ -159,18 +133,21 @@ void Precalculations::find_all_tainted_vals() {
       visit_val(v);
     }
   }
+  // done calculating
 
-  std::set<Value *> not_visited_assert;
+  // only for asserting that the subset is valid:
+  std::set<std::shared_ptr<TaintedValue>> not_visited_assert;
   std::set_difference(
       tainted_values.begin(), tainted_values.end(), visited_values.begin(),
       visited_values.end(),
       std::inserter(not_visited_assert, not_visited_assert.begin()));
   assert(not_visited_assert.empty());
+  std::set<BasicBlock *> tainted_blocks;
   // taint all the blocks that are relevant
   std::transform(tainted_values.begin(), tainted_values.end(),
                  std::inserter(tainted_blocks, tainted_blocks.begin()),
                  [](auto v) -> BasicBlock * {
-                   if (auto *inst = dyn_cast<Instruction>(v))
+                   if (auto *inst = dyn_cast<Instruction>(v->v))
                      return inst->getParent();
                    else
                      return nullptr;
@@ -184,30 +161,38 @@ void Precalculations::find_all_tainted_vals() {
   }
 }
 
-void Precalculations::visit_val(llvm::Value *v) {
+void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   errs() << "Visit\n";
-  v->dump();
+  v->v->dump();
   visited_values.insert(v);
 
-  if (auto *c = dyn_cast<Constant>(v)) {
+  if (v->is_pointer()) {
+    visit_ptr(v);
+  }
+
+  if (auto *c = dyn_cast<Constant>(v->v)) {
     return;
   }
-  if (auto *l = dyn_cast<LoadInst>(v)) {
+  if (auto *l = dyn_cast<LoadInst>(v->v)) {
     insert_tainted_value(l->getPointerOperand());
-    if (l->getType()->isPointerTy()) {
-      visit_ptr(l);
+    return;
+  }
+  if (auto *a = dyn_cast<AllocaInst>(v->v)) {
+    // nothing to do: visit_ptr is called on all ptrs anyway
+    return;
+  }
+  if (auto *s = dyn_cast<StoreInst>(v->v)) {
+    if (is_tainted(s->getPointerOperand())) {
+      // visit form ptr
+      insert_tainted_value(s->getValueOperand());
+    } else {
+      // TODO
+      //  visit from val -- a ptr is captured
+      assert(false && "TODO IMPLEMENT");
     }
     return;
   }
-  if (auto *a = dyn_cast<AllocaInst>(v)) {
-    visit_val(a);
-    return;
-  }
-  if (auto *s = dyn_cast<StoreInst>(v)) {
-    visit_val(s);
-    return;
-  }
-  if (auto *op = dyn_cast<BinaryOperator>(v)) {
+  if (auto *op = dyn_cast<BinaryOperator>(v->v)) {
     // arithmetic
     // TODO do we need to exclude some opcodes?
     assert(op->getNumOperands() == 2);
@@ -215,55 +200,63 @@ void Precalculations::visit_val(llvm::Value *v) {
     insert_tainted_value(op->getOperand(1));
     return;
   }
-  if (auto *op = dyn_cast<CmpInst>(v)) {
+  if (auto *op = dyn_cast<CmpInst>(v->v)) {
     // cmp
     assert(op->getNumOperands() == 2);
     insert_tainted_value(op->getOperand(0));
     insert_tainted_value(op->getOperand(1));
     return;
   }
-  if (auto *select = dyn_cast<SelectInst>(v)) {
+  if (auto *select = dyn_cast<SelectInst>(v->v)) {
     insert_tainted_value(select->getCondition());
     insert_tainted_value(select->getTrueValue());
     insert_tainted_value(select->getFalseValue());
     return;
   }
-  if (auto *arg = dyn_cast<Argument>(v)) {
-    visit_val(arg);
+  if (auto *arg = dyn_cast<Argument>(v->v)) {
+    visit_arg(v);
     return;
   }
-  if (auto *call = dyn_cast<CallBase>(v)) {
-    visit_val(call);
+  if (auto *call = dyn_cast<CallBase>(v->v)) {
+    visit_call(v);
     return;
   }
-  if (auto *phi = dyn_cast<PHINode>(v)) {
-    visit_val(phi);
+  if (auto *phi = dyn_cast<PHINode>(v->v)) {
+    for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
+      auto v = phi->getIncomingValue(i);
+      insert_tainted_value(v);
+    }
     return;
   }
-  if (auto *cast = dyn_cast<CastInst>(v)) {
+  if (auto *cast = dyn_cast<CastInst>(v->v)) {
     insert_tainted_value(cast->getOperand(0));
     return;
   }
-  if (auto *gep = dyn_cast<GetElementPtrInst>(v)) {
+  if (auto *gep = dyn_cast<GetElementPtrInst>(v->v)) {
     for (unsigned int i = 0; i < gep->getNumOperands(); ++i) {
       insert_tainted_value(gep->getOperand(i));
     }
+    assert(is_tainted(gep->getPointerOperand()));
     return;
   }
 
   errs() << "Support for analyzing this Value is not implemented yet\n";
-  v->dump();
+  v->v->dump();
   assert(false);
 }
 
-void Precalculations::visit_ptr(llvm::Value *ptr) {
-  insert_tainted_value(ptr);
+void Precalculations::visit_ptr(std::shared_ptr<TaintedValue> ptr) {
+  assert(ptr->is_pointer());
+  insert_tainted_value(ptr->v);
   visited_values.insert(ptr);
-  assert(ptr->getType()->isPointerTy());
-  for (auto u : ptr->users()) {
+
+  assert(false && "TODO IMPLEMENT");
+  /*
+  for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
       insert_tainted_value(s);
-      if (s->getValueOperand() == ptr) {
+      if (s->getValueOperand() == ptr->v) {
+        // TODO
         visit_ptr(s->getPointerOperand());
       }
       continue;
@@ -293,28 +286,7 @@ void Precalculations::visit_ptr(llvm::Value *ptr) {
     u->dump();
     assert(false);
   }
-}
-
-void Precalculations::visit_val(llvm::AllocaInst *alloca) {
-  assert(visited_values.find(alloca) != visited_values.end());
-  visit_ptr(alloca);
-}
-
-void Precalculations::visit_val(llvm::PHINode *phi) {
-  assert(visited_values.find(phi) != visited_values.end());
-
-  for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
-    auto v = phi->getIncomingValue(i);
-    tainted_values.insert(v);
-  }
-}
-
-void Precalculations::visit_val(llvm::StoreInst *store) {
-  assert(visited_values.find(store) != visited_values.end());
-
-  assert(tainted_values.find(store->getPointerOperand()) !=
-         tainted_values.end());
-  insert_tainted_value(store->getValueOperand());
+   */
 }
 
 std::shared_ptr<FunctionToPrecalculate>
@@ -325,26 +297,22 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
                    [&func](const auto p) { return p->F_orig == func; });
 
   if (pos == functions_to_include.end()) {
+    errs() << "include function: " << func->getName() << "\n";
     auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
     functions_to_include.insert(fun_to_precalc);
+
     for (auto u : func->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
-        insert_tainted_value(call);
-        visited_values.insert(call); // no need to do something with it just
-                                     // make shure it is included
+        auto new_val = insert_tainted_value(call);
+        visited_values.insert(new_val); // no need to do something with it just
+                                        // make shure it is included
         continue;
       }
-      /*
-            errs() << "Error analyzing usage of function: " << func->getName()
-                   << "\n";
-            errs() << "Support for analyzing this Value is not implemented
-         yet\n"; u->dump(); assert(false);
-            */
-      // uses that will result in indirect calls will be handled from the call
-      // site (see visit_all_indirect_calls_for_FnType)
     }
+    // indirect calls
+    taint_all_indirect_calls(func);
 
     return fun_to_precalc;
   } else {
@@ -352,8 +320,8 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
   }
 }
 
-void Precalculations::visit_val(llvm::Argument *arg) {
-  assert(visited_values.find(arg) != visited_values.end());
+void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
+  auto *arg = cast<Argument>(arg_info->v);
 
   auto *func = arg->getParent();
 
@@ -361,6 +329,8 @@ void Precalculations::visit_val(llvm::Argument *arg) {
 
   if (fun_to_precalc->args_to_use.find(arg->getArgNo()) ==
       fun_to_precalc->args_to_use.end()) {
+
+    fun_to_precalc->args_to_use.insert(arg->getArgNo());
     // else: nothing to do, this was already visited
     for (auto u : func->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
@@ -368,20 +338,17 @@ void Precalculations::visit_val(llvm::Argument *arg) {
         insert_tainted_value(operand);
         continue;
       }
-    }
-    // TODO
-    fun_to_precalc->args_to_use.insert(arg->getArgNo());
-
-    if (functions_that_may_be_called_indirect.find(func) !=
-        functions_that_may_be_called_indirect.end()) {
-      // this func may be called indirect we need to visit all indirect call
-      // sites
-      visit_all_indirect_call_args(func, arg->getArgNo());
+      if (functions_that_may_be_called_indirect.find(func) !=
+          functions_that_may_be_called_indirect.end()) {
+        // this func may be called indirect we need to visit all indirect call
+        // sites
+        taint_all_indirect_call_args(func, arg->getArgNo());
+      }
     }
   }
 }
 
-bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) const {
+bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) {
 
   // check if this is tainted as the ret val is used
 
@@ -389,26 +356,29 @@ bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) const {
   std::transform(call->use_begin(), call->use_end(),
                  std::inserter(users_of_retval, users_of_retval.begin()),
                  [](const auto &u) { return dyn_cast<Value>(&u); });
-  bool need_return_val = not is_disjoint(tainted_values, users_of_retval);
+  bool need_return_val = not is_none_tainted(users_of_retval);
   return need_return_val;
 }
 
-void Precalculations::visit_val(llvm::CallBase *call) {
-  assert(visited_values.find(call) != visited_values.end());
+void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
+  auto *call = cast<CallBase>(call_info->v);
+  assert(is_visited(call));
+
+  std::vector<Function *> possible_targets = get_possible_call_targets(call);
 
   bool need_return_val = is_retval_of_call_used(call);
-
   if (need_return_val) {
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
+      // TODO
     } else {
-      for (auto func : get_possible_call_targets(call)) {
-        assert(
-            not func->isDeclaration() &&
-            "cannot analyze if calling external function for return value has "
-            "side effects");
-        for (auto bb = func->begin(); bb != func->end(); ++bb) {
-          if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
+      for (auto func : possible_targets) {
+        assert(not func->isDeclaration() &&
+               "cannot analyze if calling external function for return value "
+               "has "
+               "side effects");
+        for (auto &bb : *func) {
+          if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
             insert_tainted_value(ret);
           }
         }
@@ -422,27 +392,31 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     if (is_invoke_necessary_for_control_flow(invoke)) {
       // if it will not cause an exception, there is no need to have an invoke
-      // in this case control flow will not break if we just skip this function,
-      // as we know that it does not make the flow go away due to an exception
-      std::vector<Function *> possible_targets =
-          get_possible_call_targets(call);
+      // in this case control flow will not break if we just skip this
+      // function, as we know that it does not make the flow go away due to an
+      // exception
 
       for (auto func : possible_targets) {
         assert(not func->isDeclaration() &&
                "cannot analyze if external function may throw an exception");
-        for (auto bb = func->begin(); bb != func->end(); ++bb) {
-          if (auto *res = dyn_cast<ResumeInst>(bb->getTerminator())) {
+        for (auto &bb : *func) {
+          if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
             insert_tainted_value(res);
           }
         }
       }
     }
   }
+
+  if (call->isIndirectCall()) {
+    // we need to taint the function ptr
+    insert_tainted_value(call->getCalledOperand());
+  }
 }
 
 void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
                                           llvm::Value *ptr) {
-  assert(visited_values.find(ptr) != visited_values.end());
+  assert(is_visited(call));
 
   if (call->getCalledOperand() == ptr) {
     // visit from the function ptr: nothing to check
@@ -469,8 +443,10 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       } else {
         // the needed value is the result of reading the comm
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
-        visited_values.insert(call);
-        insert_tainted_value(call);
+        // TODO
+        auto new_val = insert_tainted_value(call);
+        visited_values.insert(new_val);
+
         insert_tainted_value(
             call->getArgOperand(0)); // we also need to keep the comm
       }
@@ -490,8 +466,12 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
 
     if (func->isIntrinsic() &&
         (func->getIntrinsicID() == Intrinsic::lifetime_start ||
-         func->getIntrinsicID() == Intrinsic::lifetime_end)) {
-      // ignore lifetime intrinsics
+         func->getIntrinsicID() == Intrinsic::lifetime_end ||
+         func->getIntrinsicID() == Intrinsic::type_test ||
+         func->getIntrinsicID() == Intrinsic::public_type_test ||
+         func->getIntrinsicID() == Intrinsic::assume ||
+         func->getIntrinsicID() == Intrinsic::type_checked_load)) {
+      // ignore intrinsics
       continue;
     }
 
@@ -500,43 +480,50 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       if (arg->hasAttribute(Attribute::NoCapture) &&
           arg->hasAttribute(Attribute::ReadOnly)) {
         continue; // nothing to do reading the val is allowed
-        // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as first
-        // ptr lvl is only read
+        // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as
+        // first ptr lvl is only read
       }
       if (func->isDeclaration()) {
         errs() << "Can not analyze usage of external function:\n";
         func->dump();
         assert(false);
       } else {
-        insert_tainted_value(arg);
-        visited_values.insert(arg);
-        visit_ptr(arg);
+        auto new_val = insert_tainted_value(arg);
+        // TODO
+        visited_values.insert(new_val);
+        visit_ptr(new_val);
       }
     }
   }
 }
 
-void Precalculations::insert_tainted_value(llvm::Value *v) {
-  if (tainted_values.insert(v).second) {
+std::shared_ptr<TaintedValue>
+Precalculations::insert_tainted_value(llvm::Value *v) {
+  // TODO what to do with ptr vals
+  assert(not v->getType()->isPointerTy());
+  if (not is_tainted(v)) {
     // only if not already in set
+    auto new_elem = std::make_shared<TaintedValue>(v);
+    tainted_values.insert(new_elem);
     if (auto *inst = dyn_cast<Instruction>(v)) {
       auto bb = inst->getParent();
       if (not bb->isEntryBlock()) {
-        // we need to insert the instruction that lets the control flow go here
+        // we need to insert the instruction that lets the control flow go
+        // here
         for (auto pred_bb : predecessors(bb)) {
           auto *term = pred_bb->getTerminator();
           if (term->getNumSuccessors() > 1) {
             if (auto *branch = dyn_cast<BranchInst>(term)) {
               assert(branch->isConditional());
               insert_tainted_value(branch->getCondition());
-              insert_tainted_value(branch);
-              visited_values.insert(branch);
+              auto new_val = insert_tainted_value(branch);
+              visited_values.insert(new_val);
             } else if (auto *invoke = dyn_cast<InvokeInst>(term)) {
               insert_tainted_value(invoke);
               // we will later visit it
             } else if (auto *switch_inst = dyn_cast<SwitchInst>(term)) {
-              insert_tainted_value(switch_inst);
-              visited_values.insert(switch_inst);
+              auto new_val = insert_tainted_value(switch_inst);
+              visited_values.insert(new_val);
               insert_tainted_value(switch_inst->getCondition());
             } else {
               errs() << "Error analyzing CFG:\n";
@@ -547,8 +534,8 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
             assert(dyn_cast<BranchInst>(term));
             assert(dyn_cast<BranchInst>(term)->isConditional() == false);
             assert(term->getSuccessor(0) == bb);
-            visited_values.insert(term);
-            insert_tainted_value(term);
+            auto new_val = insert_tainted_value(term);
+            visited_values.insert(new_val);
           }
         }
       } else {
@@ -556,6 +543,10 @@ void Precalculations::insert_tainted_value(llvm::Value *v) {
         insert_functions_to_include(bb->getParent());
       }
     }
+  } else {
+    // the present value form the set
+    return *std::find_if(tainted_values.begin(), tainted_values.end(),
+                         [&v](const auto &vv) { return vv->v == v; });
   }
 }
 
@@ -612,7 +603,7 @@ void Precalculations::replace_calls_in_copy(
         if (call->isIndirectCall()) {
           to_replace.push_back(call);
         } else {
-          assert(tainted_values.find(callee) == tainted_values.end());
+          assert(not is_tainted(callee));
           // it is not used: nothing to do
         }
       }
@@ -701,8 +692,7 @@ void Precalculations::replace_calls_in_copy(
     assert(orig_call);
 
     for (unsigned int i = 0; i < call->arg_size(); ++i) {
-      if (tainted_values.find(orig_call->getArgOperand(i)) ==
-          tainted_values.end()) {
+      if (not is_tainted(orig_call->getArgOperand(i))) {
         // set unused arg to 0 (so we dont need to compute it)
         call->setArgOperand(
             i, Constant::getNullValue(call->getArgOperand(i)->getType()));
@@ -719,14 +709,14 @@ void Precalculations::prune_function_copy(
 
   std::vector<Instruction *> to_prune;
 
-  // first  gather all instructions, so that the iterator does not get broken if
-  // we remove stuff
+  // first  gather all instructions, so that the iterator does not get broken
+  // if we remove stuff
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
 
     Instruction *inst = &*I;
     auto old_v = func->new_to_old_map[inst];
-    if (tainted_values.find(old_v) == tainted_values.end()) {
+    if (not is_tainted(old_v)) {
       to_prune.push_back(inst);
     } else if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
       // an invoke because it may return an exception
@@ -779,7 +769,6 @@ void Precalculations::prune_function_copy(
   }
   // and remove BBs
   for (auto *BB : to_remove_bb) {
-    BB->dump();
     BB->eraseFromParent();
   }
 
@@ -901,7 +890,7 @@ Precalculations::get_possible_call_targets(llvm::CallBase *call) {
   return possible_targets;
 }
 
-void Precalculations::visit_all_indirect_call_args(llvm::Function *func,
+void Precalculations::taint_all_indirect_call_args(llvm::Function *func,
                                                    unsigned int ArgNo) {
 
   // TODO this could be done more efficient...
@@ -911,6 +900,21 @@ void Precalculations::visit_all_indirect_call_args(llvm::Function *func,
         auto targets = get_possible_call_targets(call);
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
           insert_tainted_value(call->getArgOperand(ArgNo));
+        }
+      }
+    }
+  }
+}
+
+void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
+  // TODO this could be done more efficient...
+  // TODO duplicate code with taint_all_indirect_call_args
+  for (auto &f : M.functions()) {
+    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+      if (auto *call = dyn_cast<CallBase>(&*I)) {
+        auto targets = get_possible_call_targets(call);
+        if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
+          insert_tainted_value(call);
         }
       }
     }

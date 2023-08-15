@@ -15,6 +15,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 */
 
 #include "devirt_analysis.h"
+#include <numeric>
 #include <utility>
 
 #include "llvm/IR/Module.h"
@@ -45,6 +46,19 @@ private:
 
   static llvm::GlobalVariable *
   get_vtable_from_ptr_user(llvm::User *vtable_value);
+};
+
+struct ImportantGEPIndex {
+  std::vector<unsigned int> important_gep_index;
+};
+
+struct TaintedValue {
+  TaintedValue(llvm::Value *v) : v(v){};
+  llvm::Value *v;
+  // additional information for pointers: which indices of this pointer are
+  // relevant
+  std::set<std::shared_ptr<ImportantGEPIndex>> important_gep_index = {};
+  bool is_pointer() { return v->getType()->isPointerTy(); };
 };
 
 class FunctionToPrecalculate {
@@ -85,11 +99,10 @@ public:
 
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
   std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
-  std::set<llvm::Value *> tainted_values;
-  std::set<llvm::BasicBlock *> tainted_blocks;
-  std::set<llvm::Value *> visited_values;
+  std::set<std::shared_ptr<TaintedValue>> tainted_values;
+  std::set<std::shared_ptr<TaintedValue>> visited_values;
 
-  void insert_tainted_value(llvm::Value *v);
+  std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v);
 
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
@@ -102,25 +115,51 @@ public:
   void find_all_tainted_vals();
   void find_functions_called_indirect();
 
-  void visit_val(llvm::Value *v);
-  void visit_val(llvm::AllocaInst *alloca);
-  void visit_val(llvm::PHINode *phi);
-  void visit_val(llvm::StoreInst *store);
-  void visit_val(llvm::Argument *arg);
-  void visit_val(llvm::CallBase *call);
+  void visit_val(std::shared_ptr<TaintedValue> v);
+  void visit_arg(std::shared_ptr<TaintedValue> arg_info);
+  void visit_call(std::shared_ptr<TaintedValue> call_info);
   void visit_call_from_ptr(llvm::CallBase *call, llvm::Value *ptr);
-  void visit_ptr(llvm::Value *ptr);
+  void visit_ptr(std::shared_ptr<TaintedValue> ptr);
 
-  bool is_retval_of_call_used(llvm::CallBase *call) const;
+  bool is_tainted(llvm::Value *v) {
+    return std::find_if(tainted_values.begin(), tainted_values.end(),
+                        [&v](const auto &vv) { return vv->v == v; }) !=
+           tainted_values.end();
+  }
 
-  void visit_all_indirect_call_args(llvm::Function *func, unsigned int argNo);
+  template <class container> unsigned int get_num_tainted(container vals) {
+    return std::accumulate(
+        vals.begin(), vals.end(), (unsigned int)0,
+        [this](auto accu, auto v) { return accu + is_tainted(v); });
+  };
+
+  template <class container> bool are_all_tainted(container vals) {
+    return get_num_tainted(vals) == vals.size();
+  }
+
+  template <class container> bool is_none_tainted(container vals) {
+    return !std::accumulate(
+        vals.begin(), vals.end(), false,
+        [this](auto accu, auto v) { return accu || is_tainted(v); });
+  };
+
+  bool is_visited(llvm::Value *v) {
+    return std::find_if(visited_values.begin(), visited_values.end(),
+                        [&v](const auto &vv) { return vv->v == v; }) !=
+           visited_values.end();
+  }
+
+  bool is_retval_of_call_used(llvm::CallBase *call);
+
+  void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo);
+  void taint_all_indirect_calls(llvm::Function *func);
 
   void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
   void
   replace_usages_of_func_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
   void prune_function_copy(const std::shared_ptr<FunctionToPrecalculate> &func);
 
-  bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
+  bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke);
 
   void add_call_to_precalculation_to_main();
 
