@@ -76,6 +76,7 @@ struct MPICompilerAssistanceMatchingPass
 
   void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<TargetLibraryInfoWrapperPass>();
+    AU.addRequired<ModuleSummaryIndexWrapperPass>();
     AU.addRequiredTransitive<AAResultsWrapperPass>();
     AU.addRequired<LoopInfoWrapperPass>();
     AU.addRequired<ScalarEvolutionWrapperPass>();

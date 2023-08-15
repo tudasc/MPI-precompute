@@ -19,6 +19,7 @@
 
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ModuleSummaryAnalysis.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/PassManager.h"
@@ -32,6 +33,7 @@ public:
   llvm::LoopInfo *getLoopInfo(llvm::Function &f);
   llvm::ScalarEvolution *getSE(llvm::Function &f);
   llvm::DominatorTree *getDomTree(llvm::Function &f);
+  llvm::ModuleSummaryIndex *get_module_summary_index() { return MSI; };
 
   llvm::TargetLibraryInfo *getTLI();
 
@@ -39,6 +41,7 @@ private:
   llvm::FunctionAnalysisManager *FAM;
 
   llvm::TargetLibraryInfo *TLI;
+  llvm::ModuleSummaryIndex *MSI;
 };
 
 // will be managed by main
