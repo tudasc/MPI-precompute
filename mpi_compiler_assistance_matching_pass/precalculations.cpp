@@ -16,6 +16,7 @@
 
 #include "analysis_results.h"
 #include "conflict_detection.h"
+#include "devirt_analysis.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
 
@@ -28,8 +29,6 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "llvm/IR/Verifier.h"
-
-// #include "llvm/Transforms/IPO/WholeProgramDevirt.h"
 
 #include "debug.h"
 using namespace llvm;
@@ -58,6 +57,13 @@ bool is_disjoint(const Set1 &set1, const Set2 &set2) {
   }
 
   return true;
+}
+
+void test_devirt_analysis(Module &M) {
+  DevirtModule dvm =
+      DevirtModule(M, analysis_results->get_module_summary_index());
+
+  dvm.run();
 }
 
 // True if callee can raise an exception and the exception handling code is
@@ -115,6 +121,8 @@ bool is_free(llvm::CallBase *call) {
 void Precalculations::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;
+
+  test_devirt_analysis(M);
 
   for (auto call : to_precompute) {
     bool is_send = call->getCalledFunction() == mpi_func->mpi_send_init;

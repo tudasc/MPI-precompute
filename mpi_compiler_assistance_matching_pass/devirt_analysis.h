@@ -336,34 +336,13 @@ private:
   CallSiteInfo &findCallSiteInfo(CallBase &CB);
 };
 
-CallSiteInfo &VTableSlotInfo::findCallSiteInfo(CallBase &CB) {
-  std::vector<uint64_t> Args;
-  auto *CBType = dyn_cast<IntegerType>(CB.getType());
-  if (!CBType || CBType->getBitWidth() > 64 || CB.arg_empty())
-    return CSInfo;
-  for (auto &&Arg : drop_begin(CB.args())) {
-    auto *CI = dyn_cast<ConstantInt>(Arg);
-    if (!CI || CI->getBitWidth() > 64)
-      return CSInfo;
-    Args.push_back(CI->getZExtValue());
-  }
-  return ConstCSInfo[Args];
-}
-
-void VTableSlotInfo::addCallSite(Value *VTable, CallBase &CB,
-                                 unsigned *NumUnsafeUses) {
-  auto &CSI = findCallSiteInfo(CB);
-  CSI.AllCallSitesDevirted = false;
-  CSI.CallSites.push_back({VTable, CB, NumUnsafeUses});
-}
-
 struct DevirtModule {
   Module &M;
-  function_ref<AAResults &(Function &)> AARGetter;
-  function_ref<DominatorTree &(Function &)> LookupDomTree;
+  // function_ref<AAResults &(Function &)> AARGetter;
+  // function_ref<DominatorTree &(Function &)> LookupDomTree;
 
   ModuleSummaryIndex *ExportSummary;
-  const ModuleSummaryIndex *ImportSummary;
+  // const ModuleSummaryIndex *ImportSummary;
 
   IntegerType *Int8Ty;
   PointerType *Int8PtrTy;
@@ -394,22 +373,25 @@ struct DevirtModule {
   // true.
   std::map<CallInst *, unsigned> NumUnsafeUsesForTypeTest;
 
-  DevirtModule(Module &M, function_ref<AAResults &(Function &)> AARGetter,
-               function_ref<DominatorTree &(Function &)> LookupDomTree,
-               ModuleSummaryIndex *ExportSummary,
-               const ModuleSummaryIndex *ImportSummary)
-      : M(M), AARGetter(AARGetter), LookupDomTree(LookupDomTree),
-        ExportSummary(ExportSummary), ImportSummary(ImportSummary),
+  DevirtModule(
+      Module &M,
+      // function_ref<AAResults &(Function &)> AARGetter,
+      //          function_ref<DominatorTree &(Function &)> LookupDomTree,
+      ModuleSummaryIndex *ExportSummary
+      //         const ModuleSummaryIndex *ImportSummary
+      )
+      : M(M),
+        // AARGetter(AARGetter), LookupDomTree(LookupDomTree),
+        ExportSummary(ExportSummary),
+        // ImportSummary(ImportSummary),
         Int8Ty(Type::getInt8Ty(M.getContext())),
         Int8PtrTy(Type::getInt8PtrTy(M.getContext())),
         Int32Ty(Type::getInt32Ty(M.getContext())),
         Int64Ty(Type::getInt64Ty(M.getContext())),
         IntPtrTy(M.getDataLayout().getIntPtrType(M.getContext(), 0)),
         Int8Arr0Ty(ArrayType::get(Type::getInt8Ty(M.getContext()), 0)) {
-    assert(!(ExportSummary && ImportSummary));
+    // assert(!(ExportSummary && ImportSummary));
   }
-
-  bool areRemarksEnabled();
 
   void
   scanTypeTestUsers(Function *TypeTestFunc,
@@ -426,76 +408,8 @@ struct DevirtModule {
                             uint64_t ByteOffset,
                             ModuleSummaryIndex *ExportSummary);
 
-  void applySingleImplDevirt(VTableSlotInfo &SlotInfo, Constant *TheFn,
-                             bool &IsExported);
-  bool trySingleImplDevirt(ModuleSummaryIndex *ExportSummary,
-                           MutableArrayRef<VirtualCallTarget> TargetsForSlot,
-                           VTableSlotInfo &SlotInfo,
-                           WholeProgramDevirtResolution *Res);
-
-  void applyICallBranchFunnel(VTableSlotInfo &SlotInfo, Constant *JT,
-                              bool &IsExported);
-  void tryICallBranchFunnel(MutableArrayRef<VirtualCallTarget> TargetsForSlot,
-                            VTableSlotInfo &SlotInfo,
-                            WholeProgramDevirtResolution *Res, VTableSlot Slot);
-
-  bool tryEvaluateFunctionsWithArgs(
-      MutableArrayRef<VirtualCallTarget> TargetsForSlot,
-      ArrayRef<uint64_t> Args);
-
-  void applyUniformRetValOpt(CallSiteInfo &CSInfo, StringRef FnName,
-                             uint64_t TheRetVal);
-  bool tryUniformRetValOpt(MutableArrayRef<VirtualCallTarget> TargetsForSlot,
-                           CallSiteInfo &CSInfo,
-                           WholeProgramDevirtResolution::ByArg *Res);
-
-  // Returns the global symbol name that is used to export information about the
-  // given vtable slot and list of arguments.
-  std::string getGlobalName(VTableSlot Slot, ArrayRef<uint64_t> Args,
-                            StringRef Name);
-
-  bool shouldExportConstantsAsAbsoluteSymbols();
-
-  // This function is called during the export phase to create a symbol
-  // definition containing information about the given vtable slot and list of
-  // arguments.
-  void exportGlobal(VTableSlot Slot, ArrayRef<uint64_t> Args, StringRef Name,
-                    Constant *C);
-  void exportConstant(VTableSlot Slot, ArrayRef<uint64_t> Args, StringRef Name,
-                      uint32_t Const, uint32_t &Storage);
-
-  // This function is called during the import phase to create a reference to
-  // the symbol definition created during the export phase.
-  Constant *importGlobal(VTableSlot Slot, ArrayRef<uint64_t> Args,
-                         StringRef Name);
-  Constant *importConstant(VTableSlot Slot, ArrayRef<uint64_t> Args,
-                           StringRef Name, IntegerType *IntTy,
-                           uint32_t Storage);
-
-  Constant *getMemberAddr(const TypeMemberInfo *M);
-
-  void applyUniqueRetValOpt(CallSiteInfo &CSInfo, StringRef FnName, bool IsOne,
-                            Constant *UniqueMemberAddr);
-  bool tryUniqueRetValOpt(unsigned BitWidth,
-                          MutableArrayRef<VirtualCallTarget> TargetsForSlot,
-                          CallSiteInfo &CSInfo,
-                          WholeProgramDevirtResolution::ByArg *Res,
-                          VTableSlot Slot, ArrayRef<uint64_t> Args);
-
-  void applyVirtualConstProp(CallSiteInfo &CSInfo, StringRef FnName,
-                             Constant *Byte, Constant *Bit);
-  bool tryVirtualConstProp(MutableArrayRef<VirtualCallTarget> TargetsForSlot,
-                           VTableSlotInfo &SlotInfo,
-                           WholeProgramDevirtResolution *Res, VTableSlot Slot);
-
-  void rebuildGlobal(VTableBits &B);
-
   // Apply the summary resolution for Slot to all virtual calls in SlotInfo.
   void importResolution(VTableSlot Slot, VTableSlotInfo &SlotInfo);
-
-  // If we were able to eliminate all unsafe uses for a type checked load,
-  // eliminate the associated type tests by replacing them with true.
-  void removeRedundantTypeTests();
 
   bool run();
 
@@ -516,12 +430,6 @@ struct DevirtModule {
   static bool mustBeUnreachableFunction(Function *const F,
                                         ModuleSummaryIndex *ExportSummary);
 
-  // Lower the module using the action and summary passed as command line
-  // arguments. For testing purposes only.
-  static bool
-  runForTesting(Module &M, function_ref<AAResults &(Function &)> AARGetter,
-                function_ref<OptimizationRemarkEmitter &(Function *)> OREGetter,
-                function_ref<DominatorTree &(Function &)> LookupDomTree);
 };
 
 #endif // INCLUDE_GUARD_DEVIRT_ANALYSIS_H
