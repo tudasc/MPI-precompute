@@ -651,7 +651,6 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
     if (tryFindVirtualCallTargets(TargetsForSlot, TypeMemberInfos,
                                   S.first.ByteOffset, ExportSummary)) {
       // populate the result
-      errs() << "Populate Result\n";
       std::vector<Function *> possible_targets;
       for (auto slot : TargetsForSlot) {
         possible_targets.push_back(slot.Fn);
