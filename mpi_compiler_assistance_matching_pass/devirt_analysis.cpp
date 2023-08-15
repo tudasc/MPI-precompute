@@ -569,12 +569,6 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
     TypeTestFunc =
         M.getFunction(Intrinsic::getName(Intrinsic::public_type_test));
 
-  if (TypeTestFunc)
-    TypeTestFunc->dump();
-  if (TypeCheckedLoadFunc)
-    TypeCheckedLoadFunc->dump();
-  if (AssumeFunc)
-    AssumeFunc->dump();
 
   // Rebuild type metadata into a map for easy lookup.
   std::vector<VTableBits> Bits;
@@ -684,7 +678,6 @@ void DevirtModule::scanTypeTestUsers(
     auto *CI = dyn_cast<CallInst>(U.getUser());
     if (!CI)
       continue;
-    CI->dump();
 
     // Search for virtual calls based on %p and add them to DevirtCalls.
     SmallVector<DevirtCallSite, 1> DevirtCalls;
