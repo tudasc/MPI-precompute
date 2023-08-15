@@ -59,13 +59,6 @@ bool is_disjoint(const Set1 &set1, const Set2 &set2) {
   return true;
 }
 
-void test_devirt_analysis(Module &M) {
-  DevirtModule dvm =
-      DevirtModule(M, analysis_results->get_module_summary_index());
-
-  dvm.run();
-}
-
 // True if callee can raise an exception and the exception handling code is
 // actually tainted if exception handling is not tainted, we dont need to handle
 // the exception anyway and abortion is fine in this case
@@ -121,8 +114,6 @@ bool is_free(llvm::CallBase *call) {
 void Precalculations::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;
-
-  test_devirt_analysis(M);
 
   for (auto call : to_precompute) {
     bool is_send = call->getCalledFunction() == mpi_func->mpi_send_init;
@@ -355,13 +346,6 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
       // site (see visit_all_indirect_calls_for_FnType)
     }
 
-    if (fn_types_with_indirect_calls.find(func->getFunctionType()) !=
-        fn_types_with_indirect_calls.end()) {
-      // this func may be called indirect we need to also include all other
-      // funcs with the same type
-      visit_all_indirect_calls_for_FnType(func->getFunctionType());
-    }
-
     return fun_to_precalc;
   } else {
     return *pos;
@@ -385,13 +369,14 @@ void Precalculations::visit_val(llvm::Argument *arg) {
         continue;
       }
     }
+    // TODO
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
-    if (fn_types_with_indirect_calls.find(func->getFunctionType()) !=
-        fn_types_with_indirect_calls.end()) {
-      // this func may be called indirect we need to also include all other
-      // funcs with the same type
-      visit_all_indirect_call_args_for_FnType(func->getFunctionType(),
-                                              arg->getArgNo());
+
+    if (functions_that_may_be_called_indirect.find(func) !=
+        functions_that_may_be_called_indirect.end()) {
+      // this func may be called indirect we need to visit all indirect call
+      // sites
+      visit_all_indirect_call_args(func, arg->getArgNo());
     }
   }
 }
@@ -414,18 +399,18 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   bool need_return_val = is_retval_of_call_used(call);
 
   if (need_return_val) {
-    assert(not call->isIndirectCall() && "TODO not implemented\n");
-    // TODO
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
     } else {
-      assert(not call->getCalledFunction()->isDeclaration() &&
-             "cannot analyze if calling external function for return value has "
-             "side effects");
-      for (auto bb = call->getCalledFunction()->begin();
-           bb != call->getCalledFunction()->end(); ++bb) {
-        if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
-          insert_tainted_value(ret);
+      for (auto func : get_possible_call_targets(call)) {
+        assert(
+            not func->isDeclaration() &&
+            "cannot analyze if calling external function for return value has "
+            "side effects");
+        for (auto bb = func->begin(); bb != func->end(); ++bb) {
+          if (auto *ret = dyn_cast<ReturnInst>(bb->getTerminator())) {
+            insert_tainted_value(ret);
+          }
         }
       }
     }
@@ -435,20 +420,20 @@ void Precalculations::visit_val(llvm::CallBase *call) {
   // if there are no resumes in called function: no need to do anything as an
   // exception cannot be raised
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-    assert(not call->isIndirectCall() && "TODO not implemented\n");
-    // TODO
-
     if (is_invoke_necessary_for_control_flow(invoke)) {
       // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this function,
       // as we know that it does not make the flow go away due to an exception
-      call->getCalledFunction()->dump();
-      assert(not call->getCalledFunction()->isDeclaration() &&
-             "cannot analyze if external function may throw an exception");
-      for (auto bb = call->getCalledFunction()->begin();
-           bb != call->getCalledFunction()->end(); ++bb) {
-        if (auto *res = dyn_cast<ResumeInst>(bb->getTerminator())) {
-          insert_tainted_value(res);
+      std::vector<Function *> possible_targets =
+          get_possible_call_targets(call);
+
+      for (auto func : possible_targets) {
+        assert(not func->isDeclaration() &&
+               "cannot analyze if external function may throw an exception");
+        for (auto bb = func->begin(); bb != func->end(); ++bb) {
+          if (auto *res = dyn_cast<ResumeInst>(bb->getTerminator())) {
+            insert_tainted_value(res);
+          }
         }
       }
     }
@@ -475,57 +460,58 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   }
   assert(not ptr_given_as_arg.empty());
 
-  auto *func = call->getCalledFunction();
+  for (auto *func : get_possible_call_targets(call)) {
 
-  if (func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank) {
-    // we know it is safe to execute these "readonly" funcs
-    if (*ptr_given_as_arg.begin() == 0 && ptr_given_as_arg.size() == 1) {
-      // nothing to: do only reads the communicator
-    } else {
-      // the needed value is the result of reading the comm
-      assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
-      visited_values.insert(call);
-      insert_tainted_value(call);
-      insert_tainted_value(
-          call->getArgOperand(0)); // we also need to keep the comm
+    if (func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank) {
+      // we know it is safe to execute these "readonly" funcs
+      if (*ptr_given_as_arg.begin() == 0 && ptr_given_as_arg.size() == 1) {
+        // nothing to: do only reads the communicator
+      } else {
+        // the needed value is the result of reading the comm
+        assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
+        visited_values.insert(call);
+        insert_tainted_value(call);
+        insert_tainted_value(
+            call->getArgOperand(0)); // we also need to keep the comm
+      }
+      continue;
     }
-    return;
-  }
-  if (func == mpi_func->mpi_init || func == mpi_func->mpi_init_thread) {
-    // skip: MPI_Init will only transfer the cmd line args to all processes, not
-    // modify them otherwise
-    return;
-  }
-  if (func == mpi_func->mpi_send_init || func == mpi_func->mpi_recv_init) {
-    // skip: these functions will be managed seperately anyway
-    // it may be the case, that e.g. the buffer or request aliases with
-    // something important
-    return;
-  }
-
-  if (func->isIntrinsic() &&
-      (func->getIntrinsicID() == Intrinsic::lifetime_start ||
-       func->getIntrinsicID() == Intrinsic::lifetime_end)) {
-    // ignore lifetime intrinsics
-    return;
-  }
-
-  for (auto arg_num : ptr_given_as_arg) {
-    auto *arg = func->getArg(arg_num);
-    if (arg->hasAttribute(Attribute::NoCapture) &&
-        arg->hasAttribute(Attribute::ReadOnly)) {
-      continue; // nothing to do reading the val is allowed
-      // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as first
-      // ptr lvl is only read
+    if (func == mpi_func->mpi_init || func == mpi_func->mpi_init_thread) {
+      // skip: MPI_Init will only transfer the cmd line args to all processes,
+      // not modify them otherwise
+      continue;
     }
-    if (func->isDeclaration()) {
-      errs() << "Can not analyze usage of external function:\n";
-      func->dump();
-      assert(false);
-    } else {
-      insert_tainted_value(arg);
-      visited_values.insert(arg);
-      visit_ptr(arg);
+    if (func == mpi_func->mpi_send_init || func == mpi_func->mpi_recv_init) {
+      // skip: these functions will be managed seperately anyway
+      // it may be the case, that e.g. the buffer or request aliases with
+      // something important
+      continue;
+    }
+
+    if (func->isIntrinsic() &&
+        (func->getIntrinsicID() == Intrinsic::lifetime_start ||
+         func->getIntrinsicID() == Intrinsic::lifetime_end)) {
+      // ignore lifetime intrinsics
+      continue;
+    }
+
+    for (auto arg_num : ptr_given_as_arg) {
+      auto *arg = func->getArg(arg_num);
+      if (arg->hasAttribute(Attribute::NoCapture) &&
+          arg->hasAttribute(Attribute::ReadOnly)) {
+        continue; // nothing to do reading the val is allowed
+        // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as first
+        // ptr lvl is only read
+      }
+      if (func->isDeclaration()) {
+        errs() << "Can not analyze usage of external function:\n";
+        func->dump();
+        assert(false);
+      } else {
+        insert_tainted_value(arg);
+        visited_values.insert(arg);
+        visit_ptr(arg);
+      }
     }
   }
 }
@@ -623,13 +609,11 @@ void Precalculations::replace_calls_in_copy(
         continue;
       } else {
         // indirect call
-        if (call->isIndirectCall() &&
-            fn_types_with_indirect_calls.find(call->getFunctionType()) !=
-                fn_types_with_indirect_calls.end()) {
+        if (call->isIndirectCall()) {
           to_replace.push_back(call);
         } else {
-          // callee not in functions_to_include, we will later remove it
           assert(tainted_values.find(callee) == tainted_values.end());
+          // it is not used: nothing to do
         }
       }
     }
@@ -850,64 +834,12 @@ void Precalculations::add_call_to_precalculation_to_main() {
   builder.CreateCall(mpi_func->optimized.check_registered_conflicts);
 }
 
-void Precalculations::find_functionTypes_called_indirect() {
+void Precalculations::find_functions_called_indirect() {
 
   for (auto &f : M.functions()) {
-    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-
-      Instruction *inst = &*I;
-      if (auto call = dyn_cast<CallBase>(inst)) {
-        if (call->isIndirectCall()) {
-          // we do need to visit all indirect calls
-          if (fn_types_with_indirect_calls.insert(call->getFunctionType())
-                  .second) {
-            // only if not already in set
-            // errs() << "Function Type that needs to be visited:\n";
-            // call->getFunctionType()->dump();
-          }
-        }
-      }
-    }
-  }
-}
-
-void Precalculations::visit_all_indirect_calls_for_FnType(
-    llvm::FunctionType *fntype) {
-  for (auto &f : M.functions()) {
-    // TODO do proper analysis to check the external func is not part of any
-    // vtable
-    if (f.getFunctionType() == fntype && not f.isDeclaration()) {
-      insert_functions_to_include(&f);
-    }
-    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-
-      Instruction *inst = &*I;
-      if (auto call = dyn_cast<CallBase>(inst)) {
-        if (call->isIndirectCall()) {
-          if (call->getFunctionType() == fntype) {
-            insert_tainted_value(call);
-            visited_values.insert(call);
-            insert_tainted_value(call->getCalledOperand());
-          }
-        }
-      }
-    }
-  }
-}
-
-void Precalculations::visit_all_indirect_call_args_for_FnType(
-    llvm::FunctionType *fntype, unsigned int argNo) {
-
-  for (auto &f : M.functions()) {
-    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-
-      Instruction *inst = &*I;
-      if (auto call = dyn_cast<CallBase>(inst)) {
-        if (call->isIndirectCall()) {
-          if (call->getFunctionType() == fntype) {
-            insert_tainted_value(call->getArgOperand(argNo));
-          }
-        }
+    for (auto u : f.users()) {
+      if (not isa<CallBase>(u)) {
+        functions_that_may_be_called_indirect.insert(&f);
       }
     }
   }
@@ -948,6 +880,43 @@ void Precalculations::replace_usages_of_func_in_copy(
     assert(has_replaced);
   }
 }
+std::vector<llvm::Function *>
+Precalculations::get_possible_call_targets(llvm::CallBase *call) {
+  std::vector<llvm::Function *> possible_targets;
+  if (call->isIndirectCall()) {
+    possible_targets = virtual_call_sites.get_possible_call_targets(call);
+  } else {
+    possible_targets.push_back(call->getCalledFunction());
+  }
+  if (possible_targets.empty()) {
+    // can call any function with same type that we get a ptr of somewhere
+    for (auto func : functions_that_may_be_called_indirect) {
+      if (func->getFunctionType() == call->getFunctionType())
+        possible_targets.push_back(func);
+    }
+    // TODO can we check that we will not be able to get a ptr to a function
+    // outside of the module?
+  }
+  assert(not possible_targets.empty() && "could not find tgts of call");
+  return possible_targets;
+}
+
+void Precalculations::visit_all_indirect_call_args(llvm::Function *func,
+                                                   unsigned int ArgNo) {
+
+  // TODO this could be done more efficient...
+  for (auto &f : M.functions()) {
+    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+      if (auto *call = dyn_cast<CallBase>(&*I)) {
+        auto targets = get_possible_call_targets(call);
+        if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
+          insert_tainted_value(call->getArgOperand(ArgNo));
+        }
+      }
+    }
+  }
+}
+
 llvm::GlobalVariable *
 VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
   assert(isa<ConstantAggregate>(vtable_value) &&

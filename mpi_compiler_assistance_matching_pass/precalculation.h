@@ -14,6 +14,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 
+#include "devirt_analysis.h"
 #include <utility>
 
 #include "llvm/IR/Module.h"
@@ -70,8 +71,8 @@ public:
 class Precalculations {
 public:
   Precalculations(llvm::Module &M, llvm::Function *entry_point)
-      : M(M), entry_point(entry_point) {
-    find_functionTypes_called_indirect();
+      : M(M), entry_point(entry_point), virtual_call_sites(DevirtAnalysis(M)) {
+    find_functions_called_indirect();
   };
 
   void add_precalculations(const std::vector<llvm::CallBase *> &to_precompute);
@@ -79,6 +80,8 @@ public:
 public:
   llvm::Module &M;
   llvm::Function *entry_point;
+
+  DevirtAnalysis virtual_call_sites;
 
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
   std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
@@ -94,13 +97,11 @@ public:
   // tags seems to be worth it
   //  or if e.g. for some reason a compute heavy loop was included as well
 
-  std::set<llvm::FunctionType *> fn_types_with_indirect_calls;
+  std::set<llvm::Function *> functions_that_may_be_called_indirect;
 
   void find_all_tainted_vals();
-  void find_functionTypes_called_indirect();
-  void visit_all_indirect_calls_for_FnType(llvm::FunctionType *fntype);
-  void visit_all_indirect_call_args_for_FnType(llvm::FunctionType *fntype,
-                                               unsigned int argNo);
+  void find_functions_called_indirect();
+
   void visit_val(llvm::Value *v);
   void visit_val(llvm::AllocaInst *alloca);
   void visit_val(llvm::PHINode *phi);
@@ -112,6 +113,8 @@ public:
 
   bool is_retval_of_call_used(llvm::CallBase *call) const;
 
+  void visit_all_indirect_call_args(llvm::Function *func, unsigned int argNo);
+
   void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
   void
   replace_usages_of_func_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
@@ -120,6 +123,8 @@ public:
   bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
 
   void add_call_to_precalculation_to_main();
+
+  std::vector<llvm::Function *> get_possible_call_targets(llvm::CallBase *call);
 };
 
 #endif // MACH_PRECALCULATIONS_H_
