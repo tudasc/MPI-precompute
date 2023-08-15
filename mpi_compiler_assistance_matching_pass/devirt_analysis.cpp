@@ -558,6 +558,7 @@ return false;
 std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
 
   std::map<llvm::CallBase *, std::vector<llvm::Function *>> result;
+
   Function *TypeTestFunc =
       M.getFunction(Intrinsic::getName(Intrinsic::type_test));
   Function *TypeCheckedLoadFunc =
@@ -568,7 +569,6 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
   if (not TypeTestFunc)
     TypeTestFunc =
         M.getFunction(Intrinsic::getName(Intrinsic::public_type_test));
-
 
   // Rebuild type metadata into a map for easy lookup.
   std::vector<VTableBits> Bits;
@@ -651,6 +651,7 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
     if (tryFindVirtualCallTargets(TargetsForSlot, TypeMemberInfos,
                                   S.first.ByteOffset, ExportSummary)) {
       // populate the result
+      errs() << "Populate Result\n";
       std::vector<Function *> possible_targets;
       for (auto slot : TargetsForSlot) {
         possible_targets.push_back(slot.Fn);
@@ -658,11 +659,17 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
       VTableSlotInfo &CSInfo = S.second;
       for (auto &cinfo : CSInfo.CSInfo.CallSites) {
         // for calls
-        result[&cinfo.CB] = possible_targets;
+        auto *call = &cinfo.CB;
+        if (result.find(call) == result.end()) {
+          result[call] = possible_targets;
+        } else {
+          assert(false && "Multiple Analysis results for the same callsite??");
+        }
       }
     }
   }
 
+  return result;
 }
 
 void DevirtModule::scanTypeTestUsers(
