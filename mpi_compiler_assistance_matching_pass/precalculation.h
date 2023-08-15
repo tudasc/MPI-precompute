@@ -102,7 +102,11 @@ public:
   std::set<std::shared_ptr<TaintedValue>> tainted_values;
   std::set<std::shared_ptr<TaintedValue>> visited_values;
 
-  std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v);
+  std::shared_ptr<TaintedValue>
+  insert_tainted_value(llvm::Value *v,
+                       std::shared_ptr<TaintedValue> from = nullptr);
+  void insert_tainted_ptr(std::shared_ptr<TaintedValue> new_ptr,
+                          std::shared_ptr<TaintedValue> from);
 
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
@@ -118,7 +122,8 @@ public:
   void visit_val(std::shared_ptr<TaintedValue> v);
   void visit_arg(std::shared_ptr<TaintedValue> arg_info);
   void visit_call(std::shared_ptr<TaintedValue> call_info);
-  void visit_call_from_ptr(llvm::CallBase *call, llvm::Value *ptr);
+  void visit_call_from_ptr(llvm::CallBase *call,
+                           std::shared_ptr<TaintedValue> ptr);
   void visit_ptr(std::shared_ptr<TaintedValue> ptr);
 
   bool is_tainted(llvm::Value *v) {
