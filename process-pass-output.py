@@ -17,6 +17,7 @@ marker_end_pass_execution = "Successfully executed the pass"
 marker_need_control = "need for control flow:"
 marker_need_dest = "need for dest compute:"
 marker_need_tag = "need for tag compute:"
+marker_need_other = "need for other reason:"
 
 
 def get_idices_of_elem(list, elem):
@@ -38,14 +39,14 @@ def annotate(module, remarks, marker, annotation):
             to_annotate = to_annotate[0:pos]
         to_anno_idx = [i for i, v in enumerate(module) if v.startswith(to_annotate)]
         if not len(to_anno_idx) == 1:
-            func = to_annotate = remarks[idx + 2]
+            func = remarks[idx + 2]
             match_func_idx = [i for i, v in enumerate(function_defines) if func in v[1]]
             assert len(match_func_idx) == 1
             to_anno_idx = [i for i in to_anno_idx if
                            function_defines[match_func_idx[0]][0] < i < function_defines[match_func_idx[0] + 1][0]]
 
-        assert len(to_anno_idx) == 1
-        module[to_anno_idx[0]] = annotation + " " + module[to_anno_idx[0]]
+        for idx in to_anno_idx:
+            module[idx] = annotation + " " + module[idx]
 
     return module
 
@@ -56,6 +57,7 @@ def print_orig(module, remarks):
     with_anno = annotate(without_debug_info, remarks, marker_need_control, "CONTROL")
     with_anno = annotate(with_anno, remarks, marker_need_tag, "TAG")
     with_anno = annotate(with_anno, remarks, marker_need_dest, "DEST")
+    with_anno = annotate(with_anno, remarks, marker_need_other, "OTHER")
 
     with open(output_orig, 'w') as the_file:
         the_file.write("\n".join(with_anno))

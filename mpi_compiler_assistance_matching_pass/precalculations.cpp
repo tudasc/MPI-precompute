@@ -1047,7 +1047,6 @@ void Precalculations::print_analysis_result_remarks() {
 
   for (auto v : tainted_values) {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
-
       if (v->needed_for_control_flow) {
         errs() << "need for control flow:\n";
         inst->dump();
@@ -1060,6 +1059,12 @@ void Precalculations::print_analysis_result_remarks() {
       }
       if (v->needed_for_dest_computation) {
         errs() << "need for dest compute:\n";
+        inst->dump();
+        errs() << inst->getFunction()->getName() << "\n";
+      }
+      if (not(v->needed_for_control_flow || v->needed_for_tag_computation ||
+              v->needed_for_dest_computation)) {
+        errs() << "need for other reason:\n";
         inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
       }
