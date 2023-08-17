@@ -593,6 +593,7 @@ std::shared_ptr<TaintedValue>
 Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
 
   auto dummy = std::make_shared<TaintedValue>(nullptr);
+  dummy->reason = reason;
 
   return insert_tainted_value(v, dummy);
 }
@@ -1061,17 +1062,17 @@ void Precalculations::print_analysis_result_remarks() {
 
   for (auto v : tainted_values) {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
-      if (v->reason | TaintReason::CONTROL_FLOW) {
+      if (v->reason & TaintReason::CONTROL_FLOW) {
         errs() << "need for control flow:\n";
         errs() << inst->getFunction()->getName() << "\n";
         inst->dump();
       }
-      if (v->reason | TaintReason::COMPUTE_TAG) {
+      if (v->reason & TaintReason::COMPUTE_TAG) {
         errs() << "need for tag compute:\n";
         errs() << inst->getFunction()->getName() << "\n";
         inst->dump();
       }
-      if (v->reason | TaintReason::COMPUTE_DEST) {
+      if (v->reason & TaintReason::COMPUTE_DEST) {
         errs() << "need for dest compute:\n";
         errs() << inst->getFunction()->getName() << "\n";
         inst->dump();
