@@ -87,7 +87,8 @@ struct MPICompilerAssistanceMatchingPass
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
 
-    Debug(M.dump(););
+    Debug(errs() << "Before Modification:\n"; M.dump();
+          errs() << "END MODULE\n";);
 
     ImplementationSpecifics::create_instance(M);
 
@@ -164,7 +165,8 @@ struct MPICompilerAssistanceMatchingPass
 
     delete analysis_results;
 
-    M.dump();
+    Debug(errs() << "After Modification:\n"; M.dump();
+          errs() << "END MODULE\n";);
 
 #ifndef NDEBUG
     auto has_error = verifyModule(M, &errs(), nullptr);

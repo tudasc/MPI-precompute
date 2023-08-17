@@ -55,6 +55,9 @@ struct ImportantGEPIndex {
 struct TaintedValue {
   TaintedValue(llvm::Value *v) : v(v){};
   llvm::Value *v;
+  bool needed_for_control_flow = false;
+  bool needed_for_tag_computation = false;
+  bool needed_for_dest_computation = false;
   // additional information for pointers: which indices of this pointer are
   // relevant
   std::set<std::shared_ptr<ImportantGEPIndex>> important_gep_index = {};
@@ -105,6 +108,12 @@ public:
   std::shared_ptr<TaintedValue>
   insert_tainted_value(llvm::Value *v,
                        std::shared_ptr<TaintedValue> from = nullptr);
+
+  std::shared_ptr<TaintedValue>
+  insert_tainted_value(llvm::Value *v, bool needed_for_control_flow,
+                       bool needed_for_tag_computation,
+                       bool needed_for_dest_computation);
+
   void insert_tainted_ptr(std::shared_ptr<TaintedValue> new_ptr,
                           std::shared_ptr<TaintedValue> from);
 
@@ -118,6 +127,8 @@ public:
 
   void find_all_tainted_vals();
   void find_functions_called_indirect();
+
+  void print_analysis_result_remarks();
 
   void visit_val(std::shared_ptr<TaintedValue> v);
   void visit_arg(std::shared_ptr<TaintedValue> arg_info);

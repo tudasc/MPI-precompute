@@ -117,10 +117,10 @@ void Precalculations::add_precalculations(
     auto *tag = get_tag_value(call, is_send);
     auto *src = get_src_value(call, is_send);
 
-    insert_tainted_value(tag);
-    insert_tainted_value(src);
+    insert_tainted_value(tag, false, true, false);
+    insert_tainted_value(src, false, false, true);
     // TODO precompute comm as well?
-    auto new_val = insert_tainted_value(call);
+    auto new_val = insert_tainted_value(call, true, false, false);
     visited_values.insert(new_val);
   }
 
@@ -158,6 +158,8 @@ void Precalculations::find_all_tainted_vals() {
   }
   // done calculating
 
+  print_analysis_result_remarks();
+
   // if tags or control flow depend on argc or argv MPI_Init will be tainted (as
   // it writes argc and argv)
 
@@ -189,7 +191,7 @@ void Precalculations::find_all_tainted_vals() {
 
   visited_values.erase(*pos2);
 
-  // done removing of MPi init
+  // done removing of MPI init
 
   // only for asserting that the subset is valid:
   std::set<std::shared_ptr<TaintedValue>> not_visited_assert;
@@ -587,13 +589,34 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   }
 }
 
+std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
+    llvm::Value *v, bool needed_for_control_flow,
+    bool needed_for_tag_computation, bool needed_for_dest_computation) {
+
+  auto dummy = std::make_shared<TaintedValue>(nullptr);
+
+  dummy->needed_for_control_flow = needed_for_control_flow;
+  dummy->needed_for_tag_computation = needed_for_tag_computation;
+  dummy->needed_for_dest_computation = needed_for_dest_computation;
+  return insert_tainted_value(v, dummy);
+}
+
 std::shared_ptr<TaintedValue>
 Precalculations::insert_tainted_value(llvm::Value *v,
                                       std::shared_ptr<TaintedValue> from) {
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
   if (not is_tainted(v)) {
     // only if not already in set
+    // TODO do we need to also asses if a value is needed for tag and dest
+    // compute?
     inserted_elem = std::make_shared<TaintedValue>(v);
+    if (from != nullptr) {
+      inserted_elem->needed_for_control_flow = from->needed_for_control_flow;
+      inserted_elem->needed_for_tag_computation =
+          from->needed_for_tag_computation;
+      inserted_elem->needed_for_dest_computation =
+          from->needed_for_dest_computation;
+    }
     tainted_values.insert(inserted_elem);
     if (auto *inst = dyn_cast<Instruction>(v)) {
       auto bb = inst->getParent();
@@ -1014,6 +1037,26 @@ void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
           insert_tainted_value(call);
         }
+      }
+    }
+  }
+}
+void Precalculations::print_analysis_result_remarks() {
+
+  for (auto v : tainted_values) {
+    if (auto *inst = dyn_cast<Instruction>(v->v)) {
+
+      if (v->needed_for_control_flow) {
+        errs() << "need for control flow:\n";
+        inst->dump();
+      }
+      if (v->needed_for_tag_computation) {
+        errs() << "need for tag compute:\n";
+        inst->dump();
+      }
+      if (v->needed_for_dest_computation) {
+        errs() << "need for dest compute:\n";
+        inst->dump();
       }
     }
   }
