@@ -304,7 +304,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
 
 void Precalculations::visit_ptr(std::shared_ptr<TaintedValue> ptr) {
   assert(ptr->is_pointer());
-  insert_tainted_value(ptr->v, ptr);
+  // insert_tainted_value(ptr->v, ptr);
   visited_values.insert(ptr);
 
   for (auto u : ptr->v->users()) {
@@ -589,7 +589,8 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   }
 }
 
-std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
+std::shared_ptr<TaintedValue>
+Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
 
   auto dummy = std::make_shared<TaintedValue>(nullptr);
 
@@ -597,8 +598,9 @@ std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(llvm::Value 
 }
 
 void propergate_state_to_children(const std::shared_ptr<TaintedValue> &parent) {
+  assert(parent != nullptr);
   for (auto child : parent->children) {
-    if (child->reason != parent->reason) {
+    if (child != nullptr && child->reason != parent->reason) {
       child->reason = child->reason | parent->reason;
       propergate_state_to_children(child);
     }
@@ -617,6 +619,8 @@ Precalculations::insert_tainted_value(llvm::Value *v,
     inserted_elem = std::make_shared<TaintedValue>(v);
     if (from != nullptr) {
       inserted_elem->reason = from->reason;
+      inserted_elem->parents.insert(from);
+      from->children.insert(inserted_elem);
     }
     tainted_values.insert(inserted_elem);
     if (auto *inst = dyn_cast<Instruction>(v)) {
@@ -666,8 +670,11 @@ Precalculations::insert_tainted_value(llvm::Value *v,
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
                                   [&v](const auto &vv) { return vv->v == v; });
-    inserted_elem->parents.insert(from);
-    from->children.insert(inserted_elem);
+    if (from != nullptr) {
+      inserted_elem->parents.insert(from);
+      from->children.insert(inserted_elem);
+      propergate_state_to_children(from);
+    }
   }
 
   assert(inserted_elem != nullptr);
