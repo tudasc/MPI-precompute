@@ -365,7 +365,7 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
-        auto new_val = insert_tainted_value(call);
+        auto new_val = insert_tainted_value(call, true, false, false);
         visited_values.insert(new_val); // no need to do something with it
                                         // just make shure it is included
         continue;
@@ -395,7 +395,7 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
     for (auto u : func->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         auto *operand = call->getArgOperand(arg->getArgNo());
-        insert_tainted_value(operand);
+        insert_tainted_value(operand, arg_info);
         continue;
       }
       if (functions_that_may_be_called_indirect.find(func) !=
@@ -448,7 +448,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
                "side effects");
         for (auto &bb : *func) {
           if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
-            insert_tainted_value(ret);
+            insert_tainted_value(ret, call_info);
           }
         }
       }
@@ -480,7 +480,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
                "cannot analyze if external function may throw an exception");
         for (auto &bb : *func) {
           if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
-            insert_tainted_value(res);
+            insert_tainted_value(res, call_info);
           }
         }
       }
@@ -489,7 +489,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
 
   if (call->isIndirectCall()) {
     // we need to taint the function ptr
-    insert_tainted_value(call->getCalledOperand());
+    insert_tainted_value(call->getCalledOperand(), call_info);
   }
 }
 
@@ -502,7 +502,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
     return;
   }
 
-  auto new_val = insert_tainted_value(call);
+  auto new_val = insert_tainted_value(call, ptr);
   visited_values.insert(new_val);
 
   errs() << "Visit\n";
@@ -526,11 +526,11 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
         // the needed value is the result of reading the comm
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
         // TODO
-        auto new_val = insert_tainted_value(call);
+        auto new_val = insert_tainted_value(call, ptr);
         visited_values.insert(new_val);
 
-        insert_tainted_value(
-            call->getArgOperand(0)); // we also need to keep the comm
+        insert_tainted_value(call->getArgOperand(0),
+                             ptr); // we also need to keep the comm
       }
       continue;
     }
@@ -580,7 +580,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
         func->dump();
         assert(false);
       } else {
-        auto new_val = insert_tainted_value(arg);
+        auto new_val = insert_tainted_value(arg, ptr);
         // TODO
         visited_values.insert(new_val);
         visit_ptr(new_val);
@@ -628,14 +628,15 @@ Precalculations::insert_tainted_value(llvm::Value *v,
           if (term->getNumSuccessors() > 1) {
             if (auto *branch = dyn_cast<BranchInst>(term)) {
               assert(branch->isConditional());
-              insert_tainted_value(branch->getCondition());
+              insert_tainted_value(branch->getCondition(), true, false, false);
               auto new_val = insert_tainted_value(branch);
               visited_values.insert(new_val);
             } else if (auto *invoke = dyn_cast<InvokeInst>(term)) {
-              insert_tainted_value(invoke);
+              insert_tainted_value(invoke, true, false, false);
               // we will later visit it
             } else if (auto *switch_inst = dyn_cast<SwitchInst>(term)) {
-              auto new_val = insert_tainted_value(switch_inst);
+              auto new_val =
+                  insert_tainted_value(switch_inst, true, false, false);
               visited_values.insert(new_val);
               insert_tainted_value(switch_inst->getCondition());
             } else {
@@ -647,7 +648,7 @@ Precalculations::insert_tainted_value(llvm::Value *v,
             assert(dyn_cast<BranchInst>(term));
             assert(dyn_cast<BranchInst>(term)->isConditional() == false);
             assert(term->getSuccessor(0) == bb);
-            auto new_val = insert_tainted_value(term);
+            auto new_val = insert_tainted_value(term, true, false, false);
             visited_values.insert(new_val);
           }
         }
@@ -1020,7 +1021,8 @@ void Precalculations::taint_all_indirect_call_args(llvm::Function *func,
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         auto targets = get_possible_call_targets(call);
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
-          insert_tainted_value(call->getArgOperand(ArgNo));
+          insert_tainted_value(
+              call->getArgOperand(ArgNo)); // TODO true false false
         }
       }
     }
@@ -1035,7 +1037,7 @@ void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         auto targets = get_possible_call_targets(call);
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
-          insert_tainted_value(call);
+          insert_tainted_value(call); // TODO true false false
         }
       }
     }
@@ -1049,14 +1051,17 @@ void Precalculations::print_analysis_result_remarks() {
       if (v->needed_for_control_flow) {
         errs() << "need for control flow:\n";
         inst->dump();
+        errs() << inst->getFunction()->getName() << "\n";
       }
       if (v->needed_for_tag_computation) {
         errs() << "need for tag compute:\n";
         inst->dump();
+        errs() << inst->getFunction()->getName() << "\n";
       }
       if (v->needed_for_dest_computation) {
         errs() << "need for dest compute:\n";
         inst->dump();
+        errs() << inst->getFunction()->getName() << "\n";
       }
     }
   }

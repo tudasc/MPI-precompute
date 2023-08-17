@@ -26,6 +26,10 @@ def get_idices_of_elem(list, elem):
 def annotate(module, remarks, marker, annotation):
     idx_annotations = get_idices_of_elem(remarks, marker)
 
+    function_defines = [(i, v) for i, v in enumerate(module) if v.startswith("define ")]
+    function_defines.append((len(module) - 1, "END OF MODULE"))
+    # is sorted by i already
+
     for idx in idx_annotations:
         # the next line
         to_annotate = remarks[idx + 1]
@@ -33,8 +37,13 @@ def annotate(module, remarks, marker, annotation):
             pos = to_annotate.find("!")
             to_annotate = to_annotate[0:pos]
         to_anno_idx = [i for i, v in enumerate(module) if v.startswith(to_annotate)]
-        print(to_annotate)
-        print(to_anno_idx)
+        if not len(to_anno_idx) == 1:
+            func = to_annotate = remarks[idx + 2]
+            match_func_idx = [i for i, v in enumerate(function_defines) if func in v[1]]
+            assert len(match_func_idx) == 1
+            to_anno_idx = [i for i in to_anno_idx if
+                           function_defines[match_func_idx[0]][0] < i < function_defines[match_func_idx[0] + 1][0]]
+
         assert len(to_anno_idx) == 1
         module[to_anno_idx[0]] = annotation + " " + module[to_anno_idx[0]]
 
