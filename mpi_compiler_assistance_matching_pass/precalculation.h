@@ -54,9 +54,9 @@ struct ImportantGEPIndex {
 
 enum TaintReason : int {
   OTHER = 0, // unspecified
-  CONTROL_FLOW = 1 < 0,
-  COMPUTE_TAG = 1 < 1,
-  COMPUTE_DEST = 1 < 2,
+  CONTROL_FLOW = 1 << 0,
+  COMPUTE_TAG = 1 << 1,
+  COMPUTE_DEST = 1 << 2,
 };
 
 struct TaintedValue {
