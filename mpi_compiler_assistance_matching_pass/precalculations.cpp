@@ -117,10 +117,10 @@ void Precalculations::add_precalculations(
     auto *tag = get_tag_value(call, is_send);
     auto *src = get_src_value(call, is_send);
 
-    insert_tainted_value(tag, false, true, false);
-    insert_tainted_value(src, false, false, true);
+    insert_tainted_value(tag, TaintReason::COMPUTE_TAG);
+    insert_tainted_value(src, TaintReason::COMPUTE_DEST);
     // TODO precompute comm as well?
-    auto new_val = insert_tainted_value(call, true, false, false);
+    auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
     visited_values.insert(new_val);
   }
 
@@ -304,7 +304,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
 
 void Precalculations::visit_ptr(std::shared_ptr<TaintedValue> ptr) {
   assert(ptr->is_pointer());
-  insert_tainted_value(ptr->v);
+  insert_tainted_value(ptr->v, ptr);
   visited_values.insert(ptr);
 
   for (auto u : ptr->v->users()) {
@@ -365,7 +365,7 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
-        auto new_val = insert_tainted_value(call, true, false, false);
+        auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
         visited_values.insert(new_val); // no need to do something with it
                                         // just make shure it is included
         continue;
@@ -589,33 +589,34 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   }
 }
 
-std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
-    llvm::Value *v, bool needed_for_control_flow,
-    bool needed_for_tag_computation, bool needed_for_dest_computation) {
+std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
 
   auto dummy = std::make_shared<TaintedValue>(nullptr);
 
-  dummy->needed_for_control_flow = needed_for_control_flow;
-  dummy->needed_for_tag_computation = needed_for_tag_computation;
-  dummy->needed_for_dest_computation = needed_for_dest_computation;
   return insert_tainted_value(v, dummy);
+}
+
+void propergate_state_to_children(const std::shared_ptr<TaintedValue> &parent) {
+  for (auto child : parent->children) {
+    if (child->reason != parent->reason) {
+      child->reason = child->reason | parent->reason;
+      propergate_state_to_children(child);
+    }
+  }
 }
 
 std::shared_ptr<TaintedValue>
 Precalculations::insert_tainted_value(llvm::Value *v,
                                       std::shared_ptr<TaintedValue> from) {
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
+
   if (not is_tainted(v)) {
     // only if not already in set
     // TODO do we need to also asses if a value is needed for tag and dest
     // compute?
     inserted_elem = std::make_shared<TaintedValue>(v);
     if (from != nullptr) {
-      inserted_elem->needed_for_control_flow = from->needed_for_control_flow;
-      inserted_elem->needed_for_tag_computation =
-          from->needed_for_tag_computation;
-      inserted_elem->needed_for_dest_computation =
-          from->needed_for_dest_computation;
+      inserted_elem->reason = from->reason;
     }
     tainted_values.insert(inserted_elem);
     if (auto *inst = dyn_cast<Instruction>(v)) {
@@ -628,17 +629,20 @@ Precalculations::insert_tainted_value(llvm::Value *v,
           if (term->getNumSuccessors() > 1) {
             if (auto *branch = dyn_cast<BranchInst>(term)) {
               assert(branch->isConditional());
-              insert_tainted_value(branch->getCondition(), true, false, false);
-              auto new_val = insert_tainted_value(branch);
+              insert_tainted_value(branch->getCondition(),
+                                   TaintReason::CONTROL_FLOW);
+              auto new_val =
+                  insert_tainted_value(branch, TaintReason::CONTROL_FLOW);
               visited_values.insert(new_val);
             } else if (auto *invoke = dyn_cast<InvokeInst>(term)) {
-              insert_tainted_value(invoke, true, false, false);
+              insert_tainted_value(invoke, TaintReason::CONTROL_FLOW);
               // we will later visit it
             } else if (auto *switch_inst = dyn_cast<SwitchInst>(term)) {
               auto new_val =
-                  insert_tainted_value(switch_inst, true, false, false);
+                  insert_tainted_value(switch_inst, TaintReason::CONTROL_FLOW);
               visited_values.insert(new_val);
-              insert_tainted_value(switch_inst->getCondition());
+              insert_tainted_value(switch_inst->getCondition(),
+                                   TaintReason::CONTROL_FLOW);
             } else {
               errs() << "Error analyzing CFG:\n";
               term->dump();
@@ -648,7 +652,8 @@ Precalculations::insert_tainted_value(llvm::Value *v,
             assert(dyn_cast<BranchInst>(term));
             assert(dyn_cast<BranchInst>(term)->isConditional() == false);
             assert(term->getSuccessor(0) == bb);
-            auto new_val = insert_tainted_value(term, true, false, false);
+            auto new_val =
+                insert_tainted_value(term, TaintReason::CONTROL_FLOW);
             visited_values.insert(new_val);
           }
         }
@@ -661,6 +666,8 @@ Precalculations::insert_tainted_value(llvm::Value *v,
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
                                   [&v](const auto &vv) { return vv->v == v; });
+    inserted_elem->parents.insert(from);
+    from->children.insert(inserted_elem);
   }
 
   assert(inserted_elem != nullptr);
@@ -1047,23 +1054,22 @@ void Precalculations::print_analysis_result_remarks() {
 
   for (auto v : tainted_values) {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
-      if (v->needed_for_control_flow) {
+      if (v->reason | TaintReason::CONTROL_FLOW) {
         errs() << "need for control flow:\n";
         inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
       }
-      if (v->needed_for_tag_computation) {
+      if (v->reason | TaintReason::COMPUTE_TAG) {
         errs() << "need for tag compute:\n";
         inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
       }
-      if (v->needed_for_dest_computation) {
+      if (v->reason | TaintReason::COMPUTE_DEST) {
         errs() << "need for dest compute:\n";
         inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
       }
-      if (not(v->needed_for_control_flow || v->needed_for_tag_computation ||
-              v->needed_for_dest_computation)) {
+      if (v->reason == TaintReason::OTHER) {
         errs() << "need for other reason:\n";
         inst->dump();
         errs() << inst->getFunction()->getName() << "\n";

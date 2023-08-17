@@ -52,12 +52,22 @@ struct ImportantGEPIndex {
   std::vector<unsigned int> important_gep_index;
 };
 
+enum TaintReason : int {
+  OTHER = 0, // unspecified
+  CONTROL_FLOW = 1 < 0,
+  COMPUTE_TAG = 1 < 1,
+  COMPUTE_DEST = 1 < 2,
+};
+
 struct TaintedValue {
   TaintedValue(llvm::Value *v) : v(v){};
   llvm::Value *v;
-  bool needed_for_control_flow = false;
-  bool needed_for_tag_computation = false;
-  bool needed_for_dest_computation = false;
+  int reason = OTHER;
+
+  // one can have multiple children and parents e.g. one call with several args
+  // whichs return value is used multiple times
+  std::set<std::shared_ptr<TaintedValue>> children = {};
+  std::set<std::shared_ptr<TaintedValue>> parents = {};
   // additional information for pointers: which indices of this pointer are
   // relevant
   std::set<std::shared_ptr<ImportantGEPIndex>> important_gep_index = {};
@@ -109,10 +119,8 @@ public:
   insert_tainted_value(llvm::Value *v,
                        std::shared_ptr<TaintedValue> from = nullptr);
 
-  std::shared_ptr<TaintedValue>
-  insert_tainted_value(llvm::Value *v, bool needed_for_control_flow,
-                       bool needed_for_tag_computation,
-                       bool needed_for_dest_computation);
+  std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
+                                                     TaintReason reason);
 
   void insert_tainted_ptr(std::shared_ptr<TaintedValue> new_ptr,
                           std::shared_ptr<TaintedValue> from);
