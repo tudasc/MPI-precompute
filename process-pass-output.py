@@ -33,13 +33,13 @@ def annotate(module, remarks, marker, annotation):
 
     for idx in idx_annotations:
         # the next line
-        to_annotate = remarks[idx + 1]
+        to_annotate = remarks[idx + 2]
         if "!" in to_annotate:
             pos = to_annotate.find("!")
             to_annotate = to_annotate[0:pos]
         to_anno_idx = [i for i, v in enumerate(module) if v.startswith(to_annotate)]
         if not len(to_anno_idx) == 1:
-            func = remarks[idx + 2]
+            func = remarks[idx + 1]
             match_func_idx = [i for i, v in enumerate(function_defines) if func in v[1]]
             assert len(match_func_idx) == 1
             to_anno_idx = [i for i in to_anno_idx if

@@ -1063,23 +1063,23 @@ void Precalculations::print_analysis_result_remarks() {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
       if (v->reason | TaintReason::CONTROL_FLOW) {
         errs() << "need for control flow:\n";
-        inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
+        inst->dump();
       }
       if (v->reason | TaintReason::COMPUTE_TAG) {
         errs() << "need for tag compute:\n";
-        inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
+        inst->dump();
       }
       if (v->reason | TaintReason::COMPUTE_DEST) {
         errs() << "need for dest compute:\n";
-        inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
+        inst->dump();
       }
       if (v->reason == TaintReason::OTHER) {
         errs() << "need for other reason:\n";
-        inst->dump();
         errs() << inst->getFunction()->getName() << "\n";
+        inst->dump();
       }
     }
   }
