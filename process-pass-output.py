@@ -23,10 +23,33 @@ def get_idices_of_elem(list, elem):
     return [i for i, x in enumerate(list) if x == elem]
 
 
-def print_orig(module):
-    to_print = [l for l in module if not l.startswith("!")]
+def annotate(module, remarks, marker, annotation):
+    idx_annotations = get_idices_of_elem(remarks, marker)
+
+    for idx in idx_annotations:
+        # the next line
+        to_annotate = remarks[idx + 1]
+        if "!" in to_annotate:
+            pos = to_annotate.find("!")
+            to_annotate = to_annotate[0:pos]
+        to_anno_idx = [i for i, v in enumerate(module) if v.startswith(to_annotate)]
+        print(to_annotate)
+        print(to_anno_idx)
+        assert len(to_anno_idx) == 1
+        module[to_anno_idx[0]] = annotation + " " + module[to_anno_idx[0]]
+
+    return module
+
+
+def print_orig(module, remarks):
+    without_debug_info = [l for l in module if not l.startswith("!")]
+
+    with_anno = annotate(without_debug_info, remarks, marker_need_control, "CONTROL")
+    with_anno = annotate(with_anno, remarks, marker_need_tag, "TAG")
+    with_anno = annotate(with_anno, remarks, marker_need_dest, "DEST")
+
     with open(output_orig, 'w') as the_file:
-        the_file.write("\n".join(to_print))
+        the_file.write("\n".join(with_anno))
 
 
 def print_modified(module):
@@ -70,7 +93,7 @@ def main():
 
     pass_comments = full_input[end_idx[0]:begin_mod_idx[0]]
 
-    print_orig(original_mod)
+    print_orig(original_mod, pass_comments)
     print_modified(altered_mod)
     print_remarks(pass_comments)
 
