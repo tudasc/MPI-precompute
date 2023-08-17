@@ -1084,6 +1084,51 @@ void Precalculations::print_analysis_result_remarks() {
       }
     }
   }
+
+  debug_printings();
+}
+
+void print_childrens(std::shared_ptr<TaintedValue> parent,
+                     unsigned int indent = 0) {
+  if (indent > 10 || parent == nullptr || parent->v == nullptr)
+    return;
+
+  for (unsigned int i = 0; i < indent; ++i) {
+    errs() << "\t";
+  }
+  parent->v->dump();
+  for (const auto &c : parent->children) {
+    print_childrens(c, indent + 1);
+  }
+}
+
+void print_parents(std::shared_ptr<TaintedValue> child,
+                   unsigned int indent = 0) {
+  if (indent > 10 || child == nullptr || child->v == nullptr)
+    return;
+
+  for (unsigned int i = 0; i < indent; ++i) {
+    errs() << "\t";
+  }
+  child->v->dump();
+  for (const auto &p : child->parents) {
+    print_parents(p, indent + 1);
+  }
+}
+
+void Precalculations::debug_printings() {
+  errs() << "ADDITIONAL DEBUG PRINTING\n";
+
+  for (auto v : tainted_values) {
+    if (auto call = dyn_cast<CallBase>(v->v)) {
+      if (call->getCalledFunction() == mpi_func->mpi_Isend) {
+        // call->dump();
+        print_parents(v);
+
+        return;
+      }
+    }
+  }
 }
 
 llvm::GlobalVariable *
@@ -1092,7 +1137,7 @@ VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
          "non constant vtable for a class?");
   assert(vtable_value->hasOneUser() &&
          "What kind of vtable is defined multiple times?");
-  Constant *vtable_initializer = cast<Constant>(vtable_value);
+  auto *vtable_initializer = cast<Constant>(vtable_value);
   if (isa<ConstantArray>(vtable_value)) {
     vtable_initializer =
         dyn_cast<Constant>(vtable_value->getUniqueUndroppableUser());
@@ -1107,7 +1152,7 @@ VtableManager::get_vtable_from_ptr_user(llvm::User *vtable_value) {
   // vtable_global->dump();
   if (not isa<GlobalValue>(vtable_global)) {
 
-    Constant *current_level_of_definition = cast<Constant>(vtable_global);
+    auto *current_level_of_definition = cast<Constant>(vtable_global);
     while (not isa<GlobalValue>(current_level_of_definition)) {
       assert(current_level_of_definition->hasOneUser() &&
              "storing the vtable into several globals is not supported?");
@@ -1189,10 +1234,10 @@ void VtableManager::perform_vtable_change_in_copies() {
         Value *getelemptr_copy = constant->getWithOperands(operands);
         // all usages of this in copied functions
         for (auto uu : constant->users()) {
-          if (auto *inst = dyn_cast<Instruction>(uu)) {
-            if (new_funcs.find(inst->getFunction()) != new_funcs.end()) {
+          if (auto *inst_uu = dyn_cast<Instruction>(uu)) {
+            if (new_funcs.find(inst_uu->getFunction()) != new_funcs.end()) {
               to_replace.push_back(
-                  std::make_tuple(inst, constant, getelemptr_copy));
+                  std::make_tuple(inst_uu, constant, getelemptr_copy));
             }
           } else {
             errs() << "unknown use of vtable access :\n";

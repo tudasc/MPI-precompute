@@ -137,6 +137,7 @@ public:
   void find_functions_called_indirect();
 
   void print_analysis_result_remarks();
+  void debug_printings();
 
   void visit_val(std::shared_ptr<TaintedValue> v);
   void visit_arg(std::shared_ptr<TaintedValue> arg_info);

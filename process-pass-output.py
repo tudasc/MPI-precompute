@@ -82,7 +82,7 @@ def main():
     print("processing pass output")
     full_input = sys.stdin.readlines()
     print("read %d lines" % len(full_input))
-    full_input = [l.strip() for l in full_input]
+    full_input = [l.rstrip() for l in full_input]
 
     end_idx = get_idices_of_elem(full_input, marker_end_module)
 
