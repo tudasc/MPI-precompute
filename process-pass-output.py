@@ -37,7 +37,7 @@ def annotate(module, remarks, marker, annotation):
         if "!" in to_annotate:
             pos = to_annotate.find("!")
             to_annotate = to_annotate[0:pos]
-        to_anno_idx = [i for i, v in enumerate(module) if v.startswith(to_annotate)]
+        to_anno_idx = [i for i, v in enumerate(module) if to_annotate in v]
         if not len(to_anno_idx) == 1:
             func = remarks[idx + 1]
             match_func_idx = [i for i, v in enumerate(function_defines) if func in v[1]]
