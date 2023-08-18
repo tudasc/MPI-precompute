@@ -71,6 +71,7 @@ struct TaintedValue {
   // additional information for pointers: which indices of this pointer are
   // relevant
   std::set<std::shared_ptr<ImportantGEPIndex>> important_gep_index = {};
+  bool whole_ptr_is_relevant = false;
   bool is_pointer() { return v->getType()->isPointerTy(); };
 };
 

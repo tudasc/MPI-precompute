@@ -310,7 +310,6 @@ void Precalculations::visit_ptr(std::shared_ptr<TaintedValue> ptr) {
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
       auto new_val = insert_tainted_value(s, ptr);
-      visited_values.insert(new_val);
       // all stores to this ptr or when the ptr is captured
       continue;
     }
@@ -685,12 +684,72 @@ Precalculations::insert_tainted_value(llvm::Value *v,
   return inserted_elem;
 }
 
+void add_gep_idx(std::shared_ptr<TaintedValue> new_ptr,
+                 std::shared_ptr<TaintedValue> from, unsigned int idx_to_add) {
+
+  if (from->whole_ptr_is_relevant == true) {
+    new_ptr->whole_ptr_is_relevant = true;
+    return;
+  }
+
+  for (auto idx_list : from->important_gep_index) {
+    auto new_idx_list = std::make_shared<ImportantGEPIndex>();
+    new_idx_list->important_gep_index.push_back(idx_to_add);
+    for (auto idx : idx_list->important_gep_index) {
+      new_idx_list->important_gep_index.push_back(idx);
+    }
+    new_ptr->important_gep_index.insert(new_idx_list);
+  }
+
+  if (from->important_gep_index.empty()) {
+    auto new_idx_list = std::make_shared<ImportantGEPIndex>();
+    new_idx_list->important_gep_index.push_back(idx_to_add);
+    new_ptr->important_gep_index.insert(new_idx_list);
+  }
+
+  // TODO propergate this information to all childs of new_ptr if necessary
+}
+
 void Precalculations::insert_tainted_ptr(std::shared_ptr<TaintedValue> new_ptr,
                                          std::shared_ptr<TaintedValue> from) {
+  if (from == nullptr || from->v == nullptr) {
+    return;
+  }
   assert(new_ptr->v->getType()->isPointerTy());
+  if (new_ptr == from) {
+    if (auto *alloc = dyn_cast<AllocaInst>(from->v)) {
+      return;
+    }
+    if (auto *call = dyn_cast<CallBase>(from->v)) {
+      assert(is_allocation(call));
+      return;
+    }
+    // visiting the ptr allocation
+  }
+  assert(new_ptr != from);
+  assert(new_ptr->v != from->v);
 
-  // TODO implement usage of additional information
-  // assert(false && "TODO IMPLEMENT");
+  errs() << "Visit Ptr:\n";
+  new_ptr->v->dump();
+  errs() << "from:\n";
+  from->v->dump();
+
+  if (auto *store = dyn_cast<StoreInst>(from->v)) {
+    if (new_ptr->v == store->getPointerOperand()) {
+      add_gep_idx(new_ptr, from, 0);
+      errs() << "new idx:\n";
+      for (auto idx_list : new_ptr->important_gep_index) {
+        for (auto idx : idx_list->important_gep_index) {
+          errs() << idx << " ";
+        }
+        errs() << "\n";
+      }
+
+      assert(false && "DEBUG ASSERTION");
+    } else {
+      // Noting to do if this ptr is stored
+    }
+  }
 }
 
 void FunctionToPrecalculate::initialize_copy() {
@@ -1104,7 +1163,7 @@ void print_childrens(std::shared_ptr<TaintedValue> parent,
 
 void print_parents(std::shared_ptr<TaintedValue> child,
                    unsigned int indent = 0) {
-  if (indent > 10 || child == nullptr || child->v == nullptr)
+  if (indent > 2 || child == nullptr || child->v == nullptr)
     return;
 
   for (unsigned int i = 0; i < indent; ++i) {
