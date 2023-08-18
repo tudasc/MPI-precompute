@@ -36,12 +36,71 @@
 using namespace llvm;
 
 void PtrUsageInfo::setIsUsedDirectly(
-    bool isUsedDirectly, std::shared_ptr<PtrUsageInfo> direct_usage_info) {
-  // TODO implement
-  assert(false);
+    bool isUsedDirectly,
+    const std::shared_ptr<PtrUsageInfo> &direct_usage_info) {
+  if (not isUsedDirectly) {
+    assert(false);
+    return;
+  }
+
+  if (not is_used_directly) {
+    is_used_directly = true;
+    // re-visit all users of ptr as something has changed
+    for (auto tv : ptrs_with_this_info) {
+      tv->visited = false;
+    }
+  }
+  if (direct_usage_info) {
+    if (info_of_direct_usage) {
+      info_of_direct_usage->merge_with(direct_usage_info);
+    } else
+      info_of_direct_usage = direct_usage_info;
+  }
 }
 
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
-  // TODO implement
-  assert(false);
+  assert(other != shared_from_this());
+
+  // merge users
+  for (auto ptr : other->ptrs_with_this_info) {
+    assert(ptr->ptr_info != shared_from_this());
+    ptr->ptr_info = shared_from_this();
+    ptrs_with_this_info.insert(ptr);
+  }
+
+  if (other->is_used_directly) {
+    this->setIsUsedDirectly(true, other->info_of_direct_usage);
+  }
+
+  bool changed = (this->is_read_from != other->is_read_from ||
+                  this->is_written_to != other->is_written_to ||
+                  this->whole_ptr_is_relevant != other->whole_ptr_is_relevant);
+
+  this->is_read_from = this->is_read_from || other->is_read_from;
+  this->is_written_to = this->is_written_to || other->is_written_to;
+  this->whole_ptr_is_relevant =
+      this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
+
+  std::move(other->parents.begin(), other->parents.end(),
+            std::inserter(parents, parents.end()));
+
+  // merge important_members
+  for (auto pos : other->important_members) {
+    if (important_members.find(pos.first) != important_members.end()) {
+      // may need to merge the information
+      if (pos.second != important_members[pos.first]) {
+        important_members[pos.first]->merge_with(pos.second);
+      } // otherwise it is the same anyway
+    } else {
+      important_members.insert(pos);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    // re-visit all users of ptr as something has changed
+    for (auto tv : ptrs_with_this_info) {
+      tv->visited = false;
+    }
+  }
 }

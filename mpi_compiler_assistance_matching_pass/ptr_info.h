@@ -19,6 +19,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #define MACH_PTR_INFO_H_
 
 #include "taintedValue.h"
+#include <map>
 #include <memory>
 #include <set>
 #include <utility>
@@ -27,7 +28,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 struct TaintedValue;
 
-class PtrUsageInfo {
+class PtrUsageInfo : public std::enable_shared_from_this<PtrUsageInfo> {
 public:
   explicit PtrUsageInfo(std::shared_ptr<TaintedValue> ptr) {
     if (ptr != nullptr) {
@@ -40,7 +41,7 @@ public:
   bool isUsedDirectly() const { return is_used_directly; }
   void
   setIsUsedDirectly(bool isUsedDirectly,
-                    std::shared_ptr<PtrUsageInfo> direct_usage_info = nullptr);
+      const std::shared_ptr<PtrUsageInfo> &direct_usage_info = nullptr);
   bool isReadFrom() const { return is_read_from; }
   void setIsReadFrom(bool isReadFrom) { is_read_from = isReadFrom; }
   bool isWholePtrIsRelevant() const { return whole_ptr_is_relevant; }
@@ -61,7 +62,7 @@ private:
   std::shared_ptr<PtrUsageInfo> info_of_direct_usage = nullptr;
   // null if the direct load is a value
 
-  std::set<std::pair<std::vector<unsigned int>, std::shared_ptr<PtrUsageInfo>>>
+  std::map<std::vector<unsigned int>, std::shared_ptr<PtrUsageInfo>>
       important_members;
 
   bool is_read_from = false;
