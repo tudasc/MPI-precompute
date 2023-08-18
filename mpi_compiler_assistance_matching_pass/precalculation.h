@@ -115,11 +115,13 @@ public:
   void visit_arg(std::shared_ptr<TaintedValue> arg_info);
 
   void visit_load(const std::shared_ptr<TaintedValue> &load_info);
+  void visit_store(const std::shared_ptr<TaintedValue> &store_info);
+  void visit_gep(const std::shared_ptr<TaintedValue> &gep_info);
 
   void visit_call(std::shared_ptr<TaintedValue> call_info);
   void visit_call_from_ptr(llvm::CallBase *call,
                            std::shared_ptr<TaintedValue> ptr);
-  void visit_ptr(std::shared_ptr<TaintedValue> ptr);
+  void visit_ptr_usages(std::shared_ptr<TaintedValue> ptr);
 
   bool is_tainted(llvm::Value *v) {
     return std::find_if(tainted_values.begin(), tainted_values.end(),

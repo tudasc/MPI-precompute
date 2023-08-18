@@ -53,6 +53,11 @@ public:
     return info_of_direct_usage;
   };
 
+  void add_ptr_info_user(std::shared_ptr<TaintedValue> v) {
+    assert(v->ptr_info == shared_from_this());
+    ptrs_with_this_info.insert(v);
+  }
+
   void merge_with(std::shared_ptr<PtrUsageInfo> other);
 
 private:

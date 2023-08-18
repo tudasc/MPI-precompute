@@ -205,7 +205,7 @@ void Precalculations::find_all_tainted_vals() {
 void Precalculations::visit_load(
     const std::shared_ptr<TaintedValue> &load_info) {
   assert(not load_info->visited);
-  load_info->visited = false;
+  load_info->visited = true;
   auto load = dyn_cast<LoadInst>(load_info->v);
   assert(load);
 
@@ -224,12 +224,22 @@ void Precalculations::visit_load(
   }
 }
 
+void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
+  assert(not gep_info->visited);
+  gep_info->visited = true;
+  auto gep = dyn_cast<StoreInst>(gep_info->v);
+  assert(gep);
+
+  // TODO implement
+  assert(false);
+}
+
 void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   errs() << "Visit\n";
   v->v->dump();
 
   if (v->is_pointer()) {
-    visit_ptr(v);
+    visit_ptr_usages(v);
   }
 
   if (auto *c = dyn_cast<Constant>(v->v)) {
@@ -241,24 +251,19 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     return;
   }
   if (auto *a = dyn_cast<AllocaInst>(v->v)) {
-    // nothing to do: visit_ptr is called on all ptrs anyway
+    // nothing to do: visit_ptr_usages is called on all ptrs anyway
     v->visited = true;
     return;
   }
   if (auto *s = dyn_cast<StoreInst>(v->v)) {
-    if (is_tainted(s->getPointerOperand())) {
-      // visit form ptr
-      insert_tainted_value(s->getValueOperand(), v);
-    } else {
-      // capture ptr
-      insert_tainted_value(s->getPointerOperand(), v);
-    }
+    visit_store(v);
     return;
   }
   if (auto *op = dyn_cast<BinaryOperator>(v->v)) {
     // arithmetic
     // TODO do we need to exclude some opcodes?
     assert(op->getNumOperands() == 2);
+    assert(not op->getType()->isPointerTy());
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
     return;
@@ -266,39 +271,56 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   if (auto *op = dyn_cast<CmpInst>(v->v)) {
     // cmp
     assert(op->getNumOperands() == 2);
+    // TODO handle pointer case?
+    assert(not op->getOperand(0)->getType()->isPointerTy());
+    assert(not op->getOperand(1)->getType()->isPointerTy());
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
     return;
   }
   if (auto *select = dyn_cast<SelectInst>(v->v)) {
     insert_tainted_value(select->getCondition(), v);
-    insert_tainted_value(select->getTrueValue(), v);
-    insert_tainted_value(select->getFalseValue(), v);
+    auto true_val = insert_tainted_value(select->getTrueValue(), v);
+    auto false_val = insert_tainted_value(select->getFalseValue(), v);
+    if (select->getType()->isPointerTy()) {
+      assert(v->ptr_info);
+      true_val->ptr_info = v->ptr_info;
+      false_val->ptr_info = v->ptr_info;
+      v->ptr_info->add_ptr_info_user(true_val);
+      v->ptr_info->add_ptr_info_user(false_val);
+    }
     return;
   }
   if (auto *arg = dyn_cast<Argument>(v->v)) {
-    visit_arg(v);
+    visit_arg(v); // todo REVISIT FUNCTION
+    assert(false);
     return;
   }
   if (auto *call = dyn_cast<CallBase>(v->v)) {
-    visit_call(v);
+    visit_call(v); // todo REVISIT FUNCTION
+    assert(false);
     return;
   }
   if (auto *phi = dyn_cast<PHINode>(v->v)) {
     for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
       auto vv = phi->getIncomingValue(i);
-      insert_tainted_value(vv, v);
+      auto new_val = insert_tainted_value(vv, v);
+      if (phi->getType()->isPointerTy()) {
+        new_val->ptr_info = v->ptr_info;
+        v->ptr_info->add_ptr_info_user(new_val);
+      }
     }
     return;
   }
   if (auto *cast = dyn_cast<CastInst>(v->v)) {
+    // ptr casting is not supported
+    assert(not cast->getType()->isPointerTy());
+    assert(not cast->getOperand(0)->getType()->isPointerTy());
     insert_tainted_value(cast->getOperand(0), v);
     return;
   }
   if (auto *gep = dyn_cast<GetElementPtrInst>(v->v)) {
-    for (unsigned int i = 0; i < gep->getNumOperands(); ++i) {
-      insert_tainted_value(gep->getOperand(i), v);
-    }
+    visit_gep(v);
     assert(is_tainted(gep->getPointerOperand()));
     return;
   }
@@ -308,10 +330,13 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   assert(false);
 }
 
-void Precalculations::visit_ptr(std::shared_ptr<TaintedValue> ptr) {
+void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
   assert(ptr->is_pointer());
-  // insert_tainted_value(ptr->v, ptr);
-  ptr->visited = true;
+  // TODO implement
+  //  insert_tainted_value(ptr->v, ptr);
+  // ptr->visited = true;
+
+  assert(false);
 
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
@@ -585,7 +610,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
         auto new_val = insert_tainted_value(arg, ptr);
         // TODO
 
-        visit_ptr(new_val);
+        visit_ptr_usages(new_val);
       }
     }
   }

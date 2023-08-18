@@ -62,7 +62,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
   assert(other != shared_from_this());
 
   // merge users
-  for (auto ptr : other->ptrs_with_this_info) {
+  for (const auto &ptr : other->ptrs_with_this_info) {
     assert(ptr->ptr_info != shared_from_this());
     ptr->ptr_info = shared_from_this();
     ptrs_with_this_info.insert(ptr);
@@ -99,7 +99,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
 
   if (changed) {
     // re-visit all users of ptr as something has changed
-    for (auto tv : ptrs_with_this_info) {
+    for (const auto &tv : ptrs_with_this_info) {
       tv->visited = false;
     }
   }
