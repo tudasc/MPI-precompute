@@ -48,8 +48,29 @@ private:
   get_vtable_from_ptr_user(llvm::User *vtable_value);
 };
 
-struct ImportantGEPIndex {
-  std::vector<unsigned int> important_gep_index;
+struct TaintedValue;
+
+struct PtrUsageInfo {
+  PtrUsageInfo() = delete;
+  explicit PtrUsageInfo(std::shared_ptr<TaintedValue> ptr) {
+    ptrs_with_this_info.insert(ptr);
+  }
+  std::set<std::pair<std::vector<unsigned int>, std::shared_ptr<PtrUsageInfo>>>
+      important_members;
+
+  bool is_used_directly = false; // meaning gep idx 0,0,...(as many zeros as
+                                 // deepest struct nesting level)
+  std::shared_ptr<PtrUsageInfo> info_of_direct_usage =
+      nullptr; // null if the direct load is a value
+
+  bool is_read_from = false;
+  bool is_written_to = false;
+
+  bool whole_ptr_is_relevant = false; // if accessed in a non-constant gep
+
+  std::set<std::shared_ptr<PtrUsageInfo>> parents;
+  std::set<std::shared_ptr<TaintedValue>>
+      ptrs_with_this_info; // all possibly aliasing pointers
 };
 
 enum TaintReason : int {
@@ -65,13 +86,12 @@ struct TaintedValue {
   int reason = OTHER;
 
   // one can have multiple children and parents e.g. one call with several args
-  // whichs return value is used multiple times
+  // whose return value is used multiple times
   std::set<std::shared_ptr<TaintedValue>> children = {};
   std::set<std::shared_ptr<TaintedValue>> parents = {};
-  // additional information for pointers: which indices of this pointer are
-  // relevant
-  std::set<std::shared_ptr<ImportantGEPIndex>> important_gep_index = {};
-  bool whole_ptr_is_relevant = false;
+  // additional information for pointers
+  std::shared_ptr<PtrUsageInfo> ptr_info = nullptr;
+
   bool is_pointer() { return v->getType()->isPointerTy(); };
 };
 
@@ -123,8 +143,8 @@ public:
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
 
-  void insert_tainted_ptr(std::shared_ptr<TaintedValue> new_ptr,
-                          std::shared_ptr<TaintedValue> from);
+  void merge_ptr_usage(std::shared_ptr<PtrUsageInfo> existing,
+                       std::shared_ptr<PtrUsageInfo> other);
 
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
@@ -142,6 +162,9 @@ public:
 
   void visit_val(std::shared_ptr<TaintedValue> v);
   void visit_arg(std::shared_ptr<TaintedValue> arg_info);
+
+  void visit_load(std::shared_ptr<TaintedValue> load_info);
+
   void visit_call(std::shared_ptr<TaintedValue> call_info);
   void visit_call_from_ptr(llvm::CallBase *call,
                            std::shared_ptr<TaintedValue> ptr);
@@ -190,6 +213,7 @@ public:
   void add_call_to_precalculation_to_main();
 
   std::vector<llvm::Function *> get_possible_call_targets(llvm::CallBase *call);
+  void insert_necessary_control_flow(llvm::Value *v);
 };
 
 #endif // MACH_PRECALCULATIONS_H_

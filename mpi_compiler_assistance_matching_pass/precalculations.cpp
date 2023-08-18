@@ -152,7 +152,7 @@ void Precalculations::find_all_tainted_vals() {
                         visited_values.begin(), visited_values.end(),
                         std::inserter(not_visited, not_visited.begin()));
 
-    for (auto v : not_visited) {
+    for (const auto &v : not_visited) {
       visit_val(v);
     }
   }
@@ -219,6 +219,40 @@ void Precalculations::find_all_tainted_vals() {
   }
 }
 
+void Precalculations::merge_ptr_usage(std::shared_ptr<PtrUsageInfo> existing,
+                                      std::shared_ptr<PtrUsageInfo> other) {
+  assert(existing);
+  assert(other);
+}
+
+void Precalculations::visit_load(std::shared_ptr<TaintedValue> load_info) {
+  // TODO implement
+  auto load = dyn_cast<LoadInst>(load_info->v);
+  assert(load);
+
+  auto loaded_from = insert_tainted_value(load->getPointerOperand(), load_info);
+
+  assert(loaded_from->is_pointer());
+
+  if (loaded_from->ptr_info == nullptr) {
+    loaded_from->ptr_info = std::make_shared<PtrUsageInfo>(loaded_from);
+  }
+  assert(loaded_from->ptr_info);
+
+  loaded_from->ptr_info->is_used_directly = true;
+  if (load_info->is_pointer()) {
+    if (loaded_from->ptr_info->info_of_direct_usage == nullptr) {
+      loaded_from->ptr_info->info_of_direct_usage = load_info->ptr_info;
+      load_info->ptr_info->parents.insert(loaded_from->ptr_info);
+    } else {
+      merge_ptr_usage(loaded_from->ptr_info->info_of_direct_usage,
+                      load_info->ptr_info);
+    }
+  } else {
+    assert(loaded_from->ptr_info->info_of_direct_usage == nullptr);
+  }
+}
+
 void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   errs() << "Visit\n";
   v->v->dump();
@@ -232,7 +266,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     return;
   }
   if (auto *l = dyn_cast<LoadInst>(v->v)) {
-    insert_tainted_value(l->getPointerOperand(), v);
+    visit_load(v);
     return;
   }
   if (auto *a = dyn_cast<AllocaInst>(v->v)) {
@@ -614,8 +648,6 @@ Precalculations::insert_tainted_value(llvm::Value *v,
 
   if (not is_tainted(v)) {
     // only if not already in set
-    // TODO do we need to also asses if a value is needed for tag and dest
-    // compute?
     inserted_elem = std::make_shared<TaintedValue>(v);
     if (from != nullptr) {
       inserted_elem->reason = from->reason;
@@ -623,49 +655,8 @@ Precalculations::insert_tainted_value(llvm::Value *v,
       from->children.insert(inserted_elem);
     }
     tainted_values.insert(inserted_elem);
-    if (auto *inst = dyn_cast<Instruction>(v)) {
-      auto bb = inst->getParent();
-      if (not bb->isEntryBlock()) {
-        // we need to insert the instruction that lets the control flow go
-        // here
-        for (auto pred_bb : predecessors(bb)) {
-          auto *term = pred_bb->getTerminator();
-          if (term->getNumSuccessors() > 1) {
-            if (auto *branch = dyn_cast<BranchInst>(term)) {
-              assert(branch->isConditional());
-              insert_tainted_value(branch->getCondition(),
-                                   TaintReason::CONTROL_FLOW);
-              auto new_val =
-                  insert_tainted_value(branch, TaintReason::CONTROL_FLOW);
-              visited_values.insert(new_val);
-            } else if (auto *invoke = dyn_cast<InvokeInst>(term)) {
-              insert_tainted_value(invoke, TaintReason::CONTROL_FLOW);
-              // we will later visit it
-            } else if (auto *switch_inst = dyn_cast<SwitchInst>(term)) {
-              auto new_val =
-                  insert_tainted_value(switch_inst, TaintReason::CONTROL_FLOW);
-              visited_values.insert(new_val);
-              insert_tainted_value(switch_inst->getCondition(),
-                                   TaintReason::CONTROL_FLOW);
-            } else {
-              errs() << "Error analyzing CFG:\n";
-              term->dump();
-              assert(false);
-            }
-          } else {
-            assert(dyn_cast<BranchInst>(term));
-            assert(dyn_cast<BranchInst>(term)->isConditional() == false);
-            assert(term->getSuccessor(0) == bb);
-            auto new_val =
-                insert_tainted_value(term, TaintReason::CONTROL_FLOW);
-            visited_values.insert(new_val);
-          }
-        }
-      } else {
-        // BB is function entry block
-        insert_functions_to_include(bb->getParent());
-      }
-    }
+    // insert what is necessary for Control flow to go here
+    insert_necessary_control_flow(v);
   } else {
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
@@ -673,81 +664,27 @@ Precalculations::insert_tainted_value(llvm::Value *v,
     if (from != nullptr) {
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
-      propergate_state_to_children(from);
+      propergate_state_to_children(from); // propergate the taint Reason
     }
   }
 
   assert(inserted_elem != nullptr);
-  if (inserted_elem->is_pointer()) {
-    insert_tainted_ptr(inserted_elem, from);
-  }
   return inserted_elem;
 }
 
-void add_gep_idx(std::shared_ptr<TaintedValue> new_ptr,
-                 std::shared_ptr<TaintedValue> from, unsigned int idx_to_add) {
-
-  if (from->whole_ptr_is_relevant == true) {
-    new_ptr->whole_ptr_is_relevant = true;
-    return;
-  }
-
-  for (auto idx_list : from->important_gep_index) {
-    auto new_idx_list = std::make_shared<ImportantGEPIndex>();
-    new_idx_list->important_gep_index.push_back(idx_to_add);
-    for (auto idx : idx_list->important_gep_index) {
-      new_idx_list->important_gep_index.push_back(idx);
-    }
-    new_ptr->important_gep_index.insert(new_idx_list);
-  }
-
-  if (from->important_gep_index.empty()) {
-    auto new_idx_list = std::make_shared<ImportantGEPIndex>();
-    new_idx_list->important_gep_index.push_back(idx_to_add);
-    new_ptr->important_gep_index.insert(new_idx_list);
-  }
-
-  // TODO propergate this information to all childs of new_ptr if necessary
-}
-
-void Precalculations::insert_tainted_ptr(std::shared_ptr<TaintedValue> new_ptr,
-                                         std::shared_ptr<TaintedValue> from) {
-  if (from == nullptr || from->v == nullptr) {
-    return;
-  }
-  assert(new_ptr->v->getType()->isPointerTy());
-  if (new_ptr == from) {
-    if (auto *alloc = dyn_cast<AllocaInst>(from->v)) {
-      return;
-    }
-    if (auto *call = dyn_cast<CallBase>(from->v)) {
-      assert(is_allocation(call));
-      return;
-    }
-    // visiting the ptr allocation
-  }
-  assert(new_ptr != from);
-  assert(new_ptr->v != from->v);
-
-  errs() << "Visit Ptr:\n";
-  new_ptr->v->dump();
-  errs() << "from:\n";
-  from->v->dump();
-
-  if (auto *store = dyn_cast<StoreInst>(from->v)) {
-    if (new_ptr->v == store->getPointerOperand()) {
-      add_gep_idx(new_ptr, from, 0);
-      errs() << "new idx:\n";
-      for (auto idx_list : new_ptr->important_gep_index) {
-        for (auto idx : idx_list->important_gep_index) {
-          errs() << idx << " ";
-        }
-        errs() << "\n";
+void Precalculations::insert_necessary_control_flow(Value *v) {
+  if (auto *inst = dyn_cast<Instruction>(v)) {
+    auto bb = inst->getParent();
+    if (not bb->isEntryBlock()) {
+      // we need to insert the instruction that lets the control flow go
+      // here
+      for (auto pred_bb : predecessors(bb)) {
+        auto *term = pred_bb->getTerminator();
+        insert_tainted_value(term, TaintReason::CONTROL_FLOW);
       }
-
-      assert(false && "DEBUG ASSERTION");
     } else {
-      // Noting to do if this ptr is stored
+      // BB is function entry block
+      insert_functions_to_include(bb->getParent());
     }
   }
 }
