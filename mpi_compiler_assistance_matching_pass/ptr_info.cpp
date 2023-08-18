@@ -40,3 +40,8 @@ void PtrUsageInfo::setIsUsedDirectly(
   // TODO implement
   assert(false);
 }
+
+void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
+  // TODO implement
+  assert(false);
+}

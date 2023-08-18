@@ -35,6 +35,8 @@ struct TaintedValue {
   llvm::Value *v;
   int reason = OTHER;
 
+  bool visited = false;
+
   // one can have multiple children and parents e.g. one call with several args
   // whose return value is used multiple times
   std::set<std::shared_ptr<TaintedValue>> children = {};

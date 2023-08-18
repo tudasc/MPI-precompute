@@ -37,8 +37,6 @@ public:
 
   bool isWrittenTo() const { return is_written_to; }
   void setIsWrittenTo(bool isWrittenTo) { is_written_to = isWrittenTo; }
-
-public:
   bool isUsedDirectly() const { return is_used_directly; }
   void
   setIsUsedDirectly(bool isUsedDirectly,
@@ -53,6 +51,8 @@ public:
     assert(is_used_directly);
     return info_of_direct_usage;
   };
+
+  void merge_with(std::shared_ptr<PtrUsageInfo> other);
 
 private:
   bool is_used_directly = false;

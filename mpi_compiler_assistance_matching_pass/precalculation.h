@@ -89,7 +89,6 @@ public:
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
   std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
   std::set<std::shared_ptr<TaintedValue>> tainted_values;
-  std::set<std::shared_ptr<TaintedValue>> visited_values;
 
   std::shared_ptr<TaintedValue>
   insert_tainted_value(llvm::Value *v,
@@ -97,9 +96,6 @@ public:
 
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
-
-  void merge_ptr_usage(const std::shared_ptr<PtrUsageInfo> &existing,
-                       const std::shared_ptr<PtrUsageInfo> &other);
 
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
@@ -146,12 +142,6 @@ public:
         vals.begin(), vals.end(), false,
         [this](auto accu, auto v) { return accu || is_tainted(v); });
   };
-
-  bool is_visited(llvm::Value *v) {
-    return std::find_if(visited_values.begin(), visited_values.end(),
-                        [&v](const auto &vv) { return vv->v == v; }) !=
-           visited_values.end();
-  }
 
   bool is_retval_of_call_used(llvm::CallBase *call);
 

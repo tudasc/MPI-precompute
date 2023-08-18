@@ -121,7 +121,7 @@ void Precalculations::add_precalculations(
     insert_tainted_value(src, TaintReason::COMPUTE_DEST);
     // TODO precompute comm as well?
     auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
-    visited_values.insert(new_val);
+    new_val->visited = true;
   }
 
   find_all_tainted_vals();
@@ -146,16 +146,20 @@ void Precalculations::add_precalculations(
 }
 
 void Precalculations::find_all_tainted_vals() {
-  while (tainted_values.size() > visited_values.size()) {
-    std::set<std::shared_ptr<TaintedValue>> not_visited;
-    std::set_difference(tainted_values.begin(), tainted_values.end(),
-                        visited_values.begin(), visited_values.end(),
-                        std::inserter(not_visited, not_visited.begin()));
+  unsigned long num_visited = 0;
 
-    for (const auto &v : not_visited) {
+  std::vector<std::shared_ptr<TaintedValue>> to_visit;
+
+  do {
+    to_visit.clear();
+    std::copy_if(tainted_values.begin(), tainted_values.end(),
+                 std::back_inserter(to_visit),
+                 [](const auto &v) { return v->visited; });
+
+    for (const auto &v : to_visit) {
       visit_val(v);
     }
-  }
+  } while (!to_visit.empty());
   // done calculating
 
   print_analysis_result_remarks();
@@ -176,30 +180,9 @@ void Precalculations::find_all_tainted_vals() {
       });
 
   tainted_values.erase(*pos);
-
-  auto pos2 = std::find_if(
-      visited_values.begin(), visited_values.end(), [](auto v) -> bool {
-        if (auto call = dyn_cast<CallBase>(v->v)) {
-          if (call->getCalledFunction() &&
-              (call->getCalledFunction() == mpi_func->mpi_init ||
-               call->getCalledFunction() == mpi_func->mpi_init_thread)) {
-            return true;
-          }
-        }
-        return false;
-      });
-
-  visited_values.erase(*pos2);
-
   // done removing of MPI init
 
   // only for asserting that the subset is valid:
-  std::set<std::shared_ptr<TaintedValue>> not_visited_assert;
-  std::set_difference(
-      tainted_values.begin(), tainted_values.end(), visited_values.begin(),
-      visited_values.end(),
-      std::inserter(not_visited_assert, not_visited_assert.begin()));
-  assert(not_visited_assert.empty());
   std::set<BasicBlock *> tainted_blocks;
   // taint all the blocks that are relevant
   std::transform(tainted_values.begin(), tainted_values.end(),
@@ -221,8 +204,8 @@ void Precalculations::find_all_tainted_vals() {
 
 void Precalculations::visit_load(
     const std::shared_ptr<TaintedValue> &load_info) {
-  assert(is_visited(
-      load_info->v)); // caller should put it into visited before calling
+  assert(not load_info->visited);
+  load_info->visited = false;
   auto load = dyn_cast<LoadInst>(load_info->v);
   assert(load);
 
@@ -244,13 +227,13 @@ void Precalculations::visit_load(
 void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   errs() << "Visit\n";
   v->v->dump();
-  visited_values.insert(v);
 
   if (v->is_pointer()) {
     visit_ptr(v);
   }
 
   if (auto *c = dyn_cast<Constant>(v->v)) {
+    v->visited = true;
     return;
   }
   if (auto *l = dyn_cast<LoadInst>(v->v)) {
@@ -259,6 +242,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   }
   if (auto *a = dyn_cast<AllocaInst>(v->v)) {
     // nothing to do: visit_ptr is called on all ptrs anyway
+    v->visited = true;
     return;
   }
   if (auto *s = dyn_cast<StoreInst>(v->v)) {
@@ -327,7 +311,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
 void Precalculations::visit_ptr(std::shared_ptr<TaintedValue> ptr) {
   assert(ptr->is_pointer());
   // insert_tainted_value(ptr->v, ptr);
-  visited_values.insert(ptr);
+  ptr->visited = true;
 
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
@@ -387,8 +371,6 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
         errs() << "Visit\n";
         call->dump();
         auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
-        visited_values.insert(new_val); // no need to do something with it
-                                        // just make shure it is included
         continue;
       }
     }
@@ -442,7 +424,8 @@ bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) {
 
 void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   auto *call = cast<CallBase>(call_info->v);
-  assert(is_visited(call));
+  assert(!call_info->visited);
+  call_info->visited = true;
 
   std::vector<Function *> possible_targets = get_possible_call_targets(call);
 
@@ -524,7 +507,6 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   }
 
   auto new_val = insert_tainted_value(call, ptr);
-  visited_values.insert(new_val);
 
   errs() << "Visit\n";
   call->dump();
@@ -548,7 +530,6 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
         // TODO
         auto new_val = insert_tainted_value(call, ptr);
-        visited_values.insert(new_val);
 
         insert_tainted_value(call->getArgOperand(0),
                              ptr); // we also need to keep the comm
@@ -603,7 +584,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       } else {
         auto new_val = insert_tainted_value(arg, ptr);
         // TODO
-        visited_values.insert(new_val);
+
         visit_ptr(new_val);
       }
     }
