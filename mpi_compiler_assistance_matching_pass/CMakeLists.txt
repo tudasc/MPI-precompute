@@ -19,7 +19,10 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         precalculation.h
         precalculations.cpp
         devirt_analysis.h
-        devirt_analysis.cpp)
+        devirt_analysis.cpp
+        taintedValue.h
+        ptr_info.h
+        ptr_info.cpp)
 
 # if one wants to use mpi
 #find_package(MPI REQUIRED)

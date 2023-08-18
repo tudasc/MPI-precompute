@@ -219,19 +219,14 @@ void Precalculations::find_all_tainted_vals() {
   }
 }
 
-void Precalculations::merge_ptr_usage(std::shared_ptr<PtrUsageInfo> existing,
-                                      std::shared_ptr<PtrUsageInfo> other) {
-  assert(existing);
-  assert(other);
-}
-
-void Precalculations::visit_load(std::shared_ptr<TaintedValue> load_info) {
-  // TODO implement
+void Precalculations::visit_load(
+    const std::shared_ptr<TaintedValue> &load_info) {
+  assert(is_visited(
+      load_info->v)); // caller should put it into visited before calling
   auto load = dyn_cast<LoadInst>(load_info->v);
   assert(load);
 
   auto loaded_from = insert_tainted_value(load->getPointerOperand(), load_info);
-
   assert(loaded_from->is_pointer());
 
   if (loaded_from->ptr_info == nullptr) {
@@ -239,17 +234,10 @@ void Precalculations::visit_load(std::shared_ptr<TaintedValue> load_info) {
   }
   assert(loaded_from->ptr_info);
 
-  loaded_from->ptr_info->is_used_directly = true;
   if (load_info->is_pointer()) {
-    if (loaded_from->ptr_info->info_of_direct_usage == nullptr) {
-      loaded_from->ptr_info->info_of_direct_usage = load_info->ptr_info;
-      load_info->ptr_info->parents.insert(loaded_from->ptr_info);
-    } else {
-      merge_ptr_usage(loaded_from->ptr_info->info_of_direct_usage,
-                      load_info->ptr_info);
-    }
+    loaded_from->ptr_info->setIsUsedDirectly(true, load_info->ptr_info);
   } else {
-    assert(loaded_from->ptr_info->info_of_direct_usage == nullptr);
+    loaded_from->ptr_info->setIsUsedDirectly(true);
   }
 }
 
