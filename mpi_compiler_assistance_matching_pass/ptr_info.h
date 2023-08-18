@@ -37,13 +37,17 @@ public:
   }
 
   bool isWrittenTo() const { return is_written_to; }
-  void setIsWrittenTo(bool isWrittenTo) { is_written_to = isWrittenTo; }
+  void setIsWrittenTo(bool isWrittenTo) {
+    is_written_to = is_written_to | isWrittenTo;
+  }
   bool isUsedDirectly() const { return is_used_directly; }
   void
   setIsUsedDirectly(bool isUsedDirectly,
       const std::shared_ptr<PtrUsageInfo> &direct_usage_info = nullptr);
   bool isReadFrom() const { return is_read_from; }
-  void setIsReadFrom(bool isReadFrom) { is_read_from = isReadFrom; }
+  void setIsReadFrom(bool isReadFrom) {
+    is_read_from = is_read_from | isReadFrom;
+  }
   bool isWholePtrIsRelevant() const { return whole_ptr_is_relevant; }
   void setWholePtrIsRelevant(bool wholePtrIsRelevant) {
     whole_ptr_is_relevant = wholePtrIsRelevant;

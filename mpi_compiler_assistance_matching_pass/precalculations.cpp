@@ -216,11 +216,37 @@ void Precalculations::visit_load(
     loaded_from->ptr_info = std::make_shared<PtrUsageInfo>(loaded_from);
   }
   assert(loaded_from->ptr_info);
+  loaded_from->ptr_info->setIsReadFrom(true);
 
   if (load_info->is_pointer()) {
     loaded_from->ptr_info->setIsUsedDirectly(true, load_info->ptr_info);
   } else {
     loaded_from->ptr_info->setIsUsedDirectly(true);
+  }
+}
+
+void Precalculations::visit_store(
+    const std::shared_ptr<TaintedValue> &store_info) {
+  assert(not store_info->visited);
+  store_info->visited = true;
+  auto store = dyn_cast<StoreInst>(store_info->v);
+  assert(store);
+
+  assert(is_tainted(store->getValueOperand()));
+
+  auto new_val = insert_tainted_value(store->getPointerOperand(), store_info);
+  if (not new_val->ptr_info) {
+    new_val->ptr_info = std::make_shared<PtrUsageInfo>(store_info);
+  }
+  new_val->ptr_info->setIsWrittenTo(true);
+  if (store->getValueOperand()) {
+
+    auto val_info =
+        insert_tainted_value(store->getValueOperand(),
+                             nullptr); // will just do a finding of the value
+    new_val->ptr_info->setIsUsedDirectly(true, val_info->ptr_info);
+  } else {
+    new_val->ptr_info->setIsUsedDirectly(true);
   }
 }
 
@@ -424,6 +450,9 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         auto *operand = call->getArgOperand(arg->getArgNo());
         insert_tainted_value(operand, arg_info);
+        if (arg_info->is_pointer()) {
+          // TODO
+        }
         continue;
       }
       if (functions_that_may_be_called_indirect.find(func) !=
