@@ -50,7 +50,9 @@ public:
   }
   bool isWholePtrIsRelevant() const { return whole_ptr_is_relevant; }
   void setWholePtrIsRelevant(bool wholePtrIsRelevant) {
-    whole_ptr_is_relevant = wholePtrIsRelevant;
+    // TODO propergate changes
+    whole_ptr_is_relevant = whole_ptr_is_relevant | wholePtrIsRelevant;
+    assert(false);
   }
   const std::shared_ptr<PtrUsageInfo> &getInfoOfDirectUsage() const {
     assert(is_used_directly);
@@ -63,6 +65,8 @@ public:
   }
 
   void merge_with(std::shared_ptr<PtrUsageInfo> other);
+  void add_important_member(std::vector<unsigned int> member_idx,
+                            std::shared_ptr<PtrUsageInfo> result_ptr);
 
 private:
   bool is_used_directly = false;

@@ -104,3 +104,15 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     }
   }
 }
+void PtrUsageInfo::add_important_member(
+    std::vector<unsigned int> member_idx,
+    std::shared_ptr<PtrUsageInfo> result_ptr) {
+
+  if (important_members.find(member_idx) != important_members.end()) {
+    important_members[member_idx]->merge_with(result_ptr);
+  } else {
+    important_members[member_idx] = result_ptr;
+  }
+  // todo propergate any changes
+  assert(false);
+}
