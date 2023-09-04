@@ -116,6 +116,13 @@ void use_self_implemented_comm() {
   double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
 
+  if (rank == 1) {
+    MPIOPT_Register_send_envelope(0, 42);
+  } else {
+    MPIOPT_Register_recv_envelope(1, 42);
+  }
+  MPIOPT_check_registered_envelopes_for_conflict();
+
   // create non contiguous datatype
   // blocklengths cycle through 1 ... 5
   // displacements is BLOCK_SIZE * blockindex at all times (could use another
