@@ -77,6 +77,7 @@ def print_remarks(remarks):
 def main():
     if sys.stdin.isatty():
         print("use this with a pipe")
+        print("Example: ./run.sh sourcefile.cpp |& python ./process-pass-output.py")
         exit(0)
 
     print("processing pass output")
