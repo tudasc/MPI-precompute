@@ -6,8 +6,8 @@ LIBS="-lopen-pal -lucp -lm"
 CXXFLAGS="-std=c++17 -O1 -g ${INCLUDE} -fuse-ld=lld"
 #
 
-#PASS_FLAGS="-fwhole-program-vtables -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
-PASS_FLAGS="-flto -fwhole-program-vtables -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+#PASS_FLAGS="-flto -fwhole-program-vtables -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+PASS_FLAGS="-fuse-ld=lld -flto -fwhole-program-vtables -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
 
 
 export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="plugin_data.json"
