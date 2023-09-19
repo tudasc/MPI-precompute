@@ -293,6 +293,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   }
 
   if (auto *c = dyn_cast<Constant>(v->v)) {
+    // nothing to do for constant
     v->visited = true;
     return;
   }
@@ -372,6 +373,16 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   if (auto *gep = dyn_cast<GetElementPtrInst>(v->v)) {
     visit_gep(v);
     assert(is_tainted(gep->getPointerOperand()));
+    return;
+  }
+  if (auto *br = dyn_cast<BranchInst>(v->v)) {
+    assert(v->reason == TaintReason::CONTROL_FLOW);
+    v->visited = true;
+    if (br->isConditional()) {
+      insert_tainted_value(br->getCondition(), v);
+    } else {
+      // nothing to do
+    }
     return;
   }
 
