@@ -154,7 +154,7 @@ void Precalculations::find_all_tainted_vals() {
     to_visit.clear();
     std::copy_if(tainted_values.begin(), tainted_values.end(),
                  std::back_inserter(to_visit),
-                 [](const auto &v) { return v->visited; });
+                 [](const auto &v) { return !v->visited; });
 
     for (const auto &v : to_visit) {
       visit_val(v);
