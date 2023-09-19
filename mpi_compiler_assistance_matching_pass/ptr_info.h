@@ -26,6 +26,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "llvm/IR/Module.h"
 
+// defined in taintedValue.h
 struct TaintedValue;
 
 class PtrUsageInfo : public std::enable_shared_from_this<PtrUsageInfo> {

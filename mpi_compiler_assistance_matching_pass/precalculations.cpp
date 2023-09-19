@@ -225,6 +225,41 @@ void Precalculations::visit_load(
   }
 }
 
+void Precalculations::visit_store_from_value(
+    const std::shared_ptr<TaintedValue> &store_info) {
+  auto store = dyn_cast<StoreInst>(store_info->v);
+  assert(store);
+
+  assert(is_tainted(store->getValueOperand()));
+  auto new_val = insert_tainted_value(store->getPointerOperand(), store_info);
+  if (not new_val->ptr_info) {
+    new_val->ptr_info = std::make_shared<PtrUsageInfo>(store_info);
+  }
+  new_val->ptr_info->setIsWrittenTo(true);
+  if (store->getValueOperand()->getType()->isPointerTy()) {
+    auto val_info =
+        insert_tainted_value(store->getValueOperand(),
+                             nullptr); // will just do a finding of the value
+    new_val->ptr_info->setIsUsedDirectly(true, val_info->ptr_info);
+  } else {
+    new_val->ptr_info->setIsUsedDirectly(true);
+  }
+}
+
+void Precalculations::visit_store_from_ptr(
+    const std::shared_ptr<TaintedValue> &store_info) {
+  auto store = dyn_cast<StoreInst>(store_info->v);
+  assert(store);
+
+  assert(is_tainted(store->getPointerOperand()));
+  // TODO do we need to do something here?
+  auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
+  // we should assert that this ptr usage is already covered by the ptr usage
+  // info
+  auto ptr = insert_tainted_value(store->getPointerOperand(), store_info);
+  assert(ptr->ptr_info->isUsedDirectly());
+}
+
 void Precalculations::visit_store(
     const std::shared_ptr<TaintedValue> &store_info) {
   assert(not store_info->visited);
@@ -232,21 +267,11 @@ void Precalculations::visit_store(
   auto store = dyn_cast<StoreInst>(store_info->v);
   assert(store);
 
-  assert(is_tainted(store->getValueOperand()));
-
-  auto new_val = insert_tainted_value(store->getPointerOperand(), store_info);
-  if (not new_val->ptr_info) {
-    new_val->ptr_info = std::make_shared<PtrUsageInfo>(store_info);
+  if (is_tainted(store->getValueOperand())) {
+    visit_store_from_value(store_info);
   }
-  new_val->ptr_info->setIsWrittenTo(true);
-  if (store->getValueOperand()) {
-
-    auto val_info =
-        insert_tainted_value(store->getValueOperand(),
-                             nullptr); // will just do a finding of the value
-    new_val->ptr_info->setIsUsedDirectly(true, val_info->ptr_info);
-  } else {
-    new_val->ptr_info->setIsUsedDirectly(true);
+  if (is_tainted(store->getPointerOperand())) {
+    visit_store_from_ptr(store_info);
   }
 }
 
@@ -317,6 +342,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     assert(not op->getType()->isPointerTy());
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
+    v->visited = true;
     return;
   }
   if (auto *op = dyn_cast<CmpInst>(v->v)) {
@@ -327,6 +353,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     assert(not op->getOperand(1)->getType()->isPointerTy());
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
+    v->visited = true;
     return;
   }
   if (auto *select = dyn_cast<SelectInst>(v->v)) {
@@ -340,16 +367,15 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
       v->ptr_info->add_ptr_info_user(true_val);
       v->ptr_info->add_ptr_info_user(false_val);
     }
+    v->visited = true;
     return;
   }
   if (auto *arg = dyn_cast<Argument>(v->v)) {
-    visit_arg(v); // todo REVISIT FUNCTION
-    assert(false);
+    visit_arg(v);
     return;
   }
   if (auto *call = dyn_cast<CallBase>(v->v)) {
-    visit_call(v); // todo REVISIT FUNCTION
-    assert(false);
+    visit_call(v);
     return;
   }
   if (auto *phi = dyn_cast<PHINode>(v->v)) {
@@ -361,6 +387,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
         v->ptr_info->add_ptr_info_user(new_val);
       }
     }
+    v->visited = true;
     return;
   }
   if (auto *cast = dyn_cast<CastInst>(v->v)) {
@@ -368,11 +395,13 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     assert(not cast->getType()->isPointerTy());
     assert(not cast->getOperand(0)->getType()->isPointerTy());
     insert_tainted_value(cast->getOperand(0), v);
+    v->visited = true;
     return;
   }
   if (auto *gep = dyn_cast<GetElementPtrInst>(v->v)) {
     visit_gep(v);
     assert(is_tainted(gep->getPointerOperand()));
+    v->visited = true;
     return;
   }
   if (auto *br = dyn_cast<BranchInst>(v->v)) {
@@ -397,8 +426,6 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
   //  insert_tainted_value(ptr->v, ptr);
   // ptr->visited = true;
 
-  assert(false);
-
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
       auto new_val = insert_tainted_value(s, ptr);
@@ -417,6 +444,7 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
       continue;
     }
     if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
+      // TODO test if the resulting GEP is actually relevant with the ptr info
       insert_tainted_value(gep, ptr);
       continue;
     }
@@ -471,6 +499,7 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
 
 void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
   auto *arg = cast<Argument>(arg_info->v);
+  arg_info->visited = true;
 
   auto *func = arg->getParent();
 
@@ -487,6 +516,7 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
         insert_tainted_value(operand, arg_info);
         if (arg_info->is_pointer()) {
           // TODO
+          assert(false && "TODO: IMPLEMENT\n");
         }
         continue;
       }
@@ -523,6 +553,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
       // TODO
+      assert(false && "CHECK IMPLEMENTATION\n");
     } else {
       for (auto func : possible_targets) {
         if (func->isIntrinsic() &&

@@ -116,6 +116,8 @@ public:
 
   void visit_load(const std::shared_ptr<TaintedValue> &load_info);
   void visit_store(const std::shared_ptr<TaintedValue> &store_info);
+  void visit_store_from_value(const std::shared_ptr<TaintedValue> &store_info);
+  void visit_store_from_ptr(const std::shared_ptr<TaintedValue> &store_info);
   void visit_gep(const std::shared_ptr<TaintedValue> &gep_info);
 
   void visit_call(std::shared_ptr<TaintedValue> call_info);
