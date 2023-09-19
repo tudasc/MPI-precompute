@@ -96,12 +96,8 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
       changed = true;
     }
   }
-
   if (changed) {
-    // re-visit all users of ptr as something has changed
-    for (const auto &tv : ptrs_with_this_info) {
-      tv->visited = false;
-    }
+    propergate_changes();
   }
 }
 void PtrUsageInfo::add_important_member(
@@ -110,9 +106,16 @@ void PtrUsageInfo::add_important_member(
 
   if (important_members.find(member_idx) != important_members.end()) {
     important_members[member_idx]->merge_with(result_ptr);
+    // TODO if merge does not change anything: nothing to do
+    propergate_changes();
   } else {
     important_members[member_idx] = result_ptr;
+    propergate_changes();
   }
-  // todo propergate any changes
-  assert(false);
+}
+void PtrUsageInfo::propergate_changes() {
+  // re-visit all users of ptr as something has changed
+  for (const auto &tv : ptrs_with_this_info) {
+    tv->visited = false;
+  }
 }
