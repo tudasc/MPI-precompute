@@ -1059,6 +1059,8 @@ void Precalculations::add_call_to_precalculation_to_main() {
     args.push_back(&arg);
   }
   builder.CreateCall(function_info->F_copy, args);
+  auto re_init_fun = get_global_re_init_function();
+  builder.CreateCall(re_init_fun);
   builder.CreateCall(mpi_func->optimized.check_registered_conflicts);
 }
 
@@ -1228,6 +1230,24 @@ void Precalculations::debug_printings() {
       }
     }
   }
+}
+
+llvm::Function *Precalculations::get_global_re_init_function() {
+
+  errs() << "insert New Function:\n";
+
+  auto *func = Function::Create(
+      FunctionType::get(Type::getVoidTy(M.getContext()), false),
+      llvm::GlobalValue::InternalLinkage, "re_init_globals", M);
+  auto bb = BasicBlock::Create(M.getContext(), "", func, nullptr);
+  assert(bb->isEntryBlock());
+  IRBuilder<> builder(bb);
+
+  builder.CreateRetVoid();
+  errs() << "New Function:\n";
+  func->dump();
+
+  return func;
 }
 
 llvm::GlobalVariable *

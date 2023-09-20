@@ -107,6 +107,8 @@ public:
 
   void find_all_tainted_vals();
   void find_functions_called_indirect();
+  // we need a function to re-initialize all globals that may be overwritten
+  llvm::Function *get_global_re_init_function();
 
   void print_analysis_result_remarks();
   void debug_printings();
