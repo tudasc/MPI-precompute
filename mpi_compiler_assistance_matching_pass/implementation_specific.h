@@ -55,7 +55,7 @@ private:
   ~ImplementationSpecifics();
 
 public:
-  llvm::Constant *COMM_WORLD;
+  llvm::GlobalVariable *COMM_WORLD;
   llvm::Constant *ANY_SOURCE;
   llvm::Constant *ANY_TAG;
 

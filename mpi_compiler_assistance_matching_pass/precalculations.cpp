@@ -263,7 +263,11 @@ void Precalculations::visit_store_from_ptr(
   // we should assert that this ptr usage is already covered by the ptr usage
   // info
   auto ptr = insert_tainted_value(store->getPointerOperand(), store_info);
-  assert(ptr->ptr_info->isUsedDirectly());
+  assert(
+      ptr->ptr_info
+          ->isUsedDirectly()); // must already be set, otherwise there is no
+                               // need in visiting this store in the first place
+  ptr->ptr_info->setIsWrittenTo(true);
 }
 
 void Precalculations::visit_store(
@@ -1233,8 +1237,7 @@ void Precalculations::debug_printings() {
 }
 
 llvm::Function *Precalculations::get_global_re_init_function() {
-
-  errs() << "insert New Function:\n";
+  auto implementation_specifics = ImplementationSpecifics::get_instance();
 
   auto *func = Function::Create(
       FunctionType::get(Type::getVoidTy(M.getContext()), false),
@@ -1243,9 +1246,23 @@ llvm::Function *Precalculations::get_global_re_init_function() {
   assert(bb->isEntryBlock());
   IRBuilder<> builder(bb);
 
+  for (auto &global : M.globals()) {
+    // if Comm World is needed there is no need to initialize it again, it
+    // cannot be modified comm World will have no ptr info and therefore is
+    // Written to check cannot be made
+    if (is_tainted(&global) &&
+        &global != implementation_specifics->COMM_WORLD) {
+      assert(global.getType()->isPointerTy());
+      auto global_info = insert_tainted_value(&global); // does find only
+      assert(global_info->ptr_info);
+      if (global_info->ptr_info->isWrittenTo()) {
+        builder.CreateStore(global.getInitializer(), &global);
+      } // else no need to do anything as it is not changed (readonly)
+      // at least not by tainted instructions
+    }
+  }
+
   builder.CreateRetVoid();
-  errs() << "New Function:\n";
-  func->dump();
 
   return func;
 }

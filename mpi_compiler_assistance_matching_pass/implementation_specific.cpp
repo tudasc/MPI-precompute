@@ -29,13 +29,14 @@ ImplementationSpecifics *ImplementationSpecifics::instance = nullptr;
 
 ImplementationSpecifics::ImplementationSpecifics(Module &M) {
 
-  // need it to use MPI_Type_size
-  // MPI_Init(NULL, NULL);
-
+  // for MPICH:
   /*COMM_WORLD =
       ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_COMM_WORLD);
       */
-  COMM_WORLD = nullptr;
+  // for openmpi:
+  COMM_WORLD = M.getGlobalVariable("ompi_mpi_comm_world");
+  assert(COMM_WORLD);
+
   INFO_NULL = nullptr;
   ANY_TAG = ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_ANY_TAG);
   ANY_SOURCE =
