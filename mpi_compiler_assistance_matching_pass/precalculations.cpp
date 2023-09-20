@@ -79,6 +79,12 @@ bool is_allocation(Function *func) {
   if (func->getName() == "_Znwm") {
     return true;
   }
+  if (func->getName() == "malloc") {
+    return true;
+  }
+  if (func->getName() == "calloc") {
+    return true;
+  }
   return false;
 }
 
@@ -89,7 +95,7 @@ bool is_allocation(llvm::CallBase *call) {
            "Non constant allocation in new??");
     return true;
   }
-  return false;
+  return is_allocation(call->getCalledFunction());
 }
 
 bool is_free(Function *func) {
@@ -280,6 +286,11 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
   gep_info->visited = true;
   auto gep = dyn_cast<GetElementPtrInst>(gep_info->v);
   assert(gep);
+  if (is_tainted(gep->getPointerOperand())) {
+    // coming from PTR
+    // TODO do we need to handle those cases different
+  }
+
   assert(gep_info->ptr_info);
 
   auto gep_ptr_info = insert_tainted_value(gep->getPointerOperand(), gep_info);
@@ -552,8 +563,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   if (need_return_val) {
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
-      // TODO
-      assert(false && "CHECK IMPLEMENTATION\n");
+
     } else {
       for (auto func : possible_targets) {
         if (func->isIntrinsic() &&
@@ -565,6 +575,10 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
              func->getIntrinsicID() == Intrinsic::type_checked_load)) {
           // ignore intrinsics
           continue;
+        }
+        if (func->isDeclaration()) {
+          errs() << "\n";
+          call->dump();
         }
         assert(not func->isDeclaration() &&
                "cannot analyze if calling external function for return value "
