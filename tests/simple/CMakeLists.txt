@@ -67,19 +67,30 @@ add_test(NAME test13
 )
 
 add_test(NAME test14
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/13
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/14
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_test(NAME test15
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/13
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/15
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_test(NAME test16
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/13
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/16
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+
+add_test(NAME test17
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/17
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+add_test(NAME test18
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/18
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 
 set_tests_properties(test01 PROPERTIES PROCESSORS 2)
 set_tests_properties(test02 PROPERTIES PROCESSORS 2)
@@ -97,6 +108,8 @@ set_tests_properties(test13 PROPERTIES PROCESSORS 2)
 set_tests_properties(test14 PROPERTIES PROCESSORS 2)
 set_tests_properties(test15 PROPERTIES PROCESSORS 2)
 set_tests_properties(test16 PROPERTIES PROCESSORS 2)
+set_tests_properties(test17 PROPERTIES PROCESSORS 2)
+set_tests_properties(test17 PROPERTIES PROCESSORS 8)
 
 # currently not implemented feature: other comm than comm world
 set_tests_properties(test04 PROPERTIES DISABLED true)
