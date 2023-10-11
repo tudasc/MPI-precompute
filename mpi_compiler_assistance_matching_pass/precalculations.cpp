@@ -290,22 +290,20 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
   gep_info->visited = true;
   auto gep = dyn_cast<GetElementPtrInst>(gep_info->v);
   assert(gep);
-  if (is_tainted(gep->getPointerOperand())) {
-    // coming from PTR
-    // TODO do we need to handle those cases different
-  }
-
-  assert(gep_info->ptr_info);
+  bool coming_from_ptr = (is_tainted(gep->getPointerOperand()));
 
   auto gep_ptr_info = insert_tainted_value(gep->getPointerOperand(), gep_info);
 
   if (gep_ptr_info->ptr_info == nullptr) {
     gep_ptr_info->ptr_info = std::make_shared<PtrUsageInfo>(gep_ptr_info);
   }
+  if (gep_info->ptr_info == nullptr) {
+    gep_info->ptr_info = std::make_shared<PtrUsageInfo>(gep_info);
+  }
 
   if (gep->hasAllConstantIndices()) {
     if (isa<GetElementPtrInst>(gep_ptr_info->v)) {
-      errs() << "Use a pass that combines GEP instructions first";
+      errs() << "Use a pass that combines GEP instructions first\n";
       assert(false);
     }
     std::vector<unsigned int> idxs;
@@ -314,13 +312,24 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
       assert(idx_constant);
       unsigned int idx_v = idx_constant->getZExtValue();
       idxs.push_back(idx_v);
-      gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
+      if (not coming_from_ptr) {
+        gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
+      } else {
+        // TODO
+        //  else: check if value is needed and de-taint if not
+        assert(false);
+      }
     }
   } else {
     // we could not determine which fields are important, need to keep track of
     // everything
-    gep_ptr_info->ptr_info->merge_with(gep_info->ptr_info);
+    // as this ptr access may override the other important fields
+    if (gep_ptr_info->ptr_info != gep_info->ptr_info) {
+      gep_ptr_info->ptr_info->merge_with(gep_info->ptr_info);
     gep_ptr_info->ptr_info->setWholePtrIsRelevant(true);
+    }
+    assert(gep_ptr_info->ptr_info == gep_info->ptr_info);
+    assert(gep_ptr_info->ptr_info->isWholePtrIsRelevant());
   }
 }
 
