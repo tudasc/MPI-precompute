@@ -16,7 +16,11 @@ export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="$TEST_DIR/plugin_data.json"
 
 cd $TEST_DIR
 
-$RUN_SCRIPT *.c
+if ls *.cpp 1> /dev/null 2>&1; then
+  $RUN_SCRIPT *.cpp
+else
+  $RUN_SCRIPT *.c
+fi
 
 #check if compiler analysis was successfull
 
