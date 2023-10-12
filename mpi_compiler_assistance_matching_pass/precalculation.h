@@ -96,6 +96,7 @@ public:
 
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
+  void remove_tainted_value(const std::shared_ptr<TaintedValue> &value_info);
 
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);

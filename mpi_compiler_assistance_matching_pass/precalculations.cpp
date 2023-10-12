@@ -124,11 +124,7 @@ bool is_free(Function *func) {
 }
 
 bool is_free(llvm::CallBase *call) {
-  // operator delete
-  if (call->getCalledFunction()->getName() == "_ZdlPv") {
-    return true;
-  }
-  return false;
+  return is_free(call->getCalledFunction());
 }
 
 void Precalculations::add_precalculations(
@@ -332,9 +328,14 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
       if (not coming_from_ptr) {
         gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
       } else {
-        // TODO
-        //  else: check if value is needed and de-taint if not
-        assert(false);
+        // coming from ptr
+        // check if value is needed and de-taint if not
+        if (not gep_ptr_info->ptr_info->isWholePtrIsRelevant()) {
+          if (not gep_ptr_info->ptr_info->is_member_relevant(idxs)) {
+            // de-taint no relevant access
+            remove_tainted_value(gep_info);
+          }
+        }
       }
     }
   } else {
@@ -1314,6 +1315,10 @@ llvm::Function *Precalculations::get_global_re_init_function() {
   builder.CreateRetVoid();
 
   return func;
+}
+void Precalculations::remove_tainted_value(
+    const std::shared_ptr<TaintedValue> &value_info) {
+  tainted_values.erase(value_info);
 }
 
 llvm::GlobalVariable *

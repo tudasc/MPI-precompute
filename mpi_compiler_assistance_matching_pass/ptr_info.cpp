@@ -119,3 +119,8 @@ void PtrUsageInfo::propergate_changes() {
     tv->visited = false;
   }
 }
+
+bool PtrUsageInfo::is_member_relevant(
+    const std::vector<unsigned int> &member_idx) {
+  return important_members.find(member_idx) != important_members.end();
+}

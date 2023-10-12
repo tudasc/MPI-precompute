@@ -79,6 +79,8 @@ public:
     ptrs_with_this_info.insert(v);
   }
 
+  bool is_member_relevant(const std::vector<unsigned int> &member_idx);
+
   void merge_with(std::shared_ptr<PtrUsageInfo> other);
   void add_important_member(std::vector<unsigned int> member_idx,
                             std::shared_ptr<PtrUsageInfo> result_ptr);
