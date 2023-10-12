@@ -67,6 +67,10 @@ int MPIOPT_Register_send_envelope(int dest, int tag) {
   new_elem->dest = dest;
   new_elem->is_conflicting = -1;
   send_envelopes = new_elem;
+  int my_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+  printf("Rank %d: Register Send envelope: (%d,%d)\n", my_rank, tag, dest);
 }
 
 int MPIOPT_Register_recv_envelope(int dest, int tag) {
@@ -77,6 +81,9 @@ int MPIOPT_Register_recv_envelope(int dest, int tag) {
   new_elem->dest = dest;
   new_elem->is_conflicting = -1;
   recv_envelopes = new_elem;
+  int my_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+  printf("Rank %d: Register recv envelope: (%d,%d)\n", my_rank, tag, dest);
 }
 
 int check_envelope_list_for_conflicts(bool is_send) {
@@ -132,6 +139,12 @@ void MPIOPT_check_registered_envelopes_for_conflict() {
 
 int check_if_envelope_was_registered(int dest, int tag, bool is_send) {
 
+  int my_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
+  printf("Rank %d: Check if envelope was registered: (%d,%d)\n", my_rank, tag,
+         dest);
+
   struct envelope_list_entry *list_to_use = recv_envelopes;
   if (is_send) {
     list_to_use = send_envelopes;
@@ -150,14 +163,12 @@ int check_if_envelope_was_registered(int dest, int tag, bool is_send) {
     current_elem = nxt_elem;
     nxt_elem = current_elem->nxt;
   }
-  int my_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
   int is_conflicting = current_elem->is_conflicting;
 
   if (current_elem->tag == tag && current_elem->dest == dest) {
-    printf("matching registered envelope: (%d,%d) conflicting: %d\n",
-           current_elem->tag, current_elem->dest, is_conflicting);
+    printf("Rank %d: matching registered envelope: (%d,%d) conflicting: %d\n",
+           my_rank, current_elem->tag, current_elem->dest, is_conflicting);
   } else {
     printf("NOT matching registered envelope\n");
     printf("Rank: %d : registered (%d,%d) , used: (%d,%d)\n", my_rank,
@@ -199,10 +210,18 @@ struct communicator_info *find_comm(MPI_Comm comm) {
 LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
 
   struct list_elem *current = request_list_head->next;
+  printf("Request: dest %d, tag %d, sending_type %d, recv_type %d\n",
+         request->dest, request->tag, is_sending_type(request),
+         is_recv_type(request));
+
   while (current != NULL) {
     MPIOPT_Request *other = current->elem;
     assert(other != NULL);
     if (other != request) {
+      printf("Other: dest %d, tag %d, sending_type %d, recv_type %d \n",
+             other->dest, other->tag, is_sending_type(other),
+             is_recv_type(other));
+
       // same communication direction
       if ((is_sending_type(request) && is_sending_type(other)) ||
           (is_recv_type(request) && is_recv_type(other))) {
@@ -210,6 +229,7 @@ LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
         if (request->dest == other->dest && request->tag == other->tag &&
             request->communicators->original_communicator ==
                 other->communicators->original_communicator) {
+          printf("Sending? %d\n", is_sending_type(request));
           assert(false &&
                  "Requests with a matching envelope are not permitted");
           return 1;
