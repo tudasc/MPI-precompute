@@ -649,7 +649,14 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
 
   if (call->isIndirectCall()) {
     // we need to taint the function ptr
-    insert_tainted_value(call->getCalledOperand(), call_info);
+    auto func_ptr_info =
+        insert_tainted_value(call->getCalledOperand(), call_info);
+    // may be already set if this ptr was tainted before
+    if (func_ptr_info->ptr_info == nullptr) {
+      func_ptr_info->ptr_info = std::make_shared<PtrUsageInfo>(func_ptr_info);
+      func_ptr_info->ptr_info->setIsUsedDirectly(true);
+      func_ptr_info->ptr_info->setIsCalled(true);
+    }
   }
 }
 

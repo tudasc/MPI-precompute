@@ -44,6 +44,13 @@ public:
     }
     is_written_to = is_written_to | isWrittenTo;
   }
+  bool isCalled() const { return is_called; }
+  void setIsCalled(bool isCalled) {
+    if ((not is_called) && isCalled) {
+      propergate_changes();
+    }
+    is_called = is_called | isCalled;
+  }
   bool isUsedDirectly() const { return is_used_directly; }
   void setIsUsedDirectly(
       bool isUsedDirectly,
@@ -90,9 +97,9 @@ private:
       important_members;
 
   bool is_read_from = false;
-
   bool is_written_to = false;
   bool whole_ptr_is_relevant = false; // if accessed in a non-constant gep
+  bool is_called = false;
 
   std::set<std::shared_ptr<PtrUsageInfo>> parents;
   std::set<std::shared_ptr<TaintedValue>>
