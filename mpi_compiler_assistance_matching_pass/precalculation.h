@@ -40,7 +40,7 @@ private:
   llvm::Module &M;
 
   std::map<llvm::Function *, llvm::Function *> old_new_func_map;
-  // just for ease of programming, it is also contained in the map above
+  // just for ease of programming, it is also contained in the map above:
   std::set<llvm::Function *> new_funcs;
 
   llvm::GlobalVariable *get_replaced_vtable(llvm::User *vtable_value);
@@ -99,6 +99,7 @@ public:
 
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
+
   // TODO we need some kind of heuristic to check if precalculation of all msg
   // tags seems to be worth it
   //  or if e.g. for some reason a compute heavy loop was included as well

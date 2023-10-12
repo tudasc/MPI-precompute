@@ -33,12 +33,29 @@
 #include "debug.h"
 using namespace llvm;
 
-// True if callee can raise an exception and the exception handling code is
+// True if callee needs to be called as it contains tainted instructions
+// or True if callee can raise an exception and the exception handling code is
 // actually tainted if exception handling is not tainted, we dont need to handle
 // the exception anyway and abortion is fine in this case
 bool Precalculations::is_invoke_necessary_for_control_flow(
     llvm::InvokeInst *invoke) {
 
+  assert(invoke);
+
+  if (invoke->isIndirectCall()) {
+    // TODO if we know by devirt analysis that call is not neded we can exclude
+    // it
+    return true;
+  }
+  // calling into something we need
+  if (std::find_if(functions_to_include.begin(), functions_to_include.end(),
+                   [&invoke](auto f) {
+                     return f->F_orig == invoke->getCalledFunction();
+                   }) != functions_to_include.end()) {
+    return true;
+  }
+
+  // check if the exception part is needed
   auto *unwindBB = invoke->getUnwindDest();
 
   std::set<Instruction *> in_unwind;
@@ -326,7 +343,7 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
     // as this ptr access may override the other important fields
     if (gep_ptr_info->ptr_info != gep_info->ptr_info) {
       gep_ptr_info->ptr_info->merge_with(gep_info->ptr_info);
-    gep_ptr_info->ptr_info->setWholePtrIsRelevant(true);
+      gep_ptr_info->ptr_info->setWholePtrIsRelevant(true);
     }
     assert(gep_ptr_info->ptr_info == gep_info->ptr_info);
     assert(gep_ptr_info->ptr_info->isWholePtrIsRelevant());
@@ -494,6 +511,11 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
         insert_tainted_value(vv, ptr);
       }
       insert_tainted_value(phi, ptr);
+      continue;
+    }
+    if (auto *select = dyn_cast<SelectInst>(u)) {
+      // follow the resulting ptr
+      insert_tainted_value(select, ptr);
       continue;
     }
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -988,10 +1010,12 @@ void Precalculations::prune_function_copy(
     if (not is_tainted(old_v)) {
       to_prune.push_back(inst);
     } else if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
-      // an invoke because it may return an exception
+      // an invoke can be tainted only because it may return an exception
       // but it actually is exception free for our purpose
-      if (not is_invoke_necessary_for_control_flow(invoke) &&
-          not is_retval_of_call_used(invoke)) {
+      // meaning if it throws no MPI is used
+      if (not is_invoke_necessary_for_control_flow(
+              dyn_cast<InvokeInst>(old_v)) &&
+          not is_retval_of_call_used(dyn_cast<InvokeInst>(old_v))) {
         to_prune.push_back(inst);
       }
     }
