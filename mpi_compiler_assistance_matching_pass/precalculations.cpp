@@ -450,6 +450,15 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
   //  insert_tainted_value(ptr->v, ptr);
   // ptr->visited = true;
 
+  if (auto global = dyn_cast<GlobalVariable>(ptr->v)) {
+    auto implementation_specifics = ImplementationSpecifics::get_instance();
+    if (global == implementation_specifics->COMM_WORLD) {
+      // no need to handle all usages of Comm World as we know it is a static
+      // object
+      return;
+    }
+  }
+
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
       auto new_val = insert_tainted_value(s, ptr);
