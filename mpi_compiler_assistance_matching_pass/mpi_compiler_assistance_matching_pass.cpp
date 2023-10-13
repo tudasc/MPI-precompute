@@ -148,8 +148,7 @@ struct MPICompilerAssistanceMatchingPass
       for (auto c : combined_init_list) {
         if (c->getCalledFunction() == mpi_func->mpi_recv_init) {
           replace_init_call(c, mpi_func->optimized.mpi_recv_init_info);
-        }
-        if (c->getCalledFunction() == mpi_func->mpi_send_init) {
+        } else if (c->getCalledFunction() == mpi_func->mpi_send_init) {
           replace_init_call(c, mpi_func->optimized.mpi_send_init_info);
         }
       }
