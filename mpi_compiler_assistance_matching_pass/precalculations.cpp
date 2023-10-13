@@ -474,7 +474,12 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     }
   }
 
-  assert(ptr->ptr_info);
+  if (ptr->ptr_info == nullptr) {
+    // this pointer is not needed
+    // if this pointer is indeed needed it will later be visited again if the
+    // ptr info was initialized
+    return;
+  }
 
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
