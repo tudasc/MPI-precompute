@@ -120,6 +120,9 @@ bool is_free(Function *func) {
   if (func->getName() == "_ZdlPv") {
     return true;
   }
+  if (func->getName() == "free") {
+    return true;
+  }
   return false;
 }
 
