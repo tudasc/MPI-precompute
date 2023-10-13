@@ -332,7 +332,7 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
         // check if value is needed and de-taint if not
         if (not gep_ptr_info->ptr_info->isWholePtrIsRelevant()) {
           if (not gep_ptr_info->ptr_info->is_member_relevant(idxs)) {
-            // de-taint no relevant access
+            // de-taint non relevant access
             remove_tainted_value(gep_info);
           }
         }
@@ -464,9 +464,6 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
 
 void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
   assert(ptr->is_pointer());
-  // TODO implement
-  //  insert_tainted_value(ptr->v, ptr);
-  // ptr->visited = true;
 
   if (auto global = dyn_cast<GlobalVariable>(ptr->v)) {
     auto implementation_specifics = ImplementationSpecifics::get_instance();
@@ -477,10 +474,22 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     }
   }
 
+  assert(ptr->ptr_info);
+
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
-      auto new_val = insert_tainted_value(s, ptr);
-      // all stores to this ptr or when the ptr is captured
+      // if we dont read the ptr directly, we dont need to capture the stores
+      //  e.g. a struct ptr where the first member is not used
+      if (s->getPointerOperand() == ptr->v) {
+        // all stores to this ptr
+        if (ptr->ptr_info->isUsedDirectly() ||
+            ptr->ptr_info->isWholePtrIsRelevant()) {
+          auto new_val = insert_tainted_value(s, ptr);
+        }
+      } else {
+        // or when the ptr is captured
+        auto new_val = insert_tainted_value(s, ptr);
+      }
       continue;
     }
     if (auto *l = dyn_cast<LoadInst>(u)) {
@@ -495,7 +504,9 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
       continue;
     }
     if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
-      // TODO test if the resulting GEP is actually relevant with the ptr info
+      // the test if the resulting GEP is actually relevant with the ptr info
+      // is conducted when the gep is visited
+      // if not relevant: it will be removed from tainted values
       insert_tainted_value(gep, ptr);
       continue;
     }

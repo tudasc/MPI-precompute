@@ -75,6 +75,7 @@ public:
   };
 
   void add_ptr_info_user(std::shared_ptr<TaintedValue> v) {
+    assert(v != nullptr);
     assert(v->ptr_info == shared_from_this());
     ptrs_with_this_info.insert(v);
   }
