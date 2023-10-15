@@ -428,6 +428,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
       auto vv = phi->getIncomingValue(i);
       auto new_val = insert_tainted_value(vv, v);
       if (phi->getType()->isPointerTy()) {
+        assert(v->ptr_info);
         new_val->ptr_info = v->ptr_info;
         v->ptr_info->add_ptr_info_user(new_val);
       }
