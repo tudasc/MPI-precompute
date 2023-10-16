@@ -417,29 +417,19 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   errs() << "Visit\n";
   v->v->dump();
 
-  if (v->is_pointer()) {
-    visit_ptr_usages(v);
-  }
-
   if (auto *c = dyn_cast<Constant>(v->v)) {
     // nothing to do for constant
     v->visited = true;
-    return;
-  }
-  if (auto *l = dyn_cast<LoadInst>(v->v)) {
+  } else if (auto *l = dyn_cast<LoadInst>(v->v)) {
     visit_load(v);
-    return;
-  }
-  if (auto *a = dyn_cast<AllocaInst>(v->v)) {
+
+  } else if (auto *a = dyn_cast<AllocaInst>(v->v)) {
     // nothing to do: visit_ptr_usages is called on all ptrs anyway
     v->visited = true;
-    return;
-  }
-  if (auto *s = dyn_cast<StoreInst>(v->v)) {
+  } else if (auto *s = dyn_cast<StoreInst>(v->v)) {
     visit_store(v);
-    return;
-  }
-  if (auto *op = dyn_cast<BinaryOperator>(v->v)) {
+
+  } else if (auto *op = dyn_cast<BinaryOperator>(v->v)) {
     // arithmetic
     // TODO do we need to exclude some opcodes?
     assert(op->getNumOperands() == 2);
@@ -447,20 +437,16 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
     v->visited = true;
-    return;
-  }
-  if (auto *op = dyn_cast<CmpInst>(v->v)) {
+  } else if (auto *op = dyn_cast<CmpInst>(v->v)) {
     // cmp
     assert(op->getNumOperands() == 2);
-    // TODO handle pointer case?
+    // TODO do wen need handle pointer case special?
     assert(not op->getOperand(0)->getType()->isPointerTy());
     assert(not op->getOperand(1)->getType()->isPointerTy());
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
     v->visited = true;
-    return;
-  }
-  if (auto *select = dyn_cast<SelectInst>(v->v)) {
+  } else if (auto *select = dyn_cast<SelectInst>(v->v)) {
     insert_tainted_value(select->getCondition(), v);
     auto true_val = insert_tainted_value(select->getTrueValue(), v);
     auto false_val = insert_tainted_value(select->getFalseValue(), v);
@@ -472,35 +458,27 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
       v->ptr_info->add_ptr_info_user(false_val);
     }
     v->visited = true;
-    return;
-  }
-  if (auto *arg = dyn_cast<Argument>(v->v)) {
+
+  } else if (auto *arg = dyn_cast<Argument>(v->v)) {
     visit_arg(v);
-    return;
-  }
-  if (auto *call = dyn_cast<CallBase>(v->v)) {
+
+  } else if (auto *call = dyn_cast<CallBase>(v->v)) {
     visit_call(v);
-    return;
-  }
-  if (auto *phi = dyn_cast<PHINode>(v->v)) {
+  } else if (auto *phi = dyn_cast<PHINode>(v->v)) {
     visit_phi(v);
-    return;
-  }
-  if (auto *cast = dyn_cast<CastInst>(v->v)) {
+  } else if (auto *cast = dyn_cast<CastInst>(v->v)) {
     // ptr casting is not supported
     assert(not cast->getType()->isPointerTy());
     assert(not cast->getOperand(0)->getType()->isPointerTy());
     insert_tainted_value(cast->getOperand(0), v);
     v->visited = true;
-    return;
-  }
-  if (auto *gep = dyn_cast<GetElementPtrInst>(v->v)) {
+
+  } else if (auto *gep = dyn_cast<GetElementPtrInst>(v->v)) {
     visit_gep(v);
     assert(is_tainted(gep->getPointerOperand()));
     v->visited = true;
-    return;
-  }
-  if (auto *br = dyn_cast<BranchInst>(v->v)) {
+
+  } else if (auto *br = dyn_cast<BranchInst>(v->v)) {
     assert(v->reason == TaintReason::CONTROL_FLOW);
     v->visited = true;
     if (br->isConditional()) {
@@ -508,12 +486,18 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     } else {
       // nothing to do
     }
-    return;
+
+  }else {
+
+    errs() << "Support for analyzing this Value is not implemented yet\n";
+    v->v->dump();
+    assert(false);
+  }
+  
+  if (v->is_pointer()) {
+    visit_ptr_usages(v);
   }
 
-  errs() << "Support for analyzing this Value is not implemented yet\n";
-  v->v->dump();
-  assert(false);
 }
 
 void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
@@ -569,6 +553,7 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
           not gep->hasAllConstantIndices() ||
           ptr->ptr_info->is_member_relevant(get_gep_idxs(gep))) {
         insert_tainted_value(gep, ptr);
+        // ptr info will be constructed when the gep is visited
       }
       continue;
     }
@@ -581,7 +566,7 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     if (auto *phi = dyn_cast<PHINode>(u)) {
       // follow the phi
       insert_tainted_value(phi, ptr);
-      // the ptr info will be constructed when the phi is visited
+      // the ptr info will be properly constructed when the phi is visited
       continue;
     }
     if (auto *select = dyn_cast<SelectInst>(u)) {
