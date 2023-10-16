@@ -5,7 +5,7 @@ cmake_policy(SET CMP0118 NEW)
 project("MPI Assertion Checking")
 
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_BUILD_TYPE DEBUG)
 endif (NOT CMAKE_BUILD_TYPE)
 message("Build Type: ${CMAKE_BUILD_TYPE}")
 

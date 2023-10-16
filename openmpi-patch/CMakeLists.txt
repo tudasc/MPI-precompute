@@ -13,9 +13,10 @@ set(OMPI_CONFIGURE_FLAGS
         --with-slurm=/opt/slurm/current --with-pmi=/opt/slurm/current
         --with-ucx --enable-mca-no-build=btl-uct  --without-verbs --enable-mpi-fortran=no)
 
-if (CMAKE_BUILD_TYPE EQUAL "DEBUG")
-    set(CMAKE_CXX_FLAGS ${OMPI_CONFIGURE_FLAGS} --enable-debug)
-endif(CMAKE_BUILD_TYPE EQUAL "DEBUG")
+
+if (CMAKE_BUILD_TYPE MATCHES DEBUG)
+    set(OMPI_CONFIGURE_FLAGS ${OMPI_CONFIGURE_FLAGS} --enable-debug)
+endif (CMAKE_BUILD_TYPE MATCHES DEBUG)
 
 #TODO assert that generator is makefiles
 #or also support ninja
