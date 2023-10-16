@@ -158,6 +158,18 @@ bool is_free(llvm::CallBase *call) {
   return is_free(call->getCalledFunction());
 }
 
+std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
+  assert(gep->hasAllConstantIndices());
+  std::vector<unsigned int> idxs;
+  for (auto &idx : gep->indices()) {
+    auto idx_constant = dyn_cast<ConstantInt>(&idx);
+    assert(idx_constant);
+    unsigned int idx_v = idx_constant->getZExtValue();
+    idxs.push_back(idx_v);
+  }
+  return idxs;
+}
+
 void Precalculations::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;
@@ -350,22 +362,16 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
       errs() << "Use a pass that combines GEP instructions first\n";
       assert(false);
     }
-    std::vector<unsigned int> idxs;
-    for (auto &idx : gep->indices()) {
-      auto idx_constant = dyn_cast<ConstantInt>(&idx);
-      assert(idx_constant);
-      unsigned int idx_v = idx_constant->getZExtValue();
-      idxs.push_back(idx_v);
-      if (not coming_from_ptr) {
-        gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
-      } else {
-        // coming from ptr
-        // check if value is needed and de-taint if not
-        if (not gep_ptr_info->ptr_info->isWholePtrIsRelevant()) {
-          if (not gep_ptr_info->ptr_info->is_member_relevant(idxs)) {
-            // de-taint non relevant access
-            remove_tainted_value(gep_info);
-          }
+    std::vector<unsigned int> idxs = get_gep_idxs(gep);
+    if (not coming_from_ptr) {
+      gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
+    } else {
+      // coming from ptr
+      // check if value is needed and de-taint if not
+      if (not gep_ptr_info->ptr_info->isWholePtrIsRelevant()) {
+        if (not gep_ptr_info->ptr_info->is_member_relevant(idxs)) {
+          // de-taint non relevant access
+          remove_tainted_value(gep_info);
         }
       }
     }
@@ -569,7 +575,9 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
       // the test if the resulting GEP is actually relevant with the ptr info
       // is conducted when the gep is visited
       // if not relevant: it will be removed from tainted values
-      insert_tainted_value(gep, ptr);
+      if (ptr->ptr_info->isWholePtrIsRelevant() || ptr.p)
+
+        insert_tainted_value(gep, ptr);
       continue;
     }
     if (auto *compare = dyn_cast<ICmpInst>(u)) {
@@ -1267,7 +1275,8 @@ Precalculations::get_possible_call_targets(llvm::CallBase *call) {
   return possible_targets;
 }
 
-void Precalculations::taint_all_indirect_call_args(llvm::Function *func, unsigned int ArgNo,
+void Precalculations::taint_all_indirect_call_args(
+    llvm::Function *func, unsigned int ArgNo,
     std::shared_ptr<TaintedValue> arg_info) {
   // TODO this could be done more efficient...
   for (auto &f : M.functions()) {
