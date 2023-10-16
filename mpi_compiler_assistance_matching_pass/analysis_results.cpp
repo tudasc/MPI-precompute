@@ -16,61 +16,47 @@
 
 #include "mpi_functions.h"
 
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/Pass.h"
 
 #include "analysis_results.h"
 
 using namespace llvm;
 
-RequiredAnalysisResults::RequiredAnalysisResults(Pass *parent_pass,
-                                                 llvm::Module &M) {
-
-  assertion_checker_pass = parent_pass;
+RequiredAnalysisResults::RequiredAnalysisResults(
+    llvm::ModuleAnalysisManager &MAM, llvm::Module &M) {
 
   assert(mpi_func != nullptr &&
          "The search for MPI functions should be made first");
 
-  // just give it any function (first of this Module), the Function is not used
-  // at all dont know why the api has changed here...
-  TLI = &assertion_checker_pass->getAnalysis<TargetLibraryInfoWrapperPass>()
-             .getTLI(*M.begin());
+  FAM = &MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
 
-  current_LI_function = nullptr;
-  current_SE_function = nullptr;
-  current_AA_function = nullptr;
-  current_LI = nullptr;
-  current_SE = nullptr;
-  current_AA = nullptr;
+  // first function of M
+  TLI = &FAM->getResult<TargetLibraryAnalysis>(*M.begin());
+  MSI = &MAM.getResult<ModuleSummaryIndexAnalysis>(M);
 }
 
-llvm::AAResults *RequiredAnalysisResults::getAAResults(llvm::Function *f) {
-  if (current_AA_function != f) {
-    current_AA_function = f;
-    current_AA = &assertion_checker_pass->getAnalysis<AAResultsWrapperPass>(*f)
-                      .getAAResults();
-  }
+llvm::AAResults *RequiredAnalysisResults::getAAResults(llvm::Function &f) {
 
-  return current_AA;
+  return &FAM->getResult<AAManager>(f);
 }
 
-llvm::LoopInfo *RequiredAnalysisResults::getLoopInfo(llvm::Function *f) {
-  if (current_LI_function != f) {
-    current_LI_function = f;
-    current_LI = &assertion_checker_pass->getAnalysis<LoopInfoWrapperPass>(*f)
-                      .getLoopInfo();
-  }
+llvm::LoopInfo *RequiredAnalysisResults::getLoopInfo(llvm::Function &f) {
 
-  return current_LI;
+  return &FAM->getResult<LoopAnalysis>(f);
+  ;
 }
-llvm::ScalarEvolution *RequiredAnalysisResults::getSE(llvm::Function *f) {
-  if (current_SE_function != f) {
-    current_SE_function = f;
-    current_SE =
-        &assertion_checker_pass->getAnalysis<ScalarEvolutionWrapperPass>(*f)
-             .getSE();
-  }
+llvm::ScalarEvolution *RequiredAnalysisResults::getSE(llvm::Function &f) {
 
-  return current_SE;
+  return &FAM->getResult<ScalarEvolutionAnalysis>(f);
+  ;
+}
+
+llvm::DominatorTree *RequiredAnalysisResults::getDomTree(llvm::Function &f) {
+
+  return &FAM->getResult<DominatorTreeAnalysis>(f);
+  ;
 }
 
 llvm::TargetLibraryInfo *RequiredAnalysisResults::getTLI() { return TLI; }

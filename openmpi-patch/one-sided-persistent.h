@@ -30,6 +30,9 @@
 #include "finalization.c"
 #include "finalization.h"
 
+#include "pack.c"
+#include "pack.h"
+
 #include "interface.c"
 
 #endif /* OPT_IMPL_H */

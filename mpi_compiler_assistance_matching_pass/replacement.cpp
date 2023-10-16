@@ -25,6 +25,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "debug.h"
+#include "nc_settings.h"
 
 using namespace llvm;
 
@@ -86,116 +87,155 @@ void replace_call(CallBase *call, Function *func) {
 
   assert(call->getFunctionType() == func->getFunctionType());
 
+  call->setCalledFunction(func);
+}
+
+void replace_init_call(llvm::CallBase *call, llvm::Function *func) {
+
+  // one could assert that the only addition is the info object
+  assert(call->getFunctionType() != func->getFunctionType());
+
   IRBuilder<> builder(call->getContext());
 
+  // before the original call
+  builder.SetInsertPoint(call);
+  auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
+
+  auto info_obj_ptr =
+      builder.CreateAlloca(mpi_implementation_specifics->mpi_info);
+
+  builder.CreateCall(mpi_func->mpi_info_create->getFunctionType(),
+                     mpi_func->mpi_info_create, {info_obj_ptr});
+
+  auto info_obj =
+      builder.CreateLoad(mpi_implementation_specifics->mpi_info, info_obj_ptr);
   std::vector<Value *> args;
 
-  for (unsigned int i = 0; i < call->getNumArgOperands(); ++i) {
+  auto strings = StringConstants::get_instance(call->getModule());
+
+  // set a key value pair to the info object:
+  auto key = strings->get_string_ptr("nc_send_strategy");
+  auto value = strings->get_string_ptr(STRATEGY);
+  builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
+                     mpi_func->mpi_info_set, {info_obj, key, value});
+
+  key = strings->get_string_ptr("nc_mixed_threshold");
+  char threshold_str[30];
+  sprintf(threshold_str, "%d", THRESHOLD);
+  value = strings->get_string_ptr(threshold_str);
+  builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
+                     mpi_func->mpi_info_set, {info_obj, key, value});
+
+  // enable skipping of matching
+  /*
+  key = strings->get_string_ptr("skip_matching");
+  builder.CreateCall(mpi_func->mpi_info_set->getFunctionType(),
+                     mpi_func->mpi_info_set,
+                     {info_obj, key, runtime_check_result});
+*/
+  for (unsigned int i = 0; i < call->arg_size(); ++i) {
     args.push_back(call->getArgOperand(i));
   }
+  args.push_back(info_obj);
 
-  auto *new_call = builder.CreateCall(func, args);
+  CallBase *new_call = nullptr;
+  if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+    new_call = builder.CreateInvoke(func->getFunctionType(), func,
+                                    invoke->getNormalDest(),
+                                    invoke->getUnwindDest(), args);
 
-  ReplaceInstWithInst(call, new_call);
+    builder.SetInsertPoint(invoke->getNormalDest()->getFirstNonPHI());
+  } else {
+    new_call = builder.CreateCall(func->getFunctionType(), func, args);
+  }
+  // also free the info
+  builder.CreateCall(mpi_func->mpi_info_free->getFunctionType(),
+                     mpi_func->mpi_info_free, info_obj_ptr);
 
-  // call->replaceAllUsesWith(new_call);
-  // call->eraseFromParent();
+  call->replaceAllUsesWith(new_call);
+  call->eraseFromParent();
 }
 
-bool check_if_all_usages_of_ptr_are_lifetime(Value *ptr) {
-
-  for (auto *u : ptr->users()) {
-    if (auto *call = dyn_cast<CallBase>(u)) {
-      if (!call->getCalledFunction()->isIntrinsic()) {
-        return false;
+std::vector<CallBase *> get_request_handling_calls_for(Module &M, Function *f) {
+  std::vector<CallBase *> result;
+  if (f) {
+    for (auto *u : f->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
+        if (call->getCalledFunction() == f) {
+          result.push_back(call);
+        }
       }
-
-    } else {
-      return false;
     }
   }
-  return true;
+  return result;
 }
 
-std::vector<CallBase *> get_usage_of_request(CallBase *call) {
-
-  // get the request
-  unsigned int req_arg_pos = 6;
-
-  assert(call->getCalledFunction() == mpi_func->mpi_send_init ||
-         call->getCalledFunction() == mpi_func->mpi_recv_init);
-  assert(call->getNumArgOperands() == 7);
-
-  Value *req = call->getArgOperand(req_arg_pos);
+// calls like start wait test
+std::vector<CallBase *> get_request_handling_calls(Module &M) {
 
   std::vector<CallBase *> calls_to_replace;
 
-  for (auto *u : req->users()) {
+  auto temp = get_request_handling_calls_for(M, mpi_func->mpi_start);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_startall);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-    assert(u != nullptr);
-    if (auto *call = dyn_cast<CallBase>(u)) {
-      if (is_mpi_call(call)) {
-        calls_to_replace.push_back(call);
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_wait);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_waitall);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_waitany);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_waitsome);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-      } else {
-        errs() << "NOT SUPPORTED: Request is used in non MPI call:\n";
-        u->dump();
-        assert(false);
-      }
-    } else if (auto *cast = dyn_cast<BitCastInst>(u)) {
-      assert(check_if_all_usages_of_ptr_are_lifetime(cast));
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_test);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_testall);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_testany);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_testsome);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
-      // this is allowed:
-      //%14 = bitcast %struct.ompi_request_t** %3 to i8*
-      // call void @llvm.lifetime.start.p0i8(i64 8, i8* nonnull %14) #8
-
-    } else {
-      errs() << "NOT SUPPORTED: Request is used in non MPI call:\n";
-      u->dump();
-      assert(false);
-    }
-  }
+  temp = get_request_handling_calls_for(M, mpi_func->mpi_request_free);
+  calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
 
   return calls_to_replace;
 }
 
-void replace_communication_calls(std::vector<CallBase *> init_send_calls,
-                                 std::vector<CallBase *> init_recv_calls) {
+void replace_request_handling_calls(llvm::Module &M) {
 
-  std::set<CallBase *> calls_to_replace;
-  std::copy(init_send_calls.begin(), init_send_calls.end(),
-            std::inserter(calls_to_replace, calls_to_replace.begin()));
-  std::copy(init_recv_calls.begin(), init_recv_calls.end(),
-            std::inserter(calls_to_replace, calls_to_replace.begin()));
-
-  // first gather everythin to replace, than replace, otherwise we might break
-  // some def use chains in between, e.g. e a free is used by send_init and revc
-  // init
-
-  for (auto *call : init_send_calls) {
-    auto temp = get_usage_of_request(call);
-    std::copy(temp.begin(), temp.end(),
-              std::inserter(calls_to_replace, calls_to_replace.begin()));
-  }
-
-  for (auto *call : init_recv_calls) {
-    auto temp = get_usage_of_request(call);
-    std::copy(temp.begin(), temp.end(),
-              std::inserter(calls_to_replace, calls_to_replace.begin()));
-  }
+  auto calls_to_replace = get_request_handling_calls(M);
 
   // do the actual replacement
   for (auto *call : calls_to_replace) {
     if (call->getCalledFunction() == mpi_func->mpi_wait) {
       replace_call(call, mpi_func->optimized.mpi_wait);
+    } else if (call->getCalledFunction() == mpi_func->mpi_waitall) {
+      replace_call(call, mpi_func->optimized.mpi_waitall);
+    } else if (call->getCalledFunction() == mpi_func->mpi_waitany) {
+      replace_call(call, mpi_func->optimized.mpi_waitany);
+    } else if (call->getCalledFunction() == mpi_func->mpi_waitsome) {
+      replace_call(call, mpi_func->optimized.mpi_waitsome);
+
+    } else if (call->getCalledFunction() == mpi_func->mpi_test) {
+      replace_call(call, mpi_func->optimized.mpi_test);
+    } else if (call->getCalledFunction() == mpi_func->mpi_testall) {
+      replace_call(call, mpi_func->optimized.mpi_testall);
+    } else if (call->getCalledFunction() == mpi_func->mpi_testany) {
+      replace_call(call, mpi_func->optimized.mpi_testany);
+    } else if (call->getCalledFunction() == mpi_func->mpi_testsome) {
+      replace_call(call, mpi_func->optimized.mpi_testsome);
+
     } else if (call->getCalledFunction() == mpi_func->mpi_start) {
       replace_call(call, mpi_func->optimized.mpi_start);
+    } else if (call->getCalledFunction() == mpi_func->mpi_startall) {
+      replace_call(call, mpi_func->optimized.mpi_startall);
+
     } else if (call->getCalledFunction() == mpi_func->mpi_request_free) {
       replace_call(call, mpi_func->optimized.mpi_request_free);
-    } else if (call->getCalledFunction() == mpi_func->mpi_send_init) {
-      replace_call(call, mpi_func->optimized.mpi_send_init);
-    } else if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
-      replace_call(call, mpi_func->optimized.mpi_recv_init);
+
     } else {
 
       errs() << "This MPI call is currently NOT supported\n";
@@ -204,4 +244,104 @@ void replace_communication_calls(std::vector<CallBase *> init_send_calls,
       assert(false);
     }
   }
+}
+
+// returns the llvm value that represents is the result of the runtime check
+llvm::Value *insert_runtime_check(llvm::Value *val_a, llvm::Value *val_b) {
+  assert(false && "Not implemented");
+}
+
+// returns the llvm value that represents is the result of the runtime check
+llvm::Value *combine_runtime_checks(llvm::CallBase *call,
+                                    llvm::Value *result_src,
+                                    llvm::Value *result_tag,
+                                    llvm::Value *result_comm) {
+  std::vector<llvm::Value *> results;
+  results.push_back(result_src);
+  results.push_back(result_tag);
+  results.push_back(result_comm);
+
+  return combine_runtime_checks(call, results);
+}
+
+llvm::Value *get_runtime_check_result_true(llvm::CallBase *call) {
+  return ConstantInt::get(IntegerType::getInt8Ty(call->getContext()), 1);
+}
+llvm::Value *get_runtime_check_result_false(llvm::CallBase *call) {
+  return ConstantInt::get(IntegerType::getInt8Ty(call->getContext()), 0);
+}
+
+llvm::Value *get_runtime_check_result_str(llvm::CallBase *call,
+                                          llvm::Value *check_result) {
+  IRBuilder<> builder(call);
+  auto &context = call->getContext();
+  assert(check_result->getType() == Type::getInt8Ty(context));
+
+  // TODO these string constants should only be created once
+
+  if (auto *as_const = dyn_cast<ConstantInt>(check_result)) {
+    if (as_const->isZero()) {
+      return StringConstants::get_instance(call->getModule())
+          ->get_string_ptr("0");
+    } else if (as_const->isOne()) {
+      return StringConstants::get_instance(call->getModule())
+          ->get_string_ptr("1");
+    } else {
+      as_const->dump();
+      assert(false && "ERROR unknown bool const");
+    }
+  }
+
+  auto strings = StringConstants::get_instance(call->getModule());
+  auto zero = strings->get_string_ptr("0");
+  auto one = strings->get_string_ptr("1");
+
+  auto result = builder.CreateSelect(check_result, one, zero);
+
+  // for debug
+  call->getParent()->dump();
+
+  return result;
+}
+
+llvm::Value *
+combine_runtime_checks(llvm::CallBase *call,
+                       const std::vector<llvm::Value *> &check_results) {
+
+  auto &context = call->getContext();
+  IRBuilder<> builder(call);
+
+  std::vector<llvm::Value *> no_null_vec;
+
+  std::copy_if(check_results.begin(), check_results.end(),
+               std::back_inserter(no_null_vec),
+               [](auto *p) { return p != nullptr; });
+
+  if (no_null_vec.empty()) {
+    return ConstantInt::get(IntegerType::getInt8Ty(context), 0);
+  }
+
+  for (auto r : no_null_vec) {
+    assert(r->getType() == Type::getInt8Ty(context));
+  }
+
+  if (no_null_vec.size() == 1) {
+    return no_null_vec[0];
+  }
+
+  // TODO optimization: run constant propagation on this expression
+  return builder.CreateOr(no_null_vec);
+}
+
+std::shared_ptr<StringConstants> StringConstants::instance = nullptr;
+
+llvm::Constant *StringConstants::get_string_ptr(const std::string &s) {
+  if (strings_used.find(s) != strings_used.end()) {
+    return strings_used[s];
+  }
+  IRBuilder<> builder(M->getContext());
+
+  auto val = builder.CreateGlobalStringPtr(s, "", 0, M);
+  strings_used[s] = val;
+  return val;
 }

@@ -31,6 +31,31 @@ void MPIOPT_FINALIZE() {
         ucp_mem_unmap(context, req->mem_handle_flag);
         // ucp_mem_unmap(context, req->mem_handle_data); // was freed before
       }
+
+      if (!req->is_cont) {
+        switch (req->nc_strategy) {
+        case NC_PACKING:
+          // PACKING
+          free(req->packed_buf);
+          break;
+        case NC_DIRECT_SEND:
+          // DIRECT SEND
+          free(req->dtype_displacements);
+          free(req->dtype_lengths);
+          break;
+        case NC_OPT_PACKING:
+          free(req->packed_buf);
+          free(req->dtype_displacements);
+          free(req->dtype_lengths);
+          break;
+        case NC_MIXED:
+          free(req->packed_buf);
+          free(req->dtype_displacements);
+          free(req->dtype_lengths);
+          break;
+        }
+      }
+
       free(req);
     }
     struct list_elem *nxt_elem = elem->next;
@@ -81,6 +106,13 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
     if (request->remote_flag_rkey != NULL) {
       ucp_rkey_destroy(request->remote_flag_rkey);
     }
+
+    if (request->nc_strategy == NC_MIXED && request->pack_size != 0) {
+      ucp_mem_unmap(context, request->mem_handle_packed_data);
+      if (request->remote_packed_data_rkey != NULL) {
+        ucp_rkey_destroy(request->remote_packed_data_rkey);
+      }
+    }
   }
 
   remove_request_from_list(request);
@@ -99,6 +131,10 @@ LINKAGE_TYPE int MPIOPT_Request_free_internal(MPIOPT_Request *request) {
     ucp_mem_unmap(context, request->mem_handle_data);
     ucp_rkey_destroy(request->remote_data_rkey);
     ucp_rkey_destroy(request->remote_flag_rkey);
+    if (request->nc_strategy == NC_MIXED && request->pack_size != 0) {
+      ucp_mem_unmap(context, request->mem_handle_packed_data);
+      ucp_rkey_destroy(request->remote_packed_data_rkey);
+    }
   }
 
   struct list_elem *new_elem = malloc(sizeof(struct list_elem));

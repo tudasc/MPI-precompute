@@ -15,6 +15,6 @@ LINKAGE_TYPE int test_empty(MPIOPT_Request *request, int *flag,
                             MPI_Status *status);
 
 LINKAGE_TYPE void progress_request(MPIOPT_Request *request);
-LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request);
+LINKAGE_TYPE void progress_all_requests();
 
 #endif /* MPIOPT_TEST_H_ */

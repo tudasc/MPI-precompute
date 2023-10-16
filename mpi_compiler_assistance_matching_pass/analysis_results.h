@@ -19,40 +19,32 @@
 
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ModuleSummaryAnalysis.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 
 class RequiredAnalysisResults {
 public:
-  RequiredAnalysisResults(llvm::Pass *parent_pass, llvm::Module &M);
+  RequiredAnalysisResults(llvm::ModuleAnalysisManager &MAM, llvm::Module &M);
   ~RequiredAnalysisResults(){};
-  llvm::AAResults *getAAResults(llvm::Function *f);
-  llvm::LoopInfo *getLoopInfo(llvm::Function *f);
-  llvm::ScalarEvolution *getSE(llvm::Function *f);
+  llvm::AAResults *getAAResults(llvm::Function &f);
+  llvm::LoopInfo *getLoopInfo(llvm::Function &f);
+  llvm::ScalarEvolution *getSE(llvm::Function &f);
+  llvm::DominatorTree *getDomTree(llvm::Function &f);
+  llvm::ModuleSummaryIndex *get_module_summary_index() { return MSI; };
 
   llvm::TargetLibraryInfo *getTLI();
 
 private:
-  llvm::Function *current_AA_function;
-  llvm::AAResults *current_AA;
-  llvm::Function *current_LI_function;
-  llvm::LoopInfo *current_LI;
-  llvm::Function *current_SE_function;
-  llvm::ScalarEvolution *current_SE;
+  llvm::FunctionAnalysisManager *FAM;
 
   llvm::TargetLibraryInfo *TLI;
-  // reference to the pass
-  llvm::Pass *assertion_checker_pass;
+  llvm::ModuleSummaryIndex *MSI;
 };
 
 // will be managed by main
-
-// result of Alias analysis
-// extern std::map<llvm::Function *, llvm::AliasAnalysis *> AA;
-// result of Loop Analysis
-// extern std::map<llvm::Function *, llvm::LoopInfo *> LI;
-// extern std::map<llvm::Function *, llvm::ScalarEvolution *> SE;
 
 extern RequiredAnalysisResults *analysis_results;
 

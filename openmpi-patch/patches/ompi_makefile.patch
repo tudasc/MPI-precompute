@@ -1,0 +1,21 @@
+--- ompi/mca/osc/ucx/Makefile.in	2021-04-24 19:30:31.000000000 +0200
++++ ompi/mca/osc/ucx/Makefile.in	2022-07-07 14:22:30.405997292 +0200
+@@ -449,7 +449,7 @@
+ libmca_osc_ucx_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+ am__objects_1 = osc_ucx_comm.lo osc_ucx_component.lo \
+ 	osc_ucx_request.lo osc_ucx_active_target.lo \
+-	osc_ucx_passive_target.lo
++		osc_ucx_passive_target.lo one-sided-persistent.lo
+ am_libmca_osc_ucx_la_OBJECTS = $(am__objects_1)
+ libmca_osc_ucx_la_OBJECTS = $(am_libmca_osc_ucx_la_OBJECTS)
+ AM_V_lt = $(am__v_lt_@AM_V@)
+@@ -1742,7 +1742,8 @@
+ 	osc_ucx_component.c \
+ 	osc_ucx_request.c \
+ 	osc_ucx_active_target.c \
+-	osc_ucx_passive_target.c
++	osc_ucx_passive_target.c \
++		one-sided-persistent.c
+ 
+ AM_CPPFLAGS = $(osc_ucx_CPPFLAGS)
+ @MCA_BUILD_ompi_osc_ucx_DSO_FALSE@component_noinst = libmca_osc_ucx.la

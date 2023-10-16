@@ -31,14 +31,21 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "llvm/IR/Verifier.h"
+
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
+
+#include "precalculation.h"
+
 #include <assert.h>
-//#include <mpi.h>
+// #include <mpi.h>
 #include <cstring>
 #include <utility>
 #include <vector>
@@ -46,7 +53,7 @@
 #include "analysis_results.h"
 #include "conflict_detection.h"
 #include "debug.h"
-#include "function_coverage.h"
+#include "frontend_plugin_data.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "replacement.h"
@@ -60,37 +67,30 @@ RequiredAnalysisResults *analysis_results;
 
 struct mpi_functions *mpi_func;
 ImplementationSpecifics *mpi_implementation_specifics;
-FunctionMetadata *function_metadata;
 
 namespace {
-struct MPICompilerAssistanceMatchingPass : public ModulePass {
-  static char ID;
-
-  MPICompilerAssistanceMatchingPass() : ModulePass(ID) {}
+struct MPICompilerAssistanceMatchingPass
+    : public PassInfoMixin<MPICompilerAssistanceMatchingPass> {
 
   // register that we require this analysis
 
   void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<TargetLibraryInfoWrapperPass>();
+    AU.addRequired<ModuleSummaryIndexWrapperPass>();
     AU.addRequiredTransitive<AAResultsWrapperPass>();
     AU.addRequired<LoopInfoWrapperPass>();
     AU.addRequired<ScalarEvolutionWrapperPass>();
   }
-  /*
-   void getAnalysisUsage(AnalysisUsage &AU) const {
-   AU.addRequiredTransitive<TargetLibraryInfoWrapperPass>();
-   AU.addRequiredTransitive<AAResultsWrapperPass>();
-   AU.addRequiredTransitive<LoopInfoWrapperPass>();
-   AU.addRequiredTransitive<ScalarEvolutionWrapperPass>();
-   }
-   */
 
   StringRef getPassName() const { return "MPI Assertion Analysis"; }
 
   // Pass starts here
-  virtual bool runOnModule(Module &M) {
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
 
-    // Debug(M.dump(););
+    Debug(errs() << "Before Modification:\n"; M.dump();
+          errs() << "END MODULE\n";);
+
+    ImplementationSpecifics::create_instance(M);
 
     mpi_func = get_used_mpi_functions(M);
     // TODO is_mpi_used only checks for MPI init, but we want to use this on
@@ -101,15 +101,14 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
       return false;
     }*/
 
-    analysis_results = new RequiredAnalysisResults(this, M);
+    analysis_results = new RequiredAnalysisResults(AM, M);
 
-    function_metadata = new FunctionMetadata(analysis_results->getTLI(), M);
-
-    mpi_implementation_specifics = new ImplementationSpecifics(M);
+    // FrontendPluginData::create_instance(M);
 
     // collect all Persistent Comm Operations
-    std::vector<llvm::CallBase *> send_init_list;
-    std::vector<llvm::CallBase *> recv_init_list;
+    // std::vector<std::shared_ptr<PersistentMPIInitCall>> send_init_list;
+    // std::vector<std::shared_ptr<PersistentMPIInitCall>> recv_init_list;
+    std::vector<CallBase *> combined_init_list;
 
     if (mpi_func->mpi_send_init) {
       for (auto *u : mpi_func->mpi_send_init->users()) {
@@ -117,7 +116,9 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
           if (call->getCalledFunction() == mpi_func->mpi_send_init) {
             // not that I think anyone will pass a ptr to MPI func into another
             // func, but better save than sorry
-            send_init_list.push_back(call);
+            // send_init_list.push_back(
+            //    PersistentMPIInitCall::get_PersistentMPIInitCall(call));
+            combined_init_list.push_back(call);
           }
         }
       }
@@ -126,67 +127,74 @@ struct MPICompilerAssistanceMatchingPass : public ModulePass {
       for (auto *u : mpi_func->mpi_recv_init->users()) {
         if (auto *call = dyn_cast<CallBase>(u)) {
           if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
-            recv_init_list.push_back(call);
+            // recv_init_list.push_back(
+            //     PersistentMPIInitCall::get_PersistentMPIInitCall(call));
+            combined_init_list.push_back(call);
           }
         }
       }
     }
 
-    // remove any calls, where conflicts are possible
-    send_init_list.erase(std::remove_if(send_init_list.begin(),
-                                        send_init_list.end(),
-                                        check_mpi_send_conflicts),
-                         send_init_list.end());
+    auto *main_func = M.getFunction("main");
+    assert(main_func);
 
-    recv_init_list.erase(std::remove_if(recv_init_list.begin(),
-                                        recv_init_list.end(),
-                                        check_mpi_recv_conflicts),
-                         recv_init_list.end());
+    auto precalcuation = Precalculations(M, main_func);
+    precalcuation.add_precalculations(combined_init_list);
 
-    bool replacement = !send_init_list.empty() && !recv_init_list.empty();
+    bool replacement = !combined_init_list.empty();
     // otherwise nothing should be done
     if (replacement) {
 
-      errs() << "Replace " << send_init_list.size() << " send Operations \nand "
-             << recv_init_list.size() << " receive Operations\n";
+      for (auto c : combined_init_list) {
+        if (c->getCalledFunction() == mpi_func->mpi_recv_init) {
+          replace_init_call(c, mpi_func->optimized.mpi_recv_init_info);
+        } else if (c->getCalledFunction() == mpi_func->mpi_send_init) {
+          replace_init_call(c, mpi_func->optimized.mpi_send_init_info);
+        }
+      }
 
-      replace_communication_calls(send_init_list, recv_init_list);
+      replace_request_handling_calls(M);
+      add_init(M);
+      add_finalize(M);
     }
 
-    // Beware with operator | the functions will be executed with || they wont
-    replacement = replacement | add_init(M);
-    replacement = replacement | add_finalize(M);
-
-    errs() << "Successfully executed the pass\n\n";
     delete mpi_func;
-    delete mpi_implementation_specifics;
+    ImplementationSpecifics::delete_instance();
+    // FrontendPluginData::delete_instance();
+
     delete analysis_results;
 
-    delete function_metadata;
+    Debug(errs() << "After Modification:\n"; M.dump();
+          errs() << "END MODULE\n";);
 
-    return replacement;
+#ifndef NDEBUG
+    auto has_error = verifyModule(M, &errs(), nullptr);
+    assert(!has_error);
+#endif
+
+    errs() << "Successfully executed the pass\n\n";
+
+    if (replacement) {
+      return PreservedAnalyses::none();
+    } else {
+      return PreservedAnalyses::all();
+    }
   }
 };
 // class MSGOrderRelaxCheckerPass
 } // namespace
 
-char MPICompilerAssistanceMatchingPass::ID = 42;
+PassPluginLibraryInfo getPassPluginInfo() {
+  const auto callback = [](PassBuilder &PB) {
+    PB.registerOptimizerEarlyEPCallback([&](ModulePassManager &MPM, auto) {
+          MPM.addPass(MPICompilerAssistanceMatchingPass());
+          return true;
+        });
+  };
 
-// Automatically enable the pass.
-// http://adriansampson.net/blog/clangpass.html
-static void registerExperimentPass(const PassManagerBuilder &,
-                                   legacy::PassManagerBase &PM) {
-  PM.add(new MPICompilerAssistanceMatchingPass());
+  return {LLVM_PLUGIN_API_VERSION, "mpi-matching", "1.0.0", callback};
+};
+
+extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
+  return getPassPluginInfo();
 }
-
-// static RegisterStandardPasses
-//    RegisterMyPass(PassManagerBuilder::EP_ModuleOptimizerEarly,
-//                   registerExperimentPass);
-
-static RegisterStandardPasses
-    RegisterMyPass(PassManagerBuilder::EP_OptimizerLast,
-                   registerExperimentPass);
-
-static RegisterStandardPasses
-    RegisterMyPass0(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                    registerExperimentPass);

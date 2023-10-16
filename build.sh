@@ -5,7 +5,7 @@ fi
 
 mkdir -p build
 cd build
-#CC=clang CXX=clang++
-#cmake -DCMAKE_BUILD_TYPE=Debug ..
-cmake -DCMAKE_BUILD_TYPE=Release ..
+CC=clang CXX=clang++
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+#cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j 8

@@ -9,6 +9,7 @@
 
 #include "debug.h"
 #include "mpi-internals.h"
+#include "pack.h"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -18,6 +19,28 @@ static void empty_function_in_start_c(void *request, ucs_status_t status) {
 }
 
 LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
+
+  if (!(request->is_cont)) {
+    int position = 0;
+    switch (request->nc_strategy) {
+    case NC_PACKING:
+
+      MPI_Pack(request->buf, request->count, request->dtype,
+               request->packed_buf, request->pack_size, &position,
+               request->communicators->original_communicator);
+      break;
+    case NC_OPT_PACKING:
+      opt_pack(request);
+      break;
+
+    case NC_MIXED:
+      opt_pack_threshold(request);
+      break;
+    default:
+      break;
+    }
+  }
+
 #ifndef NDEBUG
   add_operation_to_trace(request, "MPI_Start");
 #endif
@@ -41,9 +64,63 @@ LINKAGE_TYPE int b_send(MPIOPT_Request *request) {
     add_operation_to_trace(request, "send pushes data");
 #endif
     request->flag_buffer = request->operation_number * 2 + 2;
-    ucs_status_t status =
-        ucp_put_nbi(request->ep, request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+    ucs_status_t status;
+    if (request->is_cont) {
+      status =
+          ucp_put_nbi(request->ep, request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+
+      switch (request->nc_strategy) {
+      case NC_PACKING:
+        // PACKING
+        status =
+            ucp_put_nbi(request->ep, request->packed_buf, request->pack_size,
+                        request->remote_data_addr, request->remote_data_rkey);
+        break;
+      case NC_DIRECT_SEND:
+        // DIRECT_SEND
+
+        for (int i = 0; i < request->num_cont_blocks; ++i) {
+          status = ucp_put_nbi(
+              request->ep, request->buf + request->dtype_displacements[i],
+              request->dtype_lengths[i],
+              request->remote_data_addr + request->dtype_displacements[i],
+              request->remote_data_rkey);
+          assert(status == UCS_OK || status == UCS_INPROGRESS);
+        }
+
+        break;
+      case NC_OPT_PACKING:
+        status =
+            ucp_put_nbi(request->ep, request->packed_buf, request->pack_size,
+                        request->remote_data_addr, request->remote_data_rkey);
+        break;
+
+      case NC_MIXED:
+        for (int i = 0; i < request->num_cont_blocks; ++i) {
+          if (request->dtype_lengths[i] > request->threshold) {
+            status = ucp_put_nbi(
+                request->ep, request->buf + request->dtype_displacements[i],
+                request->dtype_lengths[i],
+                request->remote_data_addr + request->dtype_displacements[i],
+                request->remote_data_rkey);
+            assert(status == UCS_OK || status == UCS_INPROGRESS);
+          }
+        }
+
+        status = ucp_put_nbi(request->ep, request->packed_buf,
+                             request->pack_size, request->remote_packed_addr,
+                             request->remote_packed_data_rkey);
+
+        break;
+
+      default:
+        break;
+      }
+    }
+
     // ensure order:
     status = ucp_worker_fence(mca_osc_ucx_component.ucp_worker);
     status = ucp_put_nbi(request->ep, &request->flag_buffer, sizeof(int),
@@ -93,9 +170,62 @@ LINKAGE_TYPE int b_recv(MPIOPT_Request *request) {
 #ifndef NDEBUG
     add_operation_to_trace(request, "recv fetches data");
 #endif
-    ucs_status_t status =
-        ucp_get_nbi(request->ep, (void *)request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+
+    ucs_status_t status;
+
+    if (request->is_cont) {
+      status =
+          ucp_get_nbi(request->ep, (void *)request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+
+      switch (request->nc_strategy) {
+      case NC_PACKING:
+        // PACKING
+        status = ucp_get_nbi(request->ep, (void *)request->packed_buf,
+                             request->pack_size, request->remote_data_addr,
+                             request->remote_data_rkey);
+        break;
+      case NC_DIRECT_SEND:
+        // DIRECT_SEND
+        for (int i = 0; i < request->num_cont_blocks; ++i) {
+          status = ucp_get_nbi(
+              request->ep, request->buf + request->dtype_displacements[i],
+              request->dtype_lengths[i],
+              request->remote_data_addr + request->dtype_displacements[i],
+              request->remote_data_rkey);
+          assert(status == UCS_OK || status == UCS_INPROGRESS);
+        }
+
+        break;
+      case NC_OPT_PACKING:
+        status = ucp_get_nbi(request->ep, (void *)request->packed_buf,
+                             request->pack_size, request->remote_data_addr,
+                             request->remote_data_rkey);
+        break;
+
+      case NC_MIXED:
+        for (int i = 0; i < request->num_cont_blocks; ++i) {
+          if (request->dtype_lengths[i] > request->threshold) {
+            status = ucp_get_nbi(
+                request->ep, request->buf + request->dtype_displacements[i],
+                request->dtype_lengths[i],
+                request->remote_data_addr + request->dtype_displacements[i],
+                request->remote_data_rkey);
+            assert(status == UCS_OK || status == UCS_INPROGRESS);
+          }
+        }
+
+        status = ucp_get_nbi(request->ep, (void *)request->packed_buf,
+                             request->pack_size, request->remote_packed_addr,
+                             request->remote_packed_data_rkey);
+
+        break;
+
+      default:
+        break;
+      }
+    }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);
     /*
@@ -152,7 +282,7 @@ start_send_when_searching_for_connection(MPIOPT_Request *request) {
   // always post a normal msg, in case of fallback to normal comm is needed
   // for the first time, the receiver will post a matching recv
   assert(request->backup_request == MPI_REQUEST_NULL);
-  return MPI_Issend(request->buf, request->size, MPI_BYTE, request->dest,
+  return MPI_Issend(request->buf, request->count, request->dtype, request->dest,
                     request->tag, request->communicators->original_communicator,
                     &request->backup_request);
 }
@@ -186,7 +316,7 @@ LINKAGE_TYPE int start_send_fallback(MPIOPT_Request *request) {
   request->operation_number++;
   assert(request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
   assert(request->backup_request == MPI_REQUEST_NULL);
-  return MPI_Isend(request->buf, request->size, MPI_BYTE, request->dest,
+  return MPI_Isend(request->buf, request->count, request->dtype, request->dest,
                    request->tag, request->communicators->original_communicator,
                    &request->backup_request);
 }
@@ -201,9 +331,9 @@ LINKAGE_TYPE int start_recv_fallback(MPIOPT_Request *request) {
 #endif
 
   request->operation_number++;
-  assert(request->type == SEND_REQUEST_TYPE_USE_FALLBACK);
+  assert(request->type == RECV_REQUEST_TYPE_USE_FALLBACK);
   assert(request->backup_request == MPI_REQUEST_NULL);
-  return MPI_Irecv(request->buf, request->size, MPI_BYTE, request->dest,
+  return MPI_Irecv(request->buf, request->count, request->dtype, request->dest,
                    request->tag, request->communicators->original_communicator,
                    &request->backup_request);
 }

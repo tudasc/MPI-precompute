@@ -16,15 +16,15 @@
 // config :
 #define RDMA_SPIN_WAIT_THRESHOLD 32
 
-//#define STATISTIC_PRINTING
-//#define BUFFER_CONTENT_CHECKING
+// #define STATISTIC_PRINTING
+// #define BUFFER_CONTENT_CHECKING
 
-//#define USE_EAGER
+// #define USE_EAGER
 
 #define USE_RENDEZVOUS
 
 // use locking for multi threaded usage
-//#define USE_LOCKING
+// #define USE_LOCKING
 // end config
 
 #if defined(USE_RENDEZVOUS) + defined(USE_EAGER) != 1

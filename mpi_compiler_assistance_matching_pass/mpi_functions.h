@@ -31,18 +31,33 @@ extern struct mpi_functions *mpi_func;
 // optimized version of persistent ops
 struct mpiopt_functions {
   llvm::Function *mpi_wait = nullptr;
+  llvm::Function *mpi_waitall = nullptr;
+  llvm::Function *mpi_waitany = nullptr;
+  llvm::Function *mpi_waitsome = nullptr;
+  llvm::Function *mpi_test = nullptr;
+  llvm::Function *mpi_testall = nullptr;
+  llvm::Function *mpi_testany = nullptr;
+  llvm::Function *mpi_testsome = nullptr;
   llvm::Function *mpi_start = nullptr;
+  llvm::Function *mpi_startall = nullptr;
   llvm::Function *mpi_send_init = nullptr;
+  llvm::Function *mpi_send_init_info = nullptr;
   llvm::Function *mpi_recv_init = nullptr;
+  llvm::Function *mpi_recv_init_info = nullptr;
   llvm::Function *mpi_request_free = nullptr;
   llvm::Function *init = nullptr;
   llvm::Function *finalize = nullptr;
+  llvm::Function *register_send_tag = nullptr;
+  llvm::Function *register_recv_tag = nullptr;
+  llvm::Function *check_registered_conflicts = nullptr;
 };
 
 struct mpi_functions {
   llvm::Function *mpi_init = nullptr;
   llvm::Function *mpi_init_thread = nullptr;
   llvm::Function *mpi_finalize = nullptr;
+  llvm::Function *mpi_comm_rank = nullptr;
+  llvm::Function *mpi_comm_size = nullptr;
 
   llvm::Function *mpi_send = nullptr;
   llvm::Function *mpi_Bsend = nullptr;
@@ -59,8 +74,13 @@ struct mpi_functions {
   llvm::Function *mpi_Irecv = nullptr;
 
   llvm::Function *mpi_test = nullptr;
+  llvm::Function *mpi_testall = nullptr;
+  llvm::Function *mpi_testany = nullptr;
+  llvm::Function *mpi_testsome = nullptr;
   llvm::Function *mpi_wait = nullptr;
   llvm::Function *mpi_waitall = nullptr;
+  llvm::Function *mpi_waitany = nullptr;
+  llvm::Function *mpi_waitsome = nullptr;
   llvm::Function *mpi_buffer_detach = nullptr;
 
   llvm::Function *mpi_barrier = nullptr;
@@ -69,9 +89,14 @@ struct mpi_functions {
   llvm::Function *mpi_Iallreduce = nullptr;
 
   llvm::Function *mpi_start = nullptr;
+  llvm::Function *mpi_startall = nullptr;
   llvm::Function *mpi_send_init = nullptr;
   llvm::Function *mpi_recv_init = nullptr;
   llvm::Function *mpi_request_free = nullptr;
+
+  llvm::Function *mpi_info_create = nullptr;
+  llvm::Function *mpi_info_set = nullptr;
+  llvm::Function *mpi_info_free = nullptr;
 
   struct mpiopt_functions optimized;
 
@@ -84,9 +109,11 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M);
 bool is_mpi_used(struct mpi_functions *mpi_func);
 
 bool is_mpi_call(llvm::CallBase *call);
+
 bool is_mpi_function(llvm::Function *f);
 
 bool is_send_function(llvm::Function *f);
+
 bool is_recv_function(llvm::Function *f);
 
 #endif /* MACH_MPI_FUNCTIONS_H_ */

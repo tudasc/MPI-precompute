@@ -5,6 +5,7 @@
 #include "test.h"
 
 #include "handshake.h"
+#include "pack.h"
 #include "wait.h"
 
 #include "debug.h"
@@ -103,9 +104,59 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
     add_operation_to_trace(request, "CROSSTALK DETECTED");
     add_operation_to_trace(request, "recv fetches data");
 #endif
-    ucs_status_t status =
-        ucp_get_nbi(request->ep, (void *)request->buf, request->size,
-                    request->remote_data_addr, request->remote_data_rkey);
+    ucs_status_t status;
+    if (request->is_cont) {
+      status =
+          ucp_get_nbi(request->ep, (void *)request->buf, request->size,
+                      request->remote_data_addr, request->remote_data_rkey);
+    } else {
+      switch (request->nc_strategy) {
+      case NC_PACKING:
+        // PACKING
+        status = ucp_get_nbi(request->ep, (void *)request->packed_buf,
+                             request->pack_size, request->remote_data_addr,
+                             request->remote_data_rkey);
+        break;
+      case NC_DIRECT_SEND:
+        // DIRECT_SEND
+        for (int i = 0; i < request->num_cont_blocks; ++i) {
+          status = ucp_get_nbi(
+              request->ep, request->buf + request->dtype_displacements[i],
+              request->dtype_lengths[i],
+              request->remote_data_addr + request->dtype_displacements[i],
+              request->remote_data_rkey);
+
+          assert(status == UCS_OK || status == UCS_INPROGRESS);
+        }
+
+        break;
+      case NC_OPT_PACKING:
+        status = ucp_get_nbi(request->ep, (void *)request->packed_buf,
+                             request->pack_size, request->remote_data_addr,
+                             request->remote_data_rkey);
+        break;
+
+      case NC_MIXED:
+        for (int i = 0; i < request->num_cont_blocks; ++i) {
+          if (request->dtype_lengths[i] > request->threshold) {
+            status = ucp_get_nbi(
+                request->ep, request->buf + request->dtype_displacements[i],
+                request->dtype_lengths[i],
+                request->remote_data_addr + request->dtype_displacements[i],
+                request->remote_data_rkey);
+            assert(status == UCS_OK || status == UCS_INPROGRESS);
+          }
+        }
+
+        status = ucp_get_nbi(request->ep, (void *)request->packed_buf,
+                             request->pack_size, request->remote_packed_addr,
+                             request->remote_packed_data_rkey);
+
+        break;
+      default:
+        break;
+      }
+    }
 
     assert(status == UCS_OK || status == UCS_INPROGRESS);
     /*
@@ -157,6 +208,28 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
                            request->ucx_request_data_transfer == NULL,
                        1)) {
     // request is finished
+
+    if (!(request->is_cont)) {
+      int position = 0;
+      switch (request->nc_strategy) {
+      case NC_PACKING:
+
+        MPI_Unpack(request->packed_buf, request->pack_size, &position,
+                   request->buf, request->count, request->dtype,
+                   request->communicators->original_communicator);
+        break;
+      case NC_OPT_PACKING:
+        opt_unpack(request);
+        break;
+
+      case NC_MIXED:
+        opt_unpack_threshold(request);
+        break;
+      default:
+        break;
+      }
+    }
+
     *flag = 1;
 #ifdef DISTINGUISH_ACTIVE_REQUESTS
     request->active = 0;
@@ -176,15 +249,11 @@ LINKAGE_TYPE void progress_request(MPIOPT_Request *request) {
 
 // call if one get stuck while waiting for a request to complete: progresses all
 // other requests
-LINKAGE_TYPE void progress_other_requests(MPIOPT_Request *current_request) {
+LINKAGE_TYPE void progress_all_requests() {
   struct list_elem *current_elem = request_list_head->next;
 
   while (current_elem != NULL) {
-    // we are stuck on this request, and should progress the others
-    // after we return, the control flow goes back to this request anyway
-    if (current_elem->elem != current_request) {
-      progress_request(current_elem->elem);
-    }
+    progress_request(current_elem->elem);
     current_elem = current_elem->next;
   }
 }

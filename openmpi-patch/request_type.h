@@ -21,6 +21,7 @@
 struct mpiopt_request; // forward declaration of struct type
 typedef struct mpiopt_request MPIOPT_Request;
 // BEFORE including other headers
+#include "mpi-internals.h"
 
 #include <mpi.h>
 
@@ -36,7 +37,6 @@ typedef struct mpiopt_request MPIOPT_Request;
 #include <ucp/api/ucp.h>
 #include <unistd.h>
 
-#include "mpi-internals.h"
 #ifndef NDEBUG
 // instead of #include "debug.h" to avoid cyclic inclusion
 struct debug_data;
@@ -55,10 +55,28 @@ struct mpiopt_request {
   int flag_buffer;
   uint64_t remote_data_addr;
   uint64_t remote_flag_addr;
+  uint64_t remote_packed_addr;
   ucp_rkey_h remote_data_rkey;
   ucp_rkey_h remote_flag_rkey;
+  ucp_rkey_h remote_packed_data_rkey;
   void *buf;
   size_t size;
+
+  // datatype metadata
+  char nc_strategy;
+  char remote_strategy;
+  char is_cont;
+  void *packed_buf;
+  size_t pack_size;
+  size_t dtype_size;
+  size_t dtype_extent;
+  int count;
+  MPI_Datatype dtype;
+  int num_cont_blocks;
+  int *dtype_displacements;
+  int *dtype_lengths;
+  int threshold; // packing threshold for mixed sending
+
   // initialized locally
   void *ucx_request_data_transfer;
   void *ucx_request_flag_transfer;
@@ -66,6 +84,7 @@ struct mpiopt_request {
   int type;
   ucp_mem_h mem_handle_data;
   ucp_mem_h mem_handle_flag;
+  ucp_mem_h mem_handle_packed_data;
   ucp_ep_h
       ep; // save used endpoint, so we dont have to look it up over and over
   struct communicator_info *communicators;

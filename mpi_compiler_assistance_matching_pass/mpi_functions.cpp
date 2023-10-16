@@ -15,6 +15,7 @@
  */
 
 #include "mpi_functions.h"
+#include "implementation_specific.h"
 #include <assert.h>
 
 #include "llvm/IR/InstrTypes.h"
@@ -63,6 +64,10 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 
     } else if (f->getName().equals("MPI_Init_thread")) {
       result->mpi_init_thread = f;
+    } else if (f->getName().equals("MPI_Comm_rank")) {
+      result->mpi_comm_rank = f;
+    } else if (f->getName().equals("MPI_Comm_size")) {
+      result->mpi_comm_size = f;
 
       // sync functions:
     } else if (f->getName().equals("MPI_Finalize")) {
@@ -122,16 +127,24 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 
     } else if (f->getName().equals("MPI_Test")) {
       result->mpi_test = f;
-
+    } else if (f->getName().equals("MPI_Testall")) {
+      result->mpi_testall = f;
+    } else if (f->getName().equals("MPI_Testany")) {
+      result->mpi_testany = f;
+    } else if (f->getName().equals("MPI_Testsome")) {
+      result->mpi_testsome = f;
     } else if (f->getName().equals("MPI_Wait")) {
       result->mpi_wait = f;
-
     } else if (f->getName().equals("MPI_Waitall")) {
       result->mpi_waitall = f;
-
+    } else if (f->getName().equals("MPI_Waitany")) {
+      result->mpi_waitany = f;
+    } else if (f->getName().equals("MPI_Waitsome")) {
+      result->mpi_waitsome = f;
     } else if (f->getName().equals("MPI_Start")) {
       result->mpi_start = f;
-
+    } else if (f->getName().equals("MPI_Startall")) {
+      result->mpi_startall = f;
     } else if (f->getName().equals("MPI_Recv_init")) {
       result->mpi_recv_init = f;
 
@@ -140,7 +153,48 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 
     } else if (f->getName().equals("MPI_Request_free")) {
       result->mpi_request_free = f;
+    } else if (f->getName().equals("MPI_Info_create")) {
+      result->mpi_info_create = f;
+    } else if (f->getName().equals("MPI_Info_set")) {
+      result->mpi_info_set = f;
+    } else if (f->getName().equals("MPI_Info_free")) {
+      result->mpi_info_free = f;
     }
+  }
+
+  auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
+
+  if (result->mpi_info_create == nullptr) {
+    auto fntype = FunctionType::get(
+        Type::getInt32Ty(M.getContext()),
+        {mpi_implementation_specifics->mpi_info->getPointerTo()}, false);
+
+    result->mpi_info_create =
+        cast<Function>(M.getOrInsertFunction("MPI_Info_create", fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_info_free == nullptr) {
+    auto fntype = FunctionType::get(
+        Type::getInt32Ty(M.getContext()),
+        {mpi_implementation_specifics->mpi_info->getPointerTo()}, false);
+
+    result->mpi_info_free =
+        cast<Function>(M.getOrInsertFunction("MPI_Info_free", fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_info_set == nullptr) {
+    auto fntype = FunctionType::get(Type::getInt32Ty(M.getContext()),
+                                    {mpi_implementation_specifics->mpi_info,
+                                     Type::getInt8PtrTy(M.getContext()),
+                                     Type::getInt8PtrTy(M.getContext())},
+                                    false);
+
+    result->mpi_info_set =
+        cast<Function>(M.getOrInsertFunction("MPI_Info_set", fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
   }
 
   // construct the optimized version of functions, if original functions where
@@ -153,10 +207,66 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
                            .getCallee()
                            ->stripPointerCasts());
   }
+  if (result->mpi_waitall) {
+    result->optimized.mpi_waitall = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Waitall",
+                              result->mpi_waitall->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_waitany) {
+    result->optimized.mpi_waitany = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Waitany",
+                              result->mpi_waitany->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_waitsome) {
+    result->optimized.mpi_waitsome = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Waitsome",
+                              result->mpi_waitsome->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_test) {
+    result->optimized.mpi_test =
+        cast<Function>(M.getOrInsertFunction(
+                            "MPIOPT_Test", result->mpi_test->getFunctionType())
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_testall) {
+    result->optimized.mpi_testall = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Testall",
+                              result->mpi_testall->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_testany) {
+    result->optimized.mpi_testany = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Testany",
+                              result->mpi_testany->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_testsome) {
+    result->optimized.mpi_testsome = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Testsome",
+                              result->mpi_testsome->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
   if (result->mpi_start) {
     result->optimized.mpi_start = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Start",
                               result->mpi_start->getFunctionType())
+            .getCallee()
+            ->stripPointerCasts());
+  }
+  if (result->mpi_startall) {
+    result->optimized.mpi_startall = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_Startall",
+                              result->mpi_startall->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
@@ -167,6 +277,7 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
             .getCallee()
             ->stripPointerCasts());
   }
+
   if (result->mpi_recv_init) {
     result->optimized.mpi_recv_init = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Recv_init",
@@ -182,6 +293,37 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
             ->stripPointerCasts());
   }
 
+  if (result->mpi_send_init) {
+
+    auto orig_fn_type = result->mpi_send_init->getFunctionType();
+    std::vector<Type *> params;
+    std::copy(orig_fn_type->param_begin(), orig_fn_type->param_end(),
+              std::back_inserter(params));
+    params.push_back(mpi_implementation_specifics->mpi_info);
+
+    auto new_fntype =
+        FunctionType::get(orig_fn_type->getReturnType(), params, false);
+    result->optimized.mpi_send_init_info =
+        cast<Function>(M.getOrInsertFunction("MPIOPT_Send_init_x", new_fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+  if (result->mpi_recv_init) {
+
+    auto orig_fn_type = result->mpi_recv_init->getFunctionType();
+    std::vector<Type *> params;
+    std::copy(orig_fn_type->param_begin(), orig_fn_type->param_end(),
+              std::back_inserter(params));
+    params.push_back(mpi_implementation_specifics->mpi_info);
+
+    auto new_fntype =
+        FunctionType::get(orig_fn_type->getReturnType(), params, false);
+    result->optimized.mpi_recv_init_info =
+        cast<Function>(M.getOrInsertFunction("MPIOPT_Recv_init_x", new_fntype)
+                           .getCallee()
+                           ->stripPointerCasts());
+  }
+
   // construct the init and finish functions, if necessary:
   if (result->mpi_init || result->mpi_init_thread || result->mpi_finalize) {
     // void funcs that do not have params
@@ -194,52 +336,24 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
         cast<Function>(M.getOrInsertFunction("MPIOPT_FINALIZE", ftype, {})
                            .getCallee()
                            ->stripPointerCasts());
+    result->optimized.check_registered_conflicts = cast<Function>(
+        M.getOrInsertFunction("MPIOPT_check_registered_envelopes_for_conflict",
+                              ftype, {})
+            .getCallee()
+            ->stripPointerCasts());
   }
-
-  // gather all MPI send and recv calls
-  /*
-   // currenty unused:
-          auto temp = gather_all_calls(result->mpi_send);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Bsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Ssend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Rsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Isend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Ibsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Irsend);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Sendrecv);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_send_init);
-          result->send_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-
-           temp = gather_all_calls(result->mpi_recv);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Irecv);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_recv_init);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-           temp = gather_all_calls(result->mpi_Sendrecv);
-          result->recv_calls.insert(result->send_calls.end(), temp.begin(),
-                          temp.end());
-                          */
+  auto *ftype = FunctionType::get(
+      Type::getInt32Ty(M.getContext()),
+      {Type::getInt32Ty(M.getContext()), Type::getInt32Ty(M.getContext())},
+      false);
+  result->optimized.register_send_tag = cast<Function>(
+      M.getOrInsertFunction("MPIOPT_Register_send_envelope", ftype, {})
+          .getCallee()
+          ->stripPointerCasts());
+  result->optimized.register_recv_tag = cast<Function>(
+      M.getOrInsertFunction("MPIOPT_Register_recv_envelope", ftype, {})
+          .getCallee()
+          ->stripPointerCasts());
 
   return result;
 }

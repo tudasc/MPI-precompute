@@ -104,9 +104,11 @@ all: $(BINARY)
 
 IMB_SRC = imb.cpp scope.cpp
 IMB_OBJ = $(IMB_SRC:.cpp=.o)
+IMB_OBJBC = $(IMB_SRC:.cpp=.bc)
 
 BECHMARK_SUITE_SRC += benchmark_suites_collection.cpp
 BECHMARK_SUITE_OBJ = $(BECHMARK_SUITE_SRC:.cpp=.o)
+BECHMARK_SUITE_OBJBC = $(BECHMARK_SUITE_SRC:.cpp=.bc)
 
 HEADERS += benchmark.h \
 benchmark_suite_base.h \
@@ -119,17 +121,18 @@ announce:
 	@if test "$(ANNOUNCE)" -eq "1"; then echo "NOTE: Building target: $(TARGET), binary name: $(BINARY)"; fi
 	@if test "$(ANNOUNCE)" -eq "1"; then echo "NOTE: Use make TARGET=<DIR_NAME> to select a target suite"; fi
 
-$(BINARY): $(IMB_OBJ) $(BECHMARK_SUITE_OBJ) $(ADDITIONAL_OBJ) 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+$(BINARY): $(IMB_OBJBC) $(BECHMARK_SUITE_OBJBC) $(ADDITIONAL_OBJ)
+	llvm-link -o all.bc $^
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ all.bc $(LDFLAGS)
 
-%.o: %.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
+%.bc: %.cpp
+	$(CXX) $(CPPFLAGS) -c -emit-llvm $(CXXFLAGS) -o $@ $<
 
-%.o: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+%.bc: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -emit-llvm -o $@ $<
 
 clean: announce
-	rm -f $(IMB_OBJ) $(BECHMARK_SUITE_OBJ) $(ADDITIONAL_OBJ) $(BINARY) 
+	rm -f $(IMB_OBJBC) $(BECHMARK_SUITE_OBJBC) $(ADDITIONAL_OBJBC) $(BINARY) all.bc
 
 
 $(BECHMARK_SUITE_OBJ): $(HEADERS) Makefile

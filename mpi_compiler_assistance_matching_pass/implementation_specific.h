@@ -18,20 +18,51 @@
 #define MACH_IMPLEMENTATION_SPECIFIC_H_
 
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/Module.h"
+#include <cassert>
+
 class ImplementationSpecifics {
 
 public:
+  // singelton-like
+  static ImplementationSpecifics *get_instance() {
+    assert(instance != nullptr);
+    return instance;
+  }
+
+  static ImplementationSpecifics *create_instance(llvm::Module &M) {
+    if (instance == nullptr)
+      instance = new ImplementationSpecifics(M);
+    return instance;
+  }
+
+  static void delete_instance() {
+    if (instance != nullptr)
+      delete instance;
+    instance = nullptr;
+  }
+
+  // singelton pattern: singeltons are NOT copy-able or assignable
+  ImplementationSpecifics(ImplementationSpecifics &other) = delete;
+
+  void operator=(const ImplementationSpecifics &) = delete;
+
+private:
+  static ImplementationSpecifics *instance;
+
   ImplementationSpecifics(llvm::Module &M);
+
   ~ImplementationSpecifics();
 
-  llvm::Constant *COMM_WORLD;
+public:
+  llvm::GlobalVariable *COMM_WORLD;
   llvm::Constant *ANY_SOURCE;
   llvm::Constant *ANY_TAG;
 
+  llvm::Constant *INFO_NULL;
+  llvm::Type *mpi_info;
+
   int get_size_of_mpi_type(llvm::Constant *type);
 };
-
-// created and deleted in main
-extern ImplementationSpecifics *mpi_implementation_specifics;
 
 #endif /* MACH_IMPLEMENTATION_SPECIFIC_H_ */
