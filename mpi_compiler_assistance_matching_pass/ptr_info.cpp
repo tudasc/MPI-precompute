@@ -58,42 +58,43 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     // if other == shared_from_this(): nothing to do already the same ptr info
 
     // merge users
-  for (const auto &ptr : other->ptrs_with_this_info) {
-    assert(ptr->ptr_info != shared_from_this());
-    ptr->ptr_info = shared_from_this();
-    ptrs_with_this_info.insert(ptr);
-  }
-
-  if (other->is_used_directly) {
-    this->setIsUsedDirectly(true, other->info_of_direct_usage);
-    // will merge the info_of_direct_usage
-  }
-
-  bool changed = (this->is_read_from != other->is_read_from ||
-                  this->is_written_to != other->is_written_to ||
-                  this->whole_ptr_is_relevant != other->whole_ptr_is_relevant);
-
-  this->is_read_from = this->is_read_from || other->is_read_from;
-  this->is_written_to = this->is_written_to || other->is_written_to;
-  this->whole_ptr_is_relevant =
-      this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
-
-  std::move(other->parents.begin(), other->parents.end(),
-            std::inserter(parents, parents.end()));
-
-  // merge important_members
-  for (auto pos : other->important_members) {
-    if (important_members.find(pos.first) != important_members.end()) {
-      // merge the information
-      important_members[pos.first]->merge_with(pos.second);
-    } else {
-      important_members.insert(pos);
-      changed = true;
+    for (const auto &ptr : other->ptrs_with_this_info) {
+      assert(ptr->ptr_info != shared_from_this());
+      ptr->ptr_info = shared_from_this();
+      ptrs_with_this_info.insert(ptr);
     }
-  }
-  if (changed) {
-    propergate_changes();
-  }
+
+    if (other->is_used_directly) {
+      this->setIsUsedDirectly(true, other->info_of_direct_usage);
+      // will merge the info_of_direct_usage
+    }
+
+    bool changed =
+        (this->is_read_from != other->is_read_from ||
+         this->is_written_to != other->is_written_to ||
+         this->whole_ptr_is_relevant != other->whole_ptr_is_relevant);
+
+    this->is_read_from = this->is_read_from || other->is_read_from;
+    this->is_written_to = this->is_written_to || other->is_written_to;
+    this->whole_ptr_is_relevant =
+        this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
+
+    std::move(other->parents.begin(), other->parents.end(),
+              std::inserter(parents, parents.end()));
+
+    // merge important_members
+    for (auto pos : other->important_members) {
+      if (important_members.find(pos.first) != important_members.end()) {
+        // merge the information
+        important_members[pos.first]->merge_with(pos.second);
+      } else {
+        important_members.insert(pos);
+        changed = true;
+      }
+    }
+    if (changed) {
+      propergate_changes();
+    }
   }
 }
 void PtrUsageInfo::add_important_member(
@@ -120,4 +121,27 @@ void PtrUsageInfo::propergate_changes() {
 bool PtrUsageInfo::is_member_relevant(
     const std::vector<unsigned int> &member_idx) {
   return important_members.find(member_idx) != important_members.end();
+}
+
+void PtrUsageInfo::dump() {
+  errs() << "PtrUsageInfo:\n";
+  errs() << "Users:\n";
+  for (const auto &u : ptrs_with_this_info) {
+    errs() << "\t";
+    u->v->dump();
+  }
+  errs() << "Is Read : " << is_read_from << "\n";
+  errs() << "Is Written : " << is_written_to << "\n";
+  errs() << "Used Directly : " << is_used_directly << "\n";
+  errs() << "Is Called : " << is_called << "\n";
+  errs() << "Is whole ptr relevant : " << whole_ptr_is_relevant
+         << " (non-constant-gep)\n";
+  errs() << "Important GEP members : \n";
+  for (auto pair : important_members) {
+    errs() << "\t";
+    for (auto idx : pair.first) {
+      errs() << idx << ", ";
+    }
+    errs() << "\n";
+  }
 }

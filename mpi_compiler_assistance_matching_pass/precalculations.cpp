@@ -1339,13 +1339,9 @@ void Precalculations::debug_printings() {
   errs() << "ADDITIONAL DEBUG PRINTING\n";
 
   for (auto v : tainted_values) {
-    if (auto call = dyn_cast<CallBase>(v->v)) {
-      if (call->getCalledFunction() == mpi_func->mpi_Isend) {
-        // call->dump();
-        print_parents(v);
-
-        return;
-      }
+    if (v->v->getName() == "this") {
+      v->ptr_info->dump();
+      assert(false);
     }
   }
 }

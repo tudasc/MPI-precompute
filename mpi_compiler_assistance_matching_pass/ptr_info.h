@@ -86,6 +86,9 @@ public:
   void add_important_member(std::vector<unsigned int> member_idx,
                             std::shared_ptr<PtrUsageInfo> result_ptr);
 
+  // for debugging
+  void dump();
+
 private:
   // propergates changes by re-visiting all users of this ptr if something
   // important has changed
