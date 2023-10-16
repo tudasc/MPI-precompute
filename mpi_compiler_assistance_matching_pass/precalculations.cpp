@@ -314,16 +314,17 @@ void Precalculations::visit_store_from_ptr(
   assert(store);
 
   assert(is_tainted(store->getPointerOperand()));
-  // TODO do we need to do something here?
-  auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
-  // we should assert that this ptr usage is already covered by the ptr usage
-  // info
+  // does only the find:
   auto ptr = insert_tainted_value(store->getPointerOperand(), store_info);
   assert(
       ptr->ptr_info
           ->isUsedDirectly()); // must already be set, otherwise there is no
                                // need in visiting this store in the first place
   ptr->ptr_info->setIsWrittenTo(true);
+  // we only need the stored value if it is used later
+  if (ptr->ptr_info->isReadFrom()) {
+    auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
+  }
 }
 
 void Precalculations::visit_store(
@@ -539,9 +540,10 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
       // if we dont read the ptr directly, we dont need to capture the stores
       //  e.g. a struct ptr where the first member is not used
       if (s->getPointerOperand() == ptr->v) {
-        // all stores to this ptr
-        if (ptr->ptr_info->isUsedDirectly() ||
-            ptr->ptr_info->isWholePtrIsRelevant()) {
+        // store to this ptr
+        if ((ptr->ptr_info->isUsedDirectly() ||
+             ptr->ptr_info->isWholePtrIsRelevant()) &&
+            ptr->ptr_info->isReadFrom()) {
           auto new_val = insert_tainted_value(s, ptr);
         }
       } else {
@@ -1339,9 +1341,10 @@ void Precalculations::debug_printings() {
   errs() << "ADDITIONAL DEBUG PRINTING\n";
 
   for (auto v : tainted_values) {
-    if (v->v->getName() == "this") {
+    if (v->v->getName() == "tag_to_use2.i") {
       v->ptr_info->dump();
       assert(false);
+      break;
     }
   }
 }
