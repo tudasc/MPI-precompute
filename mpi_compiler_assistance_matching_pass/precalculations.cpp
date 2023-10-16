@@ -354,6 +354,26 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
   }
 }
 
+void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
+  auto phi = dyn_cast<PHINode>(phi_info->v);
+  assert(phi);
+
+  for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
+    auto vv = phi->getIncomingValue(i);
+    auto new_val = insert_tainted_value(vv, phi_info);
+    if (phi->getType()->isPointerTy()) {
+      phi->dump();
+
+      // phi könnte "von oben" besucht werden: v_ptr info is not created and
+      // needs to be derived from one of the input ptrs
+      assert(phi_info->ptr_info);
+      new_val->ptr_info = phi_info->ptr_info;
+      phi_info->ptr_info->add_ptr_info_user(new_val);
+    }
+  }
+  phi_info->visited = true;
+}
+
 void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   errs() << "Visit\n";
   v->v->dump();
@@ -424,16 +444,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     return;
   }
   if (auto *phi = dyn_cast<PHINode>(v->v)) {
-    for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
-      auto vv = phi->getIncomingValue(i);
-      auto new_val = insert_tainted_value(vv, v);
-      if (phi->getType()->isPointerTy()) {
-        assert(v->ptr_info);
-        new_val->ptr_info = v->ptr_info;
-        v->ptr_info->add_ptr_info_user(new_val);
-      }
-    }
-    v->visited = true;
+    visit_phi(v);
     return;
   }
   if (auto *cast = dyn_cast<CastInst>(v->v)) {

@@ -123,6 +123,7 @@ public:
   void visit_store_from_value(const std::shared_ptr<TaintedValue> &store_info);
   void visit_store_from_ptr(const std::shared_ptr<TaintedValue> &store_info);
   void visit_gep(const std::shared_ptr<TaintedValue> &gep_info);
+  void visit_phi(const std::shared_ptr<TaintedValue> &phi_info);
 
   void visit_call(std::shared_ptr<TaintedValue> call_info);
   void visit_call_from_ptr(llvm::CallBase *call,
