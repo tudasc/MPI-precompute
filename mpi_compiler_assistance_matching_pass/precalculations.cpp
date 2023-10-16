@@ -363,18 +363,8 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
       assert(false);
     }
     std::vector<unsigned int> idxs = get_gep_idxs(gep);
-    if (not coming_from_ptr) {
-      gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
-    } else {
-      // coming from ptr
-      // check if value is needed and de-taint if not
-      if (not gep_ptr_info->ptr_info->isWholePtrIsRelevant()) {
-        if (not gep_ptr_info->ptr_info->is_member_relevant(idxs)) {
-          // de-taint non relevant access
-          remove_tainted_value(gep_info);
-        }
-      }
-    }
+    gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
+
   } else {
     // we could not determine which fields are important, need to keep track of
     // everything
@@ -572,12 +562,12 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
       continue;
     }
     if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
-      // the test if the resulting GEP is actually relevant with the ptr info
-      // is conducted when the gep is visited
-      // if not relevant: it will be removed from tainted values
-      if (ptr->ptr_info->isWholePtrIsRelevant() || ptr.p)
-
+      // if gep is relevant
+      if (ptr->ptr_info->isWholePtrIsRelevant() ||
+          not gep->hasAllConstantIndices() ||
+          ptr->ptr_info->is_member_relevant(get_gep_idxs(gep))) {
         insert_tainted_value(gep, ptr);
+      }
       continue;
     }
     if (auto *compare = dyn_cast<ICmpInst>(u)) {

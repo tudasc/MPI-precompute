@@ -38,21 +38,16 @@ using namespace llvm;
 void PtrUsageInfo::setIsUsedDirectly(
     bool isUsedDirectly,
     const std::shared_ptr<PtrUsageInfo> &direct_usage_info) {
-  if (not isUsedDirectly) {
-    assert(false);
-    return;
-  }
 
   if (not is_used_directly) {
     is_used_directly = true;
-    // re-visit all users of ptr as something has changed
-    for (auto tv : ptrs_with_this_info) {
-      tv->visited = false;
-    }
+    propergate_changes();
   }
+
   if (direct_usage_info) {
     if (info_of_direct_usage) {
       info_of_direct_usage->merge_with(direct_usage_info);
+      // merge will propergate changes if any
     } else
       info_of_direct_usage = direct_usage_info;
   }
@@ -71,6 +66,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
 
   if (other->is_used_directly) {
     this->setIsUsedDirectly(true, other->info_of_direct_usage);
+    // will merge the info_of_direct_usage
   }
 
   bool changed = (this->is_read_from != other->is_read_from ||
@@ -88,10 +84,8 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
   // merge important_members
   for (auto pos : other->important_members) {
     if (important_members.find(pos.first) != important_members.end()) {
-      // may need to merge the information
-      if (pos.second != important_members[pos.first]) {
-        important_members[pos.first]->merge_with(pos.second);
-      } // otherwise it is the same anyway
+      // merge the information
+      important_members[pos.first]->merge_with(pos.second);
     } else {
       important_members.insert(pos);
       changed = true;
@@ -109,6 +103,7 @@ void PtrUsageInfo::add_important_member(
   if (important_members.find(member_idx) != important_members.end()) {
     important_members[member_idx]->merge_with(result_ptr);
     // TODO if merge does not change anything: nothing to do
+    // but propergate "changes" is not wrong
     propergate_changes();
   } else {
     important_members[member_idx] = result_ptr;
