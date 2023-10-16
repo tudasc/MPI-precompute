@@ -154,7 +154,8 @@ public:
 
   bool is_retval_of_call_used(llvm::CallBase *call);
 
-  void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo);
+  void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
+                                    std::shared_ptr<TaintedValue> arg_info);
   void taint_all_indirect_calls(llvm::Function *func);
 
   void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);

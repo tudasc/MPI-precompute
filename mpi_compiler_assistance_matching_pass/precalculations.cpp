@@ -33,6 +33,34 @@
 #include "debug.h"
 using namespace llvm;
 
+void print_childrens(std::shared_ptr<TaintedValue> parent,
+                     unsigned int indent = 0) {
+  if (indent > 10 || parent == nullptr || parent->v == nullptr)
+    return;
+
+  for (unsigned int i = 0; i < indent; ++i) {
+    errs() << "\t";
+  }
+  parent->v->dump();
+  for (const auto &c : parent->children) {
+    print_childrens(c, indent + 1);
+  }
+}
+
+void print_parents(std::shared_ptr<TaintedValue> child,
+                   unsigned int indent = 0) {
+  if (indent > 2 || child == nullptr || child->v == nullptr)
+    return;
+
+  for (unsigned int i = 0; i < indent; ++i) {
+    errs() << "\t";
+  }
+  child->v->dump();
+  for (const auto &p : child->parents) {
+    print_parents(p, indent + 1);
+  }
+}
+
 // True if callee needs to be called as it contains tainted instructions
 // or True if callee can raise an exception and the exception handling code is
 // actually tainted if exception handling is not tainted, we dont need to handle
@@ -358,19 +386,33 @@ void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
   auto phi = dyn_cast<PHINode>(phi_info->v);
   assert(phi);
 
-  for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
-    auto vv = phi->getIncomingValue(i);
-    auto new_val = insert_tainted_value(vv, phi_info);
-    if (phi->getType()->isPointerTy()) {
-      phi->dump();
+  if (phi->getType()->isPointerTy()) {
+    auto ptr_info = phi_info->ptr_info;
+    bool ptr_info_was_present = (ptr_info != nullptr);
+    if (not ptr_info) {
+      ptr_info = std::make_shared<PtrUsageInfo>(phi_info);
+    }
+    for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
+      auto vv = phi->getIncomingValue(i);
+      auto new_val = insert_tainted_value(vv, phi_info);
 
-      // phi könnte "von oben" besucht werden: v_ptr info is not created and
-      // needs to be derived from one of the input ptrs
-      assert(phi_info->ptr_info);
-      new_val->ptr_info = phi_info->ptr_info;
-      phi_info->ptr_info->add_ptr_info_user(new_val);
+      if (new_val->ptr_info) {
+        ptr_info_was_present = true;
+        ptr_info->merge_with(new_val->ptr_info);
+      } else {
+        new_val->ptr_info = ptr_info;
+        ptr_info->add_ptr_info_user(new_val);
+      }
+    }
+    assert(ptr_info_was_present);
+  } else {
+    // no ptr
+    for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
+      auto vv = phi->getIncomingValue(i);
+      auto new_val = insert_tainted_value(vv, phi_info);
     }
   }
+
   phi_info->visited = true;
 }
 
@@ -538,16 +580,19 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     }
     if (auto *phi = dyn_cast<PHINode>(u)) {
       // follow the phi
-      for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
-        auto vv = phi->getIncomingValue(i);
-        insert_tainted_value(vv, ptr);
-      }
       insert_tainted_value(phi, ptr);
+      // the ptr info will be constructed when the phi is visited
       continue;
     }
     if (auto *select = dyn_cast<SelectInst>(u)) {
       // follow the resulting ptr
-      insert_tainted_value(select, ptr);
+      auto select_info = insert_tainted_value(select, ptr);
+      if (select_info->ptr_info == nullptr) {
+        select_info->ptr_info = ptr->ptr_info;
+        select_info->ptr_info->add_ptr_info_user(select_info);
+      } else {
+        ptr->ptr_info->merge_with(select_info->ptr_info);
+      }
       continue;
     }
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -600,10 +645,14 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
     for (auto u : func->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         auto *operand = call->getArgOperand(arg->getArgNo());
-        insert_tainted_value(operand, arg_info);
+        auto new_val = insert_tainted_value(operand, arg_info);
         if (arg_info->is_pointer()) {
-          // TODO
-          assert(false && "TODO: IMPLEMENT\n");
+          if (new_val->ptr_info == nullptr) {
+            new_val->ptr_info = arg_info->ptr_info;
+            new_val->ptr_info->add_ptr_info_user(new_val);
+          } else {
+            arg_info->ptr_info->merge_with(new_val->ptr_info);
+          }
         }
         continue;
       }
@@ -611,7 +660,7 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
           functions_that_may_be_called_indirect.end()) {
         // this func may be called indirect we need to visit all indirect call
         // sites
-        taint_all_indirect_call_args(func, arg->getArgNo());
+        taint_all_indirect_call_args(func, arg->getArgNo(), arg_info);
       }
     }
   }
@@ -716,14 +765,15 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
 
 void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
                                           std::shared_ptr<TaintedValue> ptr) {
-  // TODO Implement with new info
 
   if (call->getCalledOperand() == ptr->v) {
     // visit from the function ptr: nothing to check
     return;
   }
 
-  auto new_val = insert_tainted_value(call, ptr);
+  assert(ptr->ptr_info); // otherwise no need to trace this ptr usage
+
+  auto call_info = insert_tainted_value(call, ptr);
 
   errs() << "Visit\n";
   call->dump();
@@ -742,12 +792,11 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       // we know it is safe to execute these "readonly" funcs
       if (*ptr_given_as_arg.begin() == 0 && ptr_given_as_arg.size() == 1) {
         // nothing to: do only reads the communicator
+        // ptr is the communicator
       } else {
         // the needed value is the result of reading the comm
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
-        // TODO
         auto new_val = insert_tainted_value(call, ptr);
-
         insert_tainted_value(call->getArgOperand(0),
                              ptr); // we also need to keep the comm
       }
@@ -790,7 +839,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       auto *arg = func->getArg(arg_num);
       if (arg->hasAttribute(Attribute::NoCapture) &&
           arg->hasAttribute(Attribute::ReadOnly)) {
-        continue; // nothing to do reading the val is allowed
+        continue; // nothing to do: reading the val is allowed
         // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as
         // first ptr lvl is only read
       }
@@ -800,8 +849,12 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
         assert(false);
       } else {
         auto new_val = insert_tainted_value(arg, ptr);
-        // TODO
-
+        if (new_val->ptr_info == nullptr) {
+          new_val->ptr_info = ptr->ptr_info;
+          new_val->ptr_info->add_ptr_info_user(new_val);
+        } else {
+          ptr->ptr_info->merge_with(new_val->ptr_info);
+        }
         visit_ptr_usages(new_val);
       }
     }
@@ -1214,16 +1267,25 @@ Precalculations::get_possible_call_targets(llvm::CallBase *call) {
   return possible_targets;
 }
 
-void Precalculations::taint_all_indirect_call_args(llvm::Function *func,
-                                                   unsigned int ArgNo) {
+void Precalculations::taint_all_indirect_call_args(llvm::Function *func, unsigned int ArgNo,
+    std::shared_ptr<TaintedValue> arg_info) {
   // TODO this could be done more efficient...
   for (auto &f : M.functions()) {
     for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         auto targets = get_possible_call_targets(call);
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
-          insert_tainted_value(
-              call->getArgOperand(ArgNo)); // TODO true false false
+          auto new_info =
+              insert_tainted_value(call->getArgOperand(ArgNo), arg_info);
+          if (arg_info->is_pointer()) {
+            assert(arg_info->ptr_info);
+            if (new_info->ptr_info == nullptr) {
+              new_info->ptr_info = arg_info->ptr_info;
+              new_info->ptr_info->add_ptr_info_user(new_info);
+            } else {
+              arg_info->ptr_info->merge_with(new_info->ptr_info);
+            }
+          }
         }
       }
     }
@@ -1238,7 +1300,7 @@ void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         auto targets = get_possible_call_targets(call);
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
-          insert_tainted_value(call); // TODO true false false
+          insert_tainted_value(call, TaintReason::CONTROL_FLOW);
         }
       }
     }
@@ -1272,34 +1334,6 @@ void Precalculations::print_analysis_result_remarks() {
   }
 
   debug_printings();
-}
-
-void print_childrens(std::shared_ptr<TaintedValue> parent,
-                     unsigned int indent = 0) {
-  if (indent > 10 || parent == nullptr || parent->v == nullptr)
-    return;
-
-  for (unsigned int i = 0; i < indent; ++i) {
-    errs() << "\t";
-  }
-  parent->v->dump();
-  for (const auto &c : parent->children) {
-    print_childrens(c, indent + 1);
-  }
-}
-
-void print_parents(std::shared_ptr<TaintedValue> child,
-                   unsigned int indent = 0) {
-  if (indent > 2 || child == nullptr || child->v == nullptr)
-    return;
-
-  for (unsigned int i = 0; i < indent; ++i) {
-    errs() << "\t";
-  }
-  child->v->dump();
-  for (const auto &p : child->parents) {
-    print_parents(p, indent + 1);
-  }
 }
 
 void Precalculations::debug_printings() {

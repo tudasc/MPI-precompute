@@ -59,9 +59,10 @@ void PtrUsageInfo::setIsUsedDirectly(
 }
 
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
-  assert(other != shared_from_this());
+  if (other != shared_from_this()) {
+    // if other == shared_from_this(): nothing to do already the same ptr info
 
-  // merge users
+    // merge users
   for (const auto &ptr : other->ptrs_with_this_info) {
     assert(ptr->ptr_info != shared_from_this());
     ptr->ptr_info = shared_from_this();
@@ -98,6 +99,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
   }
   if (changed) {
     propergate_changes();
+  }
   }
 }
 void PtrUsageInfo::add_important_member(
