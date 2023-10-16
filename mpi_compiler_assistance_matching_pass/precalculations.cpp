@@ -335,8 +335,8 @@ void Precalculations::visit_store(
 
   if (is_tainted(store->getValueOperand())) {
     visit_store_from_value(store_info);
-  }
-  if (is_tainted(store->getPointerOperand())) {
+  } else {
+    assert(is_tainted(store->getPointerOperand()));
     visit_store_from_ptr(store_info);
   }
 }
