@@ -15,5 +15,6 @@ other tests target the implementation
 15 inharitance with virtual table
 16 inharitance with virtual table
 17 Waitall only on the sends anonly after that Waitall on the recvs
-18 Reinitialization of Requests
-19 same as 16 but with Foor Loop over object members
+18 same as 16 but with Foor Loop over object members
+19 Reinitialization of Requests I
+19 Reinitialization of Requests II
