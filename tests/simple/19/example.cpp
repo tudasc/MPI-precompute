@@ -62,7 +62,10 @@ public:
   }
 
   void end_halo_exchange() {
-    MPI_Waitall(4, comm_requests, MPI_STATUSES_IGNORE);
+    // could also use MPI_waitall
+    for (int i = 0; i < 4; ++i) {
+      MPI_Wait(&comm_requests[i], MPI_STATUS_IGNORE);
+    }
   }
 
 private:
@@ -115,7 +118,10 @@ public:
   }
 
   void end_halo_exchange() {
-    MPI_Waitall(4, comm_requests, MPI_STATUSES_IGNORE);
+    // could also use MPI_waitall
+    for (int i = 0; i < 4; ++i) {
+      MPI_Wait(&comm_requests[i], MPI_STATUS_IGNORE);
+    }
   }
 
 private:

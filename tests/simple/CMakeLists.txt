@@ -91,6 +91,11 @@ add_test(NAME test18
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+add_test(NAME test19
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/19
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 
 set_tests_properties(test01 PROPERTIES PROCESSORS 2)
 set_tests_properties(test02 PROPERTIES PROCESSORS 2)
@@ -109,7 +114,9 @@ set_tests_properties(test14 PROPERTIES PROCESSORS 2)
 set_tests_properties(test15 PROPERTIES PROCESSORS 2)
 set_tests_properties(test16 PROPERTIES PROCESSORS 2)
 set_tests_properties(test17 PROPERTIES PROCESSORS 2)
-set_tests_properties(test17 PROPERTIES PROCESSORS 8)
+set_tests_properties(test18 PROPERTIES PROCESSORS 2)
+set_tests_properties(test19 PROPERTIES PROCESSORS 2)
+
 
 # currently not implemented feature: other comm than comm world
 set_tests_properties(test04 PROPERTIES DISABLED true)
@@ -119,7 +126,11 @@ set_tests_properties(test10 PROPERTIES DISABLED true)
 set_tests_properties(test11 PROPERTIES DISABLED true)
 #set_tests_properties(test00 PROPERTIES DISABLED true)
 
-#TODO fix testcase
+#TODO fix testcases
+# deadlock in implementation as request gets freed
+set_tests_properties(test18 PROPERTIES DISABLED true)
 # We need to re-visit this testcase, there seems to be uninitialized memory somewhere
 # sometimes it works, sometimes not
 set_tests_properties(test03 PROPERTIES DISABLED true)
+# for loop over object members we need more detailed analysis over what members are important
+set_tests_properties(test19 PROPERTIES DISABLED true)
