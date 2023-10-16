@@ -334,11 +334,11 @@ void Precalculations::visit_store(
   auto store = dyn_cast<StoreInst>(store_info->v);
   assert(store);
 
-  if (is_tainted(store->getValueOperand())) {
-    visit_store_from_value(store_info);
-  } else {
-    assert(is_tainted(store->getPointerOperand()));
+  if (is_tainted(store->getPointerOperand())) {
     visit_store_from_ptr(store_info);
+  } else {
+    assert(is_tainted(store->getValueOperand()));
+    visit_store_from_value(store_info);
   }
 }
 
@@ -493,7 +493,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     v->v->dump();
     assert(false);
   }
-  
+
   if (v->is_pointer()) {
     visit_ptr_usages(v);
   }
@@ -1326,9 +1326,8 @@ void Precalculations::debug_printings() {
   errs() << "ADDITIONAL DEBUG PRINTING\n";
 
   for (auto v : tainted_values) {
-    if (v->v->getName() == "tag_to_use2.i") {
+    if (v->v->getName() == "this") {
       v->ptr_info->dump();
-      assert(false);
       break;
     }
   }
