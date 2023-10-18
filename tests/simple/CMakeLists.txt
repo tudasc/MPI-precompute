@@ -131,6 +131,11 @@ set_tests_properties(test10 PROPERTIES DISABLED true)
 set_tests_properties(test11 PROPERTIES DISABLED true)
 #set_tests_properties(test00 PROPERTIES DISABLED true)
 
+# These testcases Re-Use an envelope and are therefore Expeckted to fail
+#TODO better test infrastructure to also account for expected to fail tests
+set_tests_properties(test19 PROPERTIES DISABLED true)
+set_tests_properties(test20 PROPERTIES DISABLED true)
+
 #TODO fix testcases
 # We need to re-visit this testcase, there seems to be uninitialized memory somewhere
 # sometimes it works, sometimes not
