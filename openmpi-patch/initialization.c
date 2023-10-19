@@ -507,8 +507,10 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
       printf("using packing strategy\n");
 
-      MPI_Pack_size(count, datatype, comm, &request->pack_size);
-      request->packed_buf = malloc(request->pack_size);
+      int pack_size_as_int;
+      MPI_Pack_size(count, datatype, comm, &pack_size_as_int);
+      request->pack_size = pack_size_as_int;
+      request->packed_buf = calloc(request->pack_size, 1);
 
       break;
 
