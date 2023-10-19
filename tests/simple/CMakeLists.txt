@@ -137,8 +137,5 @@ set_tests_properties(test19 PROPERTIES DISABLED true)
 set_tests_properties(test20 PROPERTIES DISABLED true)
 
 #TODO fix testcases
-# We need to re-visit this testcase, there seems to be uninitialized memory somewhere
-# sometimes it works, sometimes not
-set_tests_properties(test03 PROPERTIES DISABLED true)
 # for loop over object members we need more detailed analysis over what members are important
 set_tests_properties(test18 PROPERTIES DISABLED true)
