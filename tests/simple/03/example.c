@@ -97,7 +97,7 @@ void use_persistent_comm() {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
-  char *buffer = malloc(BLOCK_COUNT * BLOCK_SIZE * N);
+  char *buffer = malloc(BLOCK_COUNT * BLOCK_SIZE * N * sizeof(char));
   double *work_buffer = calloc(N, sizeof(double));
   work_buffer[N - 1] = 0.6;
 
@@ -108,18 +108,11 @@ void use_persistent_comm() {
   // -> [a, b, b, ..., a, a, b, b, ..., a, a, a, b, ...] where a is a sent entry
   // and b is a not sent entry. full array has size BLOCK_COUNT * 10
 
-  // size = size of all sent elements
-  // extent = size of sent and unsent elements
-
-  // MPI represents any created type as a map with {(type0, displ0), (type1,
-  // displ1), ..., (typeN-1, displN-1)}
-
   int *block_lenghts = malloc(BLOCK_COUNT * sizeof(int));
   int *displacements = malloc(BLOCK_COUNT * sizeof(int));
 
   for (int i = 0; i < BLOCK_COUNT; ++i) {
     block_lenghts[i] = (i % 5) + 1;
-    // block_lenghts[i] = 2;
     displacements[i] = BLOCK_SIZE * i;
   }
 
@@ -127,39 +120,10 @@ void use_persistent_comm() {
 
   MPI_Datatype nc_datatype;
 
-  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_BYTE,
+  MPI_Type_indexed(BLOCK_COUNT, block_lenghts, displacements, MPI_CHAR,
                    &nc_datatype);
   MPI_Type_commit(&nc_datatype);
 
-  // MPI_Type_vector(BLOCK_COUNT, 2, BLOCK_SIZE, MPI_INT, &nc_datatype);
-  // MPI_Type_commit(&nc_datatype);
-
-  // testing different datatype
-  // MPI_Datatype nc_datatype3;
-  // MPI_Type_contiguous(2, nc_datatype, &nc_datatype3);
-  // MPI_Type_commit(&nc_datatype3);
-  // MPI_Datatype nc_datatype2;
-  // MPI_Type_contiguous(3, nc_datatype3, &nc_datatype2);
-  // MPI_Type_commit(&nc_datatype2);
-
-  MPI_Count typesize, lb, extent;
-  MPI_Type_size_x(nc_datatype, &typesize);
-  MPI_Type_get_extent_x(nc_datatype, &lb, &extent);
-
-  // int num_integers, num_adresses, num_datatypes, combiner;
-  // MPI_Type_get_envelope(nc_datatype, &num_integers, &num_adresses,
-  // &num_datatypes, &combiner);
-
-  // int *array_of_ints = malloc(num_integers * sizeof(int));
-  // MPI_Aint *array_of_addresses = malloc(num_adresses * sizeof(MPI_Aint));
-  // MPI_Datatype *array_of_datatypes = malloc(num_datatypes *
-  // sizeof(MPI_Datatype));
-
-  // MPI_Type_get_contents(nc_datatype, num_integers, num_adresses,
-  // num_datatypes, array_of_ints, array_of_addresses, array_of_datatypes);
-#ifdef STATISTIC_PRINTING
-  printf("Typesize: %lld, Type extent: %lld\n", typesize, extent);
-#endif
 
   MPI_Request req;
 
