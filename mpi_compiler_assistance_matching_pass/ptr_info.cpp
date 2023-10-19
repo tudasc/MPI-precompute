@@ -101,16 +101,69 @@ void PtrUsageInfo::add_important_member(
     std::vector<unsigned int> member_idx,
     std::shared_ptr<PtrUsageInfo> result_ptr) {
 
-  if (important_members.find(member_idx) != important_members.end()) {
-    important_members[member_idx]->merge_with(result_ptr);
-    // TODO if merge does not change anything: nothing to do
-    // but propergate "changes" is not wrong
-    propergate_changes();
-  } else {
+  auto existing_info = find_info_for_gep_idx(member_idx);
+
+  if (existing_info.second == nullptr) {
     important_members[member_idx] = result_ptr;
-    propergate_changes();
+
+  } else { // info already present
+    if (not existing_info.first && member_idx[member_idx.size() - 1]) {
+      // new usage has wildcard but old usage not
+      // we need to combine all usages that match this wildcard
+
+      for (auto pair : important_members) {
+        if (is_member_matching(member_idx, pair.first)) {
+          result_ptr->merge_with(pair.second);
+        }
+      }
+
+      // std::erase_if in c++20
+      for (auto iter = important_members.begin();
+           iter != important_members.end();) {
+        if (is_member_matching(member_idx, iter->first)) {
+          iter = important_members.erase(iter);
+        } else {
+          ++iter;
+        }
+      }
+      important_members[member_idx] = result_ptr;
+
+    } else {
+      // exact match regarding wildcards
+      existing_info.second->merge_with(result_ptr);
+    }
   }
+
+  // TODO if merge does not change anything: nothing to do
+  // but propergate "changes" is not wrong in either case
+  propergate_changes();
 }
+
+bool PtrUsageInfo::is_member_matching(
+    const std::vector<unsigned int> &member_idx,
+    const std::vector<unsigned int> &member_idx_reference) {
+  if (member_idx.size() > member_idx_reference.size()) {
+    // swap args so that we can assume the right one is larger
+    return is_member_matching(member_idx_reference, member_idx);
+  }
+  assert(member_idx.size() <= member_idx_reference.size());
+
+  for (size_t i = 0; i < member_idx_reference.size(); ++i) {
+    auto idx = member_idx_reference[i];
+    unsigned int member = 0; // implicit 0 if the other one runs out of indices
+    if (i < member_idx.size()) {
+      member = member_idx[i];
+    }
+    if ((idx == WILDCARD_IDX) || (member == WILDCARD_IDX)) {
+      return true;
+    }
+    if (idx != member) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void PtrUsageInfo::propergate_changes() {
   // re-visit all users of ptr as something has changed
   for (const auto &tv : ptrs_with_this_info) {
@@ -120,7 +173,23 @@ void PtrUsageInfo::propergate_changes() {
 
 bool PtrUsageInfo::is_member_relevant(
     const std::vector<unsigned int> &member_idx) {
-  return important_members.find(member_idx) != important_members.end();
+  return find_info_for_gep_idx(member_idx).second != nullptr;
+}
+
+std::pair<bool, std::shared_ptr<PtrUsageInfo>>
+PtrUsageInfo::find_info_for_gep_idx(
+    const std::vector<unsigned int> &member_idx) {
+  auto pos = std::find_if(important_members.begin(), important_members.end(),
+                          [&member_idx](auto pair) {
+                            auto idxs = pair.first;
+                            return is_member_matching(member_idx, idxs);
+                          });
+  if (pos != important_members.end()) {
+    return std::make_pair(pos->first[pos->first.size() - 1] == WILDCARD_IDX,
+                          pos->second);
+  } else {
+    return std::make_pair(false, nullptr);
+  }
 }
 
 void PtrUsageInfo::dump() {

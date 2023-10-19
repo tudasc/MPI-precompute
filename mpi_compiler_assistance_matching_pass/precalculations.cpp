@@ -158,14 +158,20 @@ bool is_free(llvm::CallBase *call) {
   return is_free(call->getCalledFunction());
 }
 
+// TODO refactoring, the ptr info can directly take the GEP
+//  this would also be better in terms of seperation of concerns ant hiding
+//  implementation detail of WILDCARD_IDX
 std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
-  assert(gep->hasAllConstantIndices());
   std::vector<unsigned int> idxs;
   for (auto &idx : gep->indices()) {
     auto idx_constant = dyn_cast<ConstantInt>(&idx);
-    assert(idx_constant);
-    unsigned int idx_v = idx_constant->getZExtValue();
-    idxs.push_back(idx_v);
+    if (idx_constant) {
+      unsigned int idx_v = idx_constant->getZExtValue();
+      idxs.push_back(idx_v);
+    } else {
+      idxs.push_back(WILDCARD_IDX);
+      break;
+    }
   }
   return idxs;
 }
@@ -358,25 +364,13 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
     gep_info->ptr_info = std::make_shared<PtrUsageInfo>(gep_info);
   }
 
-  if (gep->hasAllConstantIndices()) {
-    if (isa<GetElementPtrInst>(gep_ptr_info->v)) {
-      errs() << "Use a pass that combines GEP instructions first\n";
-      assert(false);
-    }
-    std::vector<unsigned int> idxs = get_gep_idxs(gep);
-    gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
-
-  } else {
-    // we could not determine which fields are important, need to keep track of
-    // everything
-    // as this ptr access may override the other important fields
-    if (gep_ptr_info->ptr_info != gep_info->ptr_info) {
-      gep_ptr_info->ptr_info->merge_with(gep_info->ptr_info);
-      gep_ptr_info->ptr_info->setWholePtrIsRelevant(true);
-    }
-    assert(gep_ptr_info->ptr_info == gep_info->ptr_info);
-    assert(gep_ptr_info->ptr_info->isWholePtrIsRelevant());
+  if (isa<GetElementPtrInst>(gep_ptr_info->v)) {
+    errs() << "Use a pass that combines GEP instructions first\n";
+    assert(false);
   }
+
+  std::vector<unsigned int> idxs = get_gep_idxs(gep);
+  gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
 }
 
 void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
@@ -487,7 +481,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
       // nothing to do
     }
 
-  }else {
+  } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
     v->v->dump();
@@ -497,7 +491,6 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   if (v->is_pointer()) {
     visit_ptr_usages(v);
   }
-
 }
 
 void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
@@ -549,9 +542,7 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     }
     if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
       // if gep is relevant
-      if (ptr->ptr_info->isWholePtrIsRelevant() ||
-          not gep->hasAllConstantIndices() ||
-          ptr->ptr_info->is_member_relevant(get_gep_idxs(gep))) {
+      if (ptr->ptr_info->is_member_relevant(get_gep_idxs(gep))) {
         insert_tainted_value(gep, ptr);
         // ptr info will be constructed when the gep is visited
       }
