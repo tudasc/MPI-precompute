@@ -158,24 +158,6 @@ bool is_free(llvm::CallBase *call) {
   return is_free(call->getCalledFunction());
 }
 
-// TODO refactoring, the ptr info can directly take the GEP
-//  this would also be better in terms of seperation of concerns ant hiding
-//  implementation detail of WILDCARD_IDX
-std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
-  std::vector<unsigned int> idxs;
-  for (auto &idx : gep->indices()) {
-    auto idx_constant = dyn_cast<ConstantInt>(&idx);
-    if (idx_constant) {
-      unsigned int idx_v = idx_constant->getZExtValue();
-      idxs.push_back(idx_v);
-    } else {
-      idxs.push_back(WILDCARD_IDX);
-      break;
-    }
-  }
-  return idxs;
-}
-
 void Precalculations::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;
@@ -368,9 +350,7 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
     errs() << "Use a pass that combines GEP instructions first\n";
     assert(false);
   }
-
-  std::vector<unsigned int> idxs = get_gep_idxs(gep);
-  gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
+  gep_ptr_info->ptr_info->add_important_member(gep, gep_info->ptr_info);
 }
 
 void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
@@ -542,7 +522,7 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     }
     if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
       // if gep is relevant
-      if (ptr->ptr_info->is_member_relevant(get_gep_idxs(gep))) {
+      if (ptr->ptr_info->is_member_relevant(gep)) {
         insert_tainted_value(gep, ptr);
         // ptr info will be constructed when the gep is visited
       }

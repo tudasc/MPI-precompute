@@ -20,6 +20,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "taintedValue.h"
 #include <limits>
+#include <llvm/IR/Instructions.h>
 #include <map>
 #include <memory>
 #include <set>
@@ -83,11 +84,8 @@ public:
     ptrs_with_this_info.insert(v);
   }
 
-  bool is_member_relevant(const std::vector<unsigned int> &member_idx);
-  static bool
-  is_member_matching(const std::vector<unsigned int> &member_idx,
-                     const std::vector<unsigned int> &member_idx_reference);
-  void add_important_member(std::vector<unsigned int> member_idx,
+  bool is_member_relevant(llvm::GetElementPtrInst *gep);
+  void add_important_member(llvm::GetElementPtrInst *gep,
                             std::shared_ptr<PtrUsageInfo> result_ptr);
 
   void merge_with(std::shared_ptr<PtrUsageInfo> other);
