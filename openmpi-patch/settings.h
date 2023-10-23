@@ -31,7 +31,7 @@
 
 // necessary, if one uses MPI_testsome:
 // adds a small overhead to distinguish active from inactive requests
-// #define DISTINGUISH_ACTIVE_REQUESTS
+#define DISTINGUISH_ACTIVE_REQUESTS
 
 // #define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 
