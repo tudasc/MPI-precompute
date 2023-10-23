@@ -428,8 +428,8 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   MPI_Type_size_x(datatype, &type_size);
   MPI_Type_get_extent_x(datatype, &lb, &type_extent);
 
-  int conflicts = check_if_envelope_was_registered(dest, tag, is_send_request);
-  assert(conflicts != -1);
+  int conflicts = 0;
+
 #ifndef NDEBUG
   // only if assertion checking is on
 #endif
@@ -443,6 +443,23 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   MPI_Comm_rank(comm, &rank);
   // wie viele Tasks gibt es?
   MPI_Comm_size(comm, &numtasks);
+
+  bool do_envelope_check = true;
+
+  char info_value[MPI_MAX_INFO_VAL];
+  int info_flag;
+
+  if (info != MPI_INFO_NULL) {
+    MPI_Info_get(info, INFO_KEY_NO_ENVELOPE_MATCHING, MPI_MAX_INFO_VAL,
+                 info_value, &info_flag);
+    if (info_flag) {
+      do_envelope_check = false;
+    }
+  }
+  if (do_envelope_check) {
+    conflicts = check_if_envelope_was_registered(dest, tag, is_send_request);
+  }
+  assert(conflicts != -1);
 
   void *buffer_ptr = buf;
 
@@ -462,7 +479,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
   if (!(request->is_cont)) {
     char info_send_strategy[MPI_MAX_INFO_VAL];
-    int info_flag;
 
     if (info != MPI_INFO_NULL) {
       MPI_Info_get(info, "nc_send_strategy", MPI_MAX_INFO_VAL,
@@ -567,7 +583,6 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
   request->checking_buf = calloc(request->size, 1);
   request->chekcking_request = MPI_REQUEST_NULL;
 #endif
-
 
 #ifdef CHECK_FOR_MATCHING_CONFLICTS
   conflicts = conflicts || check_for_conflicting_request(request);
