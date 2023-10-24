@@ -1,0 +1,13 @@
+#ifndef MPI_ASSERTION_CHECKING_COMPILERPASSCONSTANTS_H
+#define MPI_ASSERTION_CHECKING_COMPILERPASSCONSTANTS_H
+
+// constants that are also used in the runtime
+// mainly used for the precompute library
+
+#define SEND_ENVELOPE_TAG 0
+#define SEND_ENVELOPE_DEST 1
+
+#define RECV_ENVELOPE_TAG 2
+#define RECV_ENVELOPE_DEST 3
+
+#endif // MPI_ASSERTION_CHECKING_COMPILERPASSCONSTANTS_H

@@ -38,7 +38,7 @@ private:
 
   PrecomputeFunctions(llvm::Module &M);
 
-  ~PrecomputeFunctions();
+  ~PrecomputeFunctions(){};
 
 public:
   llvm::Function *init_precompute_lib;

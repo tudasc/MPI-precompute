@@ -14,11 +14,14 @@
  limitations under the License.
  */
 
+#include "CompilerPassConstants.h"
 #include "analysis_results.h"
 #include "conflict_detection.h"
 #include "devirt_analysis.h"
+#include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
+#include "precompute_funcs.h"
 
 #include "implementation_specific.h"
 #include "mpi_functions.h"
@@ -943,6 +946,8 @@ void Precalculations::replace_calls_in_copy(
     }
   }
 
+  auto precompute_func = PrecomputeFunctions::get_instance();
+
   for (auto *call : to_replace) {
     auto callee = call->getCalledFunction();
     if (callee == mpi_func->mpi_send_init) {
@@ -950,16 +955,22 @@ void Precalculations::replace_calls_in_copy(
       auto src = get_src_value(call, true);
       IRBuilder<> builder = IRBuilder<>(call);
 
+      builder.CreateCall(precompute_func->register_precomputed_value,
+                         {builder.getInt32(SEND_ENVELOPE_DEST), src});
       CallBase *new_call = nullptr;
       if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-        new_call = builder.CreateInvoke(mpi_func->optimized.register_send_tag,
-                                        invoke->getNormalDest(),
-                                        invoke->getUnwindDest(), {src, tag});
+
+        new_call = builder.CreateInvoke(
+            precompute_func->register_precomputed_value,
+            invoke->getNormalDest(), invoke->getUnwindDest(),
+            {builder.getInt32(SEND_ENVELOPE_TAG), tag});
       } else {
-        new_call = builder.CreateCall(mpi_func->optimized.register_send_tag,
-                                      {src, tag});
+        new_call =
+            builder.CreateCall(precompute_func->register_precomputed_value,
+                               {builder.getInt32(SEND_ENVELOPE_TAG), tag});
       }
-      call->replaceAllUsesWith(new_call);
+      call->replaceAllUsesWith(
+          ImplementationSpecifics::get_instance()->SUCCESS);
       call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
       func->new_to_old_map[new_call] = old_call_v;
@@ -967,19 +978,25 @@ void Precalculations::replace_calls_in_copy(
       continue;
     }
     if (callee == mpi_func->mpi_recv_init) {
-      auto tag = get_tag_value(call, true);
-      auto src = get_src_value(call, true);
+      auto tag = get_tag_value(call, false);
+      auto src = get_src_value(call, false);
       IRBuilder<> builder = IRBuilder<>(call);
+      builder.CreateCall(precompute_func->register_precomputed_value,
+                         {builder.getInt32(RECV_ENVELOPE_DEST), src});
       CallBase *new_call = nullptr;
       if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-        new_call = builder.CreateInvoke(mpi_func->optimized.register_recv_tag,
-                                        invoke->getNormalDest(),
-                                        invoke->getUnwindDest(), {src, tag});
+
+        new_call = builder.CreateInvoke(
+            precompute_func->register_precomputed_value,
+            invoke->getNormalDest(), invoke->getUnwindDest(),
+            {builder.getInt32(RECV_ENVELOPE_TAG), tag});
       } else {
-        new_call = builder.CreateCall(mpi_func->optimized.register_recv_tag,
-                                      {src, tag});
+        new_call =
+            builder.CreateCall(precompute_func->register_precomputed_value,
+                               {builder.getInt32(RECV_ENVELOPE_TAG), tag});
       }
-      call->replaceAllUsesWith(new_call);
+      call->replaceAllUsesWith(
+          ImplementationSpecifics::get_instance()->SUCCESS);
       call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
       func->new_to_old_map[new_call] = old_call_v;
@@ -1049,7 +1066,17 @@ void Precalculations::prune_function_copy(
     Instruction *inst = &*I;
     auto old_v = func->new_to_old_map[inst];
     if (not is_tainted(old_v)) {
-      to_prune.push_back(inst);
+      if (auto *call = dyn_cast<CallBase>(inst)) {
+        if (call->getCalledFunction() ==
+            PrecomputeFunctions::get_instance()->register_precomputed_value) {
+          // do not remove
+
+        } else {
+          to_prune.push_back(inst);
+        }
+
+      } else {
+      }
     } else if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
       // an invoke can be tainted only because it may return an exception
       // but it actually is exception free for our purpose
@@ -1147,15 +1174,18 @@ void Precalculations::add_call_to_precalculation_to_main() {
   // MPIOPT_Init will later be inserted between this 2 calls
   IRBuilder<> builder(call_to_init->getNextNode());
 
+  auto precompute_funcs = PrecomputeFunctions::get_instance();
+
   // forward args of main
   std::vector<Value *> args;
   for (auto &arg : entry_point->args()) {
     args.push_back(&arg);
   }
+  builder.CreateCall(precompute_funcs->init_precompute_lib);
   builder.CreateCall(function_info->F_copy, args);
+  builder.CreateCall(precompute_funcs->finish_precomputation);
   auto re_init_fun = get_global_re_init_function();
   builder.CreateCall(re_init_fun);
-  builder.CreateCall(mpi_func->optimized.check_registered_conflicts);
 }
 
 void Precalculations::find_functions_called_indirect() {

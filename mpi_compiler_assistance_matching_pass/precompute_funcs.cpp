@@ -39,8 +39,7 @@ PrecomputeFunctions::PrecomputeFunctions(Module &M) {
           .getCallee()
           ->stripPointerCasts());
 
-  ftype = FunctionType::get(Type::getVoidTy(M.getContext()),
-                            {Type::getVoidTy(M.getContext())}, false);
+  ftype = FunctionType::get(Type::getVoidTy(M.getContext()), {}, false);
 
   init_precompute_lib =
       cast<Function>(M.getOrInsertFunction("init_precompute_lib", ftype, {})

@@ -56,6 +56,7 @@
 #include "frontend_plugin_data.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
+#include "precompute_funcs.h"
 #include "replacement.h"
 
 using namespace llvm;
@@ -91,6 +92,7 @@ struct MPICompilerAssistanceMatchingPass
           errs() << "END MODULE\n";);
 
     ImplementationSpecifics::create_instance(M);
+    PrecomputeFunctions::create_instance(M);
 
     mpi_func = get_used_mpi_functions(M);
     // TODO is_mpi_used only checks for MPI init, but we want to use this on
@@ -160,6 +162,7 @@ struct MPICompilerAssistanceMatchingPass
 
     delete mpi_func;
     ImplementationSpecifics::delete_instance();
+    PrecomputeFunctions::delete_instance();
     // FrontendPluginData::delete_instance();
 
     delete analysis_results;
