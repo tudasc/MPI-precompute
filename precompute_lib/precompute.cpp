@@ -32,9 +32,6 @@ void init_precompute_lib() {
 
 void register_precomputed_value(int value_id, TYPE value) {
   assert(status == IN_PRECOMPUTE);
-#ifdef PRINT_REGISTERED_VALUES
-  std::cout << "BEGIN Register " << value << "(Type " << value_id << ")\n";
-#endif
 
   auto pos = precomputed_vals.find(value_id);
   if (pos == precomputed_vals.end()) {
@@ -44,7 +41,7 @@ void register_precomputed_value(int value_id, TYPE value) {
   assert(pos != precomputed_vals.end());
   pos->second.push_back(value);
 #ifdef PRINT_REGISTERED_VALUES
-  std::cout << "Register " << value << "(Type " << value_id << ")\n";
+  std::cout << "Register " << value << " (Type " << value_id << ")\n";
 #endif
 }
 
