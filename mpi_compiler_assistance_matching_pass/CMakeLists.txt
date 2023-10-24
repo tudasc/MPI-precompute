@@ -22,7 +22,11 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         devirt_analysis.cpp
         taintedValue.h
         ptr_info.h
-        ptr_info.cpp)
+        ptr_info.cpp
+        CompilerPassConstants.h
+        precompute_funcs.cpp
+        precompute_funcs.h
+)
 
 # if one wants to use mpi
 #find_package(MPI REQUIRED)
