@@ -1,8 +1,11 @@
 #include "precompute.h"
 
 #include "cassert"
+#include "iostream"
 #include "map"
 #include "vector"
+
+#define PRINT_REGISTERED_VALUES
 
 // is initialized, in precompute or in query phase
 enum status {
@@ -21,6 +24,9 @@ std::map<int, std::vector<TYPE>> precomputed_vals;
 void init_precompute_lib() {
   assert(status == UNINITIALIZED);
   status = IN_PRECOMPUTE;
+#ifdef PRINT_REGISTERED_VALUES
+  std::cout << "Begin Precompute\n";
+#endif
 }
 
 void register_precomputed_value(int value_id, TYPE value) {
@@ -33,6 +39,9 @@ void register_precomputed_value(int value_id, TYPE value) {
   }
   assert(pos != precomputed_vals.end());
   pos->second.push_back(value);
+#ifdef PRINT_REGISTERED_VALUES
+  std::cout << "Register " << value << "(Type " << value_id << ")\n";
+#endif
 }
 
 unsigned long get_num_precomputed_values(int value_id) {
@@ -56,6 +65,9 @@ TYPE get_precomputed_value(int value_id, unsigned long idx) {
 void finish_precomputation() {
   assert(status == IN_PRECOMPUTE);
   status = READY_FOR_QUERY;
+#ifdef PRINT_REGISTERED_VALUES
+  std::cout << "End Precompute\n";
+#endif
 }
 
 void free_precomputed_values() {
