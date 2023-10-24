@@ -1076,6 +1076,7 @@ void Precalculations::prune_function_copy(
         }
 
       } else {
+        to_prune.push_back(inst);
       }
     } else if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
       // an invoke can be tainted only because it may return an exception
