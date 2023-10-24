@@ -24,6 +24,7 @@ std::map<int, std::vector<TYPE>> precomputed_vals;
 void init_precompute_lib() {
   assert(status == UNINITIALIZED);
   status = IN_PRECOMPUTE;
+  precomputed_vals = {};
 #ifdef PRINT_REGISTERED_VALUES
   std::cout << "Begin Precompute\n";
 #endif
@@ -31,6 +32,9 @@ void init_precompute_lib() {
 
 void register_precomputed_value(int value_id, TYPE value) {
   assert(status == IN_PRECOMPUTE);
+#ifdef PRINT_REGISTERED_VALUES
+  std::cout << "BEGIN Register " << value << "(Type " << value_id << ")\n";
+#endif
 
   auto pos = precomputed_vals.find(value_id);
   if (pos == precomputed_vals.end()) {

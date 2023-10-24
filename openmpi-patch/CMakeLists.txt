@@ -11,8 +11,9 @@ cmake_policy(SET CMP0114 NEW)
 set(OMPI_CONFIGURE_FLAGS
         --enable-heterogeneous --enable-static --with-hwloc=${HWLOC_ROOT}
         --with-slurm=/opt/slurm/current --with-pmi=/opt/slurm/current
-        --with-ucx --enable-mca-no-build=btl-uct  --without-verbs --enable-mpi-fortran=no)
-
+        --with-ucx --enable-mca-no-build=btl-uct --without-verbs --enable-mpi-fortran=no
+        LIBS=-lprecompute LDFLAGS=-L${CMAKE_BINARY_DIR}/precompute_lib
+)
 
 if (CMAKE_BUILD_TYPE MATCHES DEBUG)
     set(OMPI_CONFIGURE_FLAGS ${OMPI_CONFIGURE_FLAGS} --enable-debug)
@@ -29,6 +30,7 @@ ExternalProject_Add(
         CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix <INSTALL_DIR> CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} ${OMPI_CONFIGURE_FLAGS}
         BUILD_COMMAND $(MAKE)
         DOWNLOAD_EXTRACT_TIMESTAMP true
+        DEPENDS precompute
 )
 
 ExternalProject_Add_Step(ompi patch_header
@@ -68,9 +70,12 @@ ExternalProject_Get_property(ompi SOURCE_DIR INSTALL_DIR BINARY_DIR)
 # source dir and binary dir, as some headers are in the source dir and others are created at build time
 set(persistent_implementation-include -I${BINARY_DIR} -I${BINARY_DIR}/opal/include -I${BINARY_DIR}/ompi/include/ -I${BINARY_DIR}/orte/include
         -I${SOURCE_DIR} -I${SOURCE_DIR}/opal/include -I${SOURCE_DIR}/ompi/include/ -I${SOURCE_DIR}/orte/include
-        -I${CMAKE_SOURCE_DIR}/precompute_lib)
+        -I${CMAKE_SOURCE_DIR}/precompute_lib
+        -I${CMAKE_SOURCE_DIR}/mpi_compiler_assistance_matching_pass
+)
 
 set(PRECOMPUTE_H_FILE ${CMAKE_SOURCE_DIR}/precompute_lib/precompute.h)
+set(COMPILER_PASS_CONSTANTS_H_FILE ${CMAKE_SOURCE_DIR}/mpi_compiler_assistance_matching_pass/CompilerPassConstants.h)
 # depends on the header file not the implementation of the library
 
 set(PERSISTENT_IMPLEMENTATION_FILES debug.c debug.h finalization.c finalization.h globals.c globals.h handshake.c handshake.h initialization.c initialization.h interface.c interface.h mpi-internals.h pack.c pack.h request_type.h settings.h start.c start.h test.c test.h wait.c wait.h)
@@ -79,7 +84,7 @@ add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
         COMMAND ${CMAKE_C_COMPILER} -E ${CFLAGS} ${persistent_implementation-include} -DLINKAGE_TYPE=static ${CMAKE_CURRENT_SOURCE_DIR}/one-sided-persistent.h -o ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
         COMMENT "build one sided persistent implementation"
-        DEPENDS ompi-build precompute ${PERSISTENT_IMPLEMENTATION_FILES} ${PRECOMPUTE_H_FILE}
+        DEPENDS ompi-build precompute ${PERSISTENT_IMPLEMENTATION_FILES} ${PRECOMPUTE_H_FILE} ${COMPILER_PASS_CONSTANTS_H_FILE}
         )
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)

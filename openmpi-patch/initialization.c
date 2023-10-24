@@ -11,7 +11,9 @@
 // datatype include
 #include "opal/datatype/opal_datatype_internal.h"
 
+#include "CompilerPassConstants.h"
 #include "precompute.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -19,15 +21,8 @@
 // dummy int to create some mpi win on
 int dummy_int = 0;
 
-struct envelope_list_entry {
-  int tag;
-  int dest;
-  int is_conflicting;
-  struct envelope_list_entry *nxt;
-};
-
-struct envelope_list_entry *send_envelopes;
-struct envelope_list_entry *recv_envelopes;
+unsigned long num_send_requests_created;
+unsigned long num_recv_requests_created;
 
 void MPIOPT_INIT() {
   // create the global win used for rdma transfers
@@ -40,16 +35,8 @@ void MPIOPT_INIT() {
   to_free_list_head = malloc(sizeof(struct list_elem));
   to_free_list_head->elem = NULL;
   to_free_list_head->next = NULL;
-  send_envelopes = malloc(sizeof(struct envelope_list_entry));
-  send_envelopes->nxt = NULL;
-  send_envelopes->tag = -1;
-  send_envelopes->dest = -1;
-  send_envelopes->is_conflicting = -1;
-  recv_envelopes = malloc(sizeof(struct envelope_list_entry));
-  recv_envelopes->nxt = NULL;
-  recv_envelopes->tag = -1;
-  recv_envelopes->dest = -1;
-  recv_envelopes->is_conflicting = -1;
+  num_send_requests_created = 0;
+  num_recv_requests_created = 0;
 
   communicator_array =
       malloc(sizeof(struct communicator_info) * MAX_NUM_OF_COMMUNICATORS);
@@ -60,133 +47,54 @@ void MPIOPT_INIT() {
   MPIOPT_Register_Communicator(MPI_COMM_WORLD);
 }
 
-int MPIOPT_Register_send_envelope(int dest, int tag) {
-  struct envelope_list_entry *new_elem =
-      malloc(sizeof(struct envelope_list_entry));
-  new_elem->nxt = send_envelopes;
-  new_elem->tag = tag;
-  new_elem->dest = dest;
-  new_elem->is_conflicting = -1;
-  send_envelopes = new_elem;
-  int my_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-
-  printf("Rank %d: Register Send envelope: (%d,%d)\n", my_rank, tag, dest);
-}
-
-int MPIOPT_Register_recv_envelope(int dest, int tag) {
-  struct envelope_list_entry *new_elem =
-      malloc(sizeof(struct envelope_list_entry));
-  new_elem->nxt = recv_envelopes;
-  new_elem->tag = tag;
-  new_elem->dest = dest;
-  new_elem->is_conflicting = -1;
-  recv_envelopes = new_elem;
-  int my_rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  printf("Rank %d: Register recv envelope: (%d,%d)\n", my_rank, tag, dest);
-}
-
-int check_envelope_list_for_conflicts(bool is_send) {
-
-  struct envelope_list_entry *list_to_use = recv_envelopes;
-  if (is_send) {
-    list_to_use = send_envelopes;
-  }
-  if (list_to_use->nxt == NULL) {
-    printf("Empty registration list\n");
-  }
-
-  struct envelope_list_entry *current_elem = list_to_use;
-  struct envelope_list_entry *nxt_elem = list_to_use->nxt;
-
-  while (nxt_elem != NULL) {
-    if (current_elem->is_conflicting == -1) {
-      int is_conflicting = 0;
-      // inner loop:
-      // observe if there is a conflict
-      struct envelope_list_entry *current_elem_inner = list_to_use;
-      struct envelope_list_entry *nxt_elem_inner = list_to_use->nxt;
-
-      while (nxt_elem_inner != NULL && !is_conflicting) {
-        if (current_elem_inner != current_elem) {
-          // check for conflict
-          if (current_elem->dest == current_elem_inner->dest &&
-              current_elem->tag == current_elem_inner->tag) {
-            current_elem_inner->is_conflicting = 1;
-            is_conflicting = 1; // ends inner while as we have found a conflict
-          }
-        }
-        current_elem_inner = nxt_elem_inner;
-        nxt_elem_inner = current_elem_inner->nxt;
-      }
-
-      current_elem->is_conflicting = is_conflicting;
-    }
-    assert(current_elem->is_conflicting != -1);
-    current_elem = nxt_elem;
-    nxt_elem = current_elem->nxt;
-  }
-}
-
-void MPIOPT_check_registered_envelopes_for_conflict() {
-
-  // TODO if any tag or any source are used: all calls are conflicting
-
-  printf("checking for conflicts at runtime\n");
-  check_envelope_list_for_conflicts(false);
-  check_envelope_list_for_conflicts(true);
-}
 
 int check_if_envelope_was_registered(int dest, int tag, bool is_send) {
 
+  unsigned long num_elements_created;
+  int dest_category;
+  int tag_category;
+  if (is_send) {
+    // read value and increment it
+    num_elements_created = num_send_requests_created++;
+    dest_category = SEND_ENVELOPE_DEST;
+    tag_category = SEND_ENVELOPE_TAG;
+  } else {
+    // read value and increment it
+    num_elements_created = num_recv_requests_created++;
+    dest_category = RECV_ENVELOPE_DEST;
+    tag_category = RECV_ENVELOPE_TAG;
+  }
+
+  assert(get_num_precomputed_values(dest_category) ==
+         get_num_precomputed_values(tag_category));
+  assert(num_elements_created < get_num_precomputed_values(dest_category));
+  assert(num_elements_created < get_num_precomputed_values(tag_category));
+
+  int current_dest = get_precomputed_value(dest_category, num_elements_created);
+  int current_tag = get_precomputed_value(tag_category, num_elements_created);
+
   int my_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-
   printf("Rank %d: Check if envelope was registered: (%d,%d)\n", my_rank, tag,
          dest);
 
-  struct envelope_list_entry *list_to_use = recv_envelopes;
-  if (is_send) {
-    list_to_use = send_envelopes;
-  }
-  if (list_to_use->nxt == NULL) {
-    printf("Empty registration list\n");
-  }
-
-  // find last elem
-  struct envelope_list_entry *prev_elem = NULL;
-  struct envelope_list_entry *current_elem = list_to_use;
-  struct envelope_list_entry *nxt_elem = list_to_use->nxt;
-
-  while (nxt_elem->nxt != NULL) {
-    prev_elem = current_elem;
-    current_elem = nxt_elem;
-    nxt_elem = current_elem->nxt;
+  // check for conflicts
+  for (unsigned long i = 0; i < get_num_precomputed_values(dest_category);
+       ++i) {
+    // dont check for conflict with itself
+    if (i != num_elements_created) {
+      int other_dest = get_precomputed_value(dest_category, i);
+      int other_tag = get_precomputed_value(tag_category, i);
+      if (other_dest == current_dest && other_tag == current_tag) {
+        printf(
+            "Rank %d: envelope (%d,%d) USED more than one time: CONFLICTING\n",
+            my_rank, tag, dest);
+        return true;
+      }
+    }
   }
 
-  int is_conflicting = current_elem->is_conflicting;
-
-  if (current_elem->tag == tag && current_elem->dest == dest) {
-    printf("Rank %d: matching registered envelope: (%d,%d) conflicting: %d\n",
-           my_rank, current_elem->tag, current_elem->dest, is_conflicting);
-  } else {
-    printf("NOT matching registered envelope\n");
-    printf("Rank: %d : registered (%d,%d) , used: (%d,%d)\n", my_rank,
-           current_elem->tag, current_elem->dest, tag, dest);
-    is_conflicting = false;
-    assert(false);
-  }
-
-  // remove from list
-
-  if (prev_elem == NULL) {
-    printf("End of registered tag list\n");
-  } else {
-    prev_elem->nxt = nxt_elem;
-    free(current_elem);
-  }
-  return is_conflicting;
+  return false;
 }
 
 struct communicator_info *find_comm(MPI_Comm comm) {
