@@ -67,7 +67,11 @@ ExternalProject_Get_property(ompi SOURCE_DIR INSTALL_DIR BINARY_DIR)
 
 # source dir and binary dir, as some headers are in the source dir and others are created at build time
 set(persistent_implementation-include -I${BINARY_DIR} -I${BINARY_DIR}/opal/include -I${BINARY_DIR}/ompi/include/ -I${BINARY_DIR}/orte/include
-        -I${SOURCE_DIR} -I${SOURCE_DIR}/opal/include -I${SOURCE_DIR}/ompi/include/ -I${SOURCE_DIR}/orte/include)
+        -I${SOURCE_DIR} -I${SOURCE_DIR}/opal/include -I${SOURCE_DIR}/ompi/include/ -I${SOURCE_DIR}/orte/include
+        -I${CMAKE_SOURCE_DIR}/precompute_lib)
+
+set(PRECOMPUTE_H_FILE ${CMAKE_SOURCE_DIR}/precompute_lib/precompute.h)
+# depends on the header file not the implementation of the library
 
 set(PERSISTENT_IMPLEMENTATION_FILES debug.c debug.h finalization.c finalization.h globals.c globals.h handshake.c handshake.h initialization.c initialization.h interface.c interface.h mpi-internals.h pack.c pack.h request_type.h settings.h start.c start.h test.c test.h wait.c wait.h)
 
@@ -75,7 +79,7 @@ add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
         COMMAND ${CMAKE_C_COMPILER} -E ${CFLAGS} ${persistent_implementation-include} -DLINKAGE_TYPE=static ${CMAKE_CURRENT_SOURCE_DIR}/one-sided-persistent.h -o ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
         COMMENT "build one sided persistent implementation"
-        DEPENDS ompi-build ${PERSISTENT_IMPLEMENTATION_FILES}
+        DEPENDS ompi-build precompute ${PERSISTENT_IMPLEMENTATION_FILES} ${PRECOMPUTE_H_FILE}
         )
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)

@@ -11,6 +11,7 @@
 // datatype include
 #include "opal/datatype/opal_datatype_internal.h"
 
+#include "precompute.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>

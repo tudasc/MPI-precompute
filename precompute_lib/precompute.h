@@ -2,7 +2,9 @@
 #ifndef PRECOMPUTE_H
 #define PRECOMPUTE_H
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 // initialization of precompute library
 // call before the precomputation
@@ -21,6 +23,9 @@ void finish_precomputation();
 
 // free everything
 void free_precomputed_values();
-}
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif // PRECOMPUTE_H
