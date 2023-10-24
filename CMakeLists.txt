@@ -18,13 +18,17 @@ link_directories(${LLVM_LIBRARY_DIRS})
 
 add_subdirectory(openmpi-patch)
 #add the mpi requirement
+
+add_subdirectory(precompute_lib)
 #add_subdirectory(WholeProgramDevirtAnalysisPass)
+
 add_subdirectory(mpi_compiler_assistance_matching_pass)
 
 
 ExternalProject_Get_property(ompi INSTALL_DIR)
 
 set(PASS_LIB ${CMAKE_BINARY_DIR}/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so)
+set(PRECOMPUTE_LIB_PATH ${CMAKE_BINARY_DIR}/precompute_lib)
 
 add_custom_target(setup_env.sh ALL
         COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/setup_env.sh.in ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
@@ -32,8 +36,8 @@ add_custom_target(setup_env.sh ALL
         echo "export MPICC=${INSTALL_DIR}/bin/mpicc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPICXX=${INSTALL_DIR}/bin/mpicxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export CPATH=\\$$CPATH:${INSTALL_DIR}/include" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export LIBRARY_PATH=\\$$LIBRARY_PATH:${INSTALL_DIR}/lib" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export LD_LIBRARY_PATH=\\$$LD_LIBRARY_PATH:${INSTALL_DIR}/lib" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export LIBRARY_PATH=\\$$LIBRARY_PATH:${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export LD_LIBRARY_PATH=\\$$LD_LIBRARY_PATH:${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPI_COMPILER_ASSISTANCE_PASS=${PASS_LIB}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export WHOLE_PROGRAM_DEVIRT_ANALYSIS_PASS=${CMAKE_BINARY_DIR}/WholeProgramDevirtAnalysisPass/libwholeProgramDevirtAnalysisPass.so" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
 

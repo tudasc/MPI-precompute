@@ -1,0 +1,65 @@
+#include "precompute.h"
+
+#include "cassert"
+#include "map"
+#include "vector"
+
+// is initialized, in precompute or in query phase
+enum status {
+  UNINITIALIZED,
+  IN_PRECOMPUTE,
+  READY_FOR_QUERY,
+  FREED,
+};
+
+enum status status = UNINITIALIZED;
+
+std::map<int, std::vector<TYPE>> precomputed_vals;
+
+// initialization of precompute library
+// call before the precomputation
+void init_precompute_lib() {
+  assert(status == UNINITIALIZED);
+  status = IN_PRECOMPUTE;
+}
+
+void register_precomputed_value(int value_id, TYPE value) {
+  assert(status == IN_PRECOMPUTE);
+
+  auto pos = precomputed_vals.find(value_id);
+  if (pos == precomputed_vals.end()) {
+    precomputed_vals[value_id] = std::vector<TYPE>();
+    pos = precomputed_vals.find(value_id);
+  }
+  assert(pos != precomputed_vals.end());
+  pos->second.push_back(value);
+}
+
+unsigned long get_num_precomputed_values(int value_id) {
+  assert(status == READY_FOR_QUERY);
+  auto pos = precomputed_vals.find(value_id);
+  if (pos != precomputed_vals.end()) {
+    return pos->second.size();
+  } else {
+    return 0;
+  }
+}
+
+TYPE get_precomputed_value(int value_id, unsigned long idx) {
+  assert(status == READY_FOR_QUERY);
+  auto pos = precomputed_vals.find(value_id);
+  assert(pos != precomputed_vals.end());
+  assert(idx < pos->second.size());
+  return pos->second[idx];
+}
+
+void finish_precomputation() {
+  assert(status == IN_PRECOMPUTE);
+  status = READY_FOR_QUERY;
+}
+
+void free_precomputed_values() {
+  precomputed_vals.clear();
+
+  status = FREED;
+}

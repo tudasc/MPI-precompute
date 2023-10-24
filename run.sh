@@ -2,7 +2,7 @@
 
 #CFLAGS="-std=c11 -O3 ${INCLUDE}"
 CFLAGS="-std=c11 -O1 -g ${INCLUDE}"
-LIBS="-lopen-pal -lucp -lm"
+LIBS="-lopen-pal -lucp -lm -lprecompute"
 CXXFLAGS="-std=c++17 -O1 -g ${INCLUDE} -fuse-ld=lld"
 #
 
