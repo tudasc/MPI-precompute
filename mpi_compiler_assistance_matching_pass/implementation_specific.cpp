@@ -41,6 +41,7 @@ ImplementationSpecifics::ImplementationSpecifics(Module &M) {
   ANY_TAG = ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_ANY_TAG);
   ANY_SOURCE =
       ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_ANY_SOURCE);
+  SUCCESS = ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_SUCCESS);
 
   mpi_info = nullptr;
   auto types = M.getIdentifiedStructTypes();

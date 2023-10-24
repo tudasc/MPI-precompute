@@ -58,6 +58,7 @@ public:
   llvm::GlobalVariable *COMM_WORLD;
   llvm::Constant *ANY_SOURCE;
   llvm::Constant *ANY_TAG;
+  llvm::Constant *SUCCESS;
 
   llvm::Constant *INFO_NULL;
   llvm::Type *mpi_info;
