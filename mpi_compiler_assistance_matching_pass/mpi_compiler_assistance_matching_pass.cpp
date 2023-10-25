@@ -68,8 +68,10 @@ bool hasUndefValues(const Module &M) {
       for (const Instruction &I : BB) {
         // Check if the instruction has any undef operands.
         for (const Use &U : I.operands()) {
-          if (U && isa<UndefValue>(U))
+          if (U && isa<UndefValue>(U)) {
+            I.dump();
             return true;
+          }
         }
       }
     }
@@ -206,9 +208,9 @@ struct MPICompilerAssistanceMatchingPass
 PassPluginLibraryInfo getPassPluginInfo() {
   const auto callback = [](PassBuilder &PB) {
     PB.registerOptimizerEarlyEPCallback([&](ModulePassManager &MPM, auto) {
-          MPM.addPass(MPICompilerAssistanceMatchingPass());
-          return true;
-        });
+      MPM.addPass(MPICompilerAssistanceMatchingPass());
+      return true;
+    });
   };
 
   return {LLVM_PLUGIN_API_VERSION, "mpi-matching", "1.0.0", callback};
