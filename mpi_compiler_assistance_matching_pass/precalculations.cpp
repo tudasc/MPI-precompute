@@ -354,6 +354,12 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
     assert(false);
   }
   gep_ptr_info->ptr_info->add_important_member(gep, gep_info->ptr_info);
+
+  // taint all values needed for calculating idx
+  for (auto &idx : cast<GetElementPtrInst>(gep_info->v)->indices()) {
+    auto *v = dyn_cast<Value>(idx);
+    insert_tainted_value(v, gep_info);
+  }
 }
 
 void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
