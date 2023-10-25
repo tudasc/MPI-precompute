@@ -501,6 +501,13 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     return;
   }
 
+  if (not ptr->ptr_info->isReadFrom()) {
+    // this pointers CONTENT (the pointee) is currently not needed
+    // if it is needed later it will be visited again
+    // if only the ptr value is needed: no need to keep track of its content
+    return;
+  }
+
   for (auto u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
       // if we dont read the ptr directly, we dont need to capture the stores
