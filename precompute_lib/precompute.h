@@ -10,6 +10,7 @@ extern "C" {
 // call before the precomputation
 void init_precompute_lib();
 
+// TODO multi-threading is not supported
 // TODO template for possible types
 #define TYPE int
 
@@ -17,6 +18,11 @@ void init_precompute_lib();
 void register_precomputed_value(int value_id, TYPE value);
 unsigned long get_num_precomputed_values(int value_id);
 TYPE get_precomputed_value(int value_id, unsigned long idx);
+
+// needed to allocate memory, so that the control-flow can abort when all values
+// are precomputed finish_precomputation will free all memory allocated with
+// this function
+void *allocate_memory_in_precompute(unsigned long size);
 
 // finish the precomputation: frees all ressources but the precompute results
 void finish_precomputation();

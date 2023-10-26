@@ -19,12 +19,15 @@ enum status status = UNINITIALIZED;
 
 std::map<int, std::vector<TYPE>> precomputed_vals;
 
+std::vector<void *> allocated_ptrs;
+
 // initialization of precompute library
 // call before the precomputation
 void init_precompute_lib() {
   assert(status == UNINITIALIZED);
   status = IN_PRECOMPUTE;
   precomputed_vals = {};
+  allocated_ptrs = {};
 #ifdef PRINT_REGISTERED_VALUES
   std::cout << "Begin Precompute\n";
 #endif
@@ -63,9 +66,20 @@ TYPE get_precomputed_value(int value_id, unsigned long idx) {
   return pos->second[idx];
 }
 
+void *allocate_memory_in_precompute(unsigned long size) {
+  assert(status == IN_PRECOMPUTE);
+  void *new_ptr = malloc(size);
+  allocated_ptrs.push_back(new_ptr);
+  return new_ptr;
+}
+
 void finish_precomputation() {
   assert(status == IN_PRECOMPUTE);
   status = READY_FOR_QUERY;
+  for (void *ptr : allocated_ptrs) {
+    free(ptr);
+  }
+  allocated_ptrs.clear();
 #ifdef PRINT_REGISTERED_VALUES
   std::cout << "End Precompute\n";
 #endif
