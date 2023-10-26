@@ -110,13 +110,14 @@ struct MPICompilerAssistanceMatchingPass
     PrecomputeFunctions::create_instance(M);
 
     mpi_func = get_used_mpi_functions(M);
-    // TODO is_mpi_used only checks for MPI init, but we want to use this on
-    // apps with muliple translation units
-    /*if (!is_mpi_used(mpi_func)) {
+
+    // as this pass is used at LTO it sees the whole program so if no MPI is
+    // used: nothing to do
+    if (!is_mpi_used(mpi_func)) {
       // nothing to do for non mpi applicatiopns
       delete mpi_func;
-      return false;
-    }*/
+      return PreservedAnalyses::all();
+    }
 
     analysis_results = new RequiredAnalysisResults(AM, M);
 

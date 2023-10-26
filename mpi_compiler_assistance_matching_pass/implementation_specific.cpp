@@ -35,7 +35,6 @@ ImplementationSpecifics::ImplementationSpecifics(Module &M) {
       */
   // for openmpi:
   COMM_WORLD = M.getGlobalVariable("ompi_mpi_comm_world");
-  assert(COMM_WORLD);
 
   INFO_NULL = nullptr;
   ANY_TAG = ConstantInt::get(IntegerType::get(M.getContext(), 32), MPI_ANY_TAG);
