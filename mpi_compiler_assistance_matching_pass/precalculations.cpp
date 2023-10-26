@@ -738,10 +738,21 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
 void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
                                           std::shared_ptr<TaintedValue> ptr) {
 
+  std::set<unsigned int> ptr_given_as_arg;
+  for (unsigned int i = 0; i < call->arg_size(); ++i) {
+    if (call->getArgOperand(i) == ptr->v) {
+      ptr_given_as_arg.insert(i);
+    }
+  }
+
   if (call->getCalledOperand() == ptr->v) {
     // visit from the function ptr: nothing to check
+    assert(ptr_given_as_arg.empty() && "Function ptr getting itself as an "
+                                       "argument is currently not supported");
     return;
   }
+
+  assert(not ptr_given_as_arg.empty());
 
   assert(ptr->ptr_info); // otherwise no need to trace this ptr usage
 
@@ -750,13 +761,6 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   errs() << "Visit\n";
   call->dump();
 
-  std::set<unsigned int> ptr_given_as_arg;
-  for (unsigned int i = 0; i < call->arg_size(); ++i) {
-    if (call->getArgOperand(i) == ptr->v) {
-      ptr_given_as_arg.insert(i);
-    }
-  }
-  assert(not ptr_given_as_arg.empty());
 
   for (auto *func : get_possible_call_targets(call)) {
 
@@ -1346,6 +1350,8 @@ void Precalculations::debug_printings() {
       break;
     }
   }
+
+  assert(false);
 }
 
 llvm::Function *Precalculations::get_global_re_init_function() {
