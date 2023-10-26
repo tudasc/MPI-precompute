@@ -1150,8 +1150,7 @@ void Precalculations::prune_function_copy(
     auto old_v = func->new_to_old_map[inst];
     if (not is_tainted(old_v)) {
       if (auto *call = dyn_cast<CallBase>(inst)) {
-        if (call->getCalledFunction() ==
-            PrecomputeFunctions::get_instance()->register_precomputed_value) {
+        if (PrecomputeFunctions::get_instance()->is_call_to_precompute(call)) {
           // do not remove
 
         } else {
@@ -1416,7 +1415,6 @@ void Precalculations::debug_printings() {
       break;
     }
   }
-
 }
 
 llvm::Function *Precalculations::get_global_re_init_function() {

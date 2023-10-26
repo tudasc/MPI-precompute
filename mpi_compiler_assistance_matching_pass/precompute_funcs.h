@@ -5,6 +5,7 @@
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Module.h"
 #include <cassert>
+#include <llvm/IR/InstrTypes.h>
 
 // holds the llvm::Function* for the functions from the precompute library
 class PrecomputeFunctions {
@@ -32,6 +33,18 @@ public:
   PrecomputeFunctions(PrecomputeFunctions &other) = delete;
 
   void operator=(const PrecomputeFunctions &) = delete;
+
+  bool is_call_to_precompute(llvm::Function *func) {
+    return func == init_precompute_lib || func == finish_precomputation ||
+           func == register_precomputed_value || func == allocate_memory;
+  }
+
+  bool is_call_to_precompute(llvm::CallBase *call) {
+    if (call->isIndirectCall()) {
+      return false;
+    }
+    return is_call_to_precompute(call->getCalledFunction());
+  }
 
 private:
   static PrecomputeFunctions *instance;
