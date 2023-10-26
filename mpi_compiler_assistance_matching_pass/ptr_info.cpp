@@ -226,5 +226,6 @@ void PtrUsageInfo::dump() {
       errs() << idx << ", ";
     }
     errs() << "\n";
+    pair.second->dump();
   }
 }

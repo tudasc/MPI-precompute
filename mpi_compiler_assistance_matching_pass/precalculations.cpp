@@ -752,6 +752,23 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
     return;
   }
 
+  auto *func = call->getCalledFunction();
+  if (not call->isIndirectCall() &&
+      (func == mpi_func->mpi_send || func == mpi_func->mpi_Isend ||
+       func == mpi_func->mpi_recv || func == mpi_func->mpi_Irecv)) {
+    assert(ptr_given_as_arg.size() == 1);
+    if (*ptr_given_as_arg.begin() == 0) {
+      ptr->v->dump();
+      call->dump();
+      assert(false && "Tracking Communication to get the envelope is currently "
+                      "not supported");
+    } else {
+      // we know that the other arguments are not important e.g. not written to
+      // like if the communicator is used
+      return;
+    }
+  }
+
   assert(not ptr_given_as_arg.empty());
 
   assert(ptr->ptr_info); // otherwise no need to trace this ptr usage
@@ -760,7 +777,6 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
 
   errs() << "Visit\n";
   call->dump();
-
 
   for (auto *func : get_possible_call_targets(call)) {
 
@@ -1351,7 +1367,6 @@ void Precalculations::debug_printings() {
     }
   }
 
-  assert(false);
 }
 
 llvm::Function *Precalculations::get_global_re_init_function() {
