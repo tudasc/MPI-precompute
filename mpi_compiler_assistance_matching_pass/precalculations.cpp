@@ -952,18 +952,18 @@ void Precalculations::replace_allocation_call(llvm::CallBase *call) {
   // no invoke for malloc
 
   Value *size = nullptr;
-  // TODO FIXME
-  //  oben nachschlagen, wie man korrekt die number of arguments bekommt
+  IRBuilder<> builder = IRBuilder<>(call);
+
   if (call->arg_size() == 1) {
     size = call->getArgOperand(0);
   } else {
     // calloc has num elements and size of elements
-    call->dump();
-    assert(false && "TODO: Implement\n");
+    assert(call->arg_size() == 2);
+    assert(call->getCalledFunction()->getName() == "calloc");
+    // TODO if both are constant, we should do constant propergation
+    size = builder.CreateMul(call->getArgOperand(0), call->getArgOperand(1));
   }
   assert(size);
-
-  IRBuilder<> builder = IRBuilder<>(call);
 
   auto *new_call =
       builder.CreateCall(PrecomputeFunctions::get_instance()->allocate_memory,
