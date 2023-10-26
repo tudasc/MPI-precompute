@@ -137,6 +137,10 @@ bool is_allocation(Function *func) {
 }
 
 bool is_allocation(llvm::CallBase *call) {
+
+  if (call->isIndirectCall()) {
+    return false;
+  }
   // operator new
   if (call->getCalledFunction()->getName() == "_Znwm") {
     assert(isa<Constant>(call->getArgOperand(0)) &&
@@ -158,6 +162,10 @@ bool is_free(Function *func) {
 }
 
 bool is_free(llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    return false;
+  }
+
   return is_free(call->getCalledFunction());
 }
 
@@ -768,6 +776,10 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       return;
     }
   }
+  if (not call->isIndirectCall() && is_free(call)) {
+    // the precompute library will take care of free, so no need to taint it
+    return;
+  }
 
   assert(not ptr_given_as_arg.empty());
 
@@ -805,8 +817,9 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       // something important
       continue;
     }
-    if (is_allocation(func) || is_free(func)) {
-      // skip: alloc/free need to be handled differently
+    if (is_allocation(func)) {
+      // skip: alloc needs to be handled differently
+      // but needs to be tainted so it will be replaced later
       continue;
     }
 
@@ -932,6 +945,34 @@ void FunctionToPrecalculate::initialize_copy() {
   }
 }
 
+void Precalculations::replace_allocation_call(llvm::CallBase *call) {
+  assert(call);
+  assert(is_allocation(call));
+  assert(isa<CallInst>(call));
+  // no invoke for malloc
+
+  Value *size = nullptr;
+  // TODO FIXME
+  //  oben nachschlagen, wie man korrekt die number of arguments bekommt
+  if (call->arg_size() == 1) {
+    size = call->getArgOperand(0);
+  } else {
+    // calloc has num elements and size of elements
+    call->dump();
+    assert(false && "TODO: Implement\n");
+  }
+  assert(size);
+
+  IRBuilder<> builder = IRBuilder<>(call);
+
+  auto *new_call =
+      builder.CreateCall(PrecomputeFunctions::get_instance()->allocate_memory,
+                         {size}, call->getName());
+
+  call->replaceAllUsesWith(new_call);
+  call->eraseFromParent();
+}
+
 void Precalculations::replace_calls_in_copy(
     std::shared_ptr<FunctionToPrecalculate> func) {
   std::vector<CallBase *> to_replace;
@@ -956,6 +997,10 @@ void Precalculations::replace_calls_in_copy(
         continue;
       }
       // end handling calls to MPI
+      if (is_allocation(call)) {
+        to_replace.push_back(call);
+        continue;
+      }
 
       // TODO code duplication wir auto pos=
       auto pos =
@@ -1037,6 +1082,11 @@ void Precalculations::replace_calls_in_copy(
       continue;
     }
     // end handling calls to MPI
+
+    if (is_allocation(call)) {
+      replace_allocation_call(call);
+      continue;
+    }
 
     auto pos = std::find_if(functions_to_include.begin(),
                             functions_to_include.end(), [&call](const auto p) {
