@@ -38,6 +38,7 @@ LINKAGE_TYPE int test_send_request(MPIOPT_Request *request, int *flag,
     *flag = 1;
     return MPI_SUCCESS;
   }
+  assert(request->active);
 #endif
 
   // progress
@@ -88,6 +89,7 @@ LINKAGE_TYPE int test_recv_request(MPIOPT_Request *request, int *flag,
     *flag = 1;
     return MPI_SUCCESS;
   }
+  assert(request->active);
 #endif
   // check for crosstalk
   if (__builtin_expect(request->flag == request->operation_number * 2 + 1, 0)) {

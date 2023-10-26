@@ -19,12 +19,16 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #define MACH_PTR_INFO_H_
 
 #include "taintedValue.h"
+#include <limits>
+#include <llvm/IR/Instructions.h>
 #include <map>
 #include <memory>
 #include <set>
 #include <utility>
 
 #include "llvm/IR/Module.h"
+
+#define WILDCARD_IDX std::numeric_limits<unsigned int>::max()
 
 // defined in taintedValue.h
 struct TaintedValue;
@@ -80,11 +84,11 @@ public:
     ptrs_with_this_info.insert(v);
   }
 
-  bool is_member_relevant(const std::vector<unsigned int> &member_idx);
+  bool is_member_relevant(llvm::GetElementPtrInst *gep);
+  void add_important_member(llvm::GetElementPtrInst *gep,
+                            std::shared_ptr<PtrUsageInfo> result_ptr);
 
   void merge_with(std::shared_ptr<PtrUsageInfo> other);
-  void add_important_member(std::vector<unsigned int> member_idx,
-                            std::shared_ptr<PtrUsageInfo> result_ptr);
 
   // for debugging
   void dump();
@@ -94,6 +98,11 @@ private:
   // important has changed
   void propergate_changes();
   bool is_used_directly = false;
+
+  // returns bool true, if wildcard usage was found
+  // false if the known usage has no wildcard
+  std::pair<bool, std::shared_ptr<PtrUsageInfo>>
+  find_info_for_gep_idx(const std::vector<unsigned int> &member_idx);
   // meaning gep idx 0,0,...(as many zeros as
   // deepest struct nesting level)
   std::shared_ptr<PtrUsageInfo> info_of_direct_usage = nullptr;

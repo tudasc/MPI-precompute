@@ -16,6 +16,9 @@ LINKAGE_TYPE void receive_handshake(MPIOPT_Request *request);
 LINKAGE_TYPE int progress_send_request_handshake_begin(MPIOPT_Request *request,
                                                        int *flag,
                                                        MPI_Status *status) {
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  assert(request->active);
+#endif
   *flag = 0;
 #ifndef NDEBUG
   add_operation_to_trace(request, "Progress_Request");
@@ -54,6 +57,9 @@ LINKAGE_TYPE int progress_send_request_handshake_begin(MPIOPT_Request *request,
     }
     // local op has finished regardless if handshake was successful or not
     *flag = 1;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+    request->active = 0;
+#endif
 
   } // end if payload was received
   return MPI_SUCCESS;
@@ -63,6 +69,10 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
                                                        int *flag,
                                                        MPI_Status *status) {
   *flag = 0;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  assert(request->active);
+#endif
+
 #ifndef NDEBUG
   add_operation_to_trace(request, "Progress_Request");
 #endif
@@ -98,6 +108,9 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
         set_request_type(request, RECV_REQUEST_TYPE_USE_FALLBACK);
         request->flag = 4;
         *flag = 1;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+        request->active = 0;
+#endif
         return MPI_SUCCESS;
       }
 
@@ -110,6 +123,7 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
       // other rank must be active as we have received the payload
       set_request_type(request, RECV_REQUEST_TYPE);
       // indicate that this request has finished
+      assert(request->operation_number == 1);
       request->flag = 4;
     } else {
       // payload arrived but no handshake
@@ -121,6 +135,9 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
       request->flag = 4;
     }
     *flag = 1;
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+    request->active = 0;
+#endif
   } // end if payload arrived
   return MPI_SUCCESS;
 }

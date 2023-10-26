@@ -14,11 +14,14 @@
  limitations under the License.
  */
 
+#include "CompilerPassConstants.h"
 #include "analysis_results.h"
 #include "conflict_detection.h"
 #include "devirt_analysis.h"
+#include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
+#include "precompute_funcs.h"
 
 #include "implementation_specific.h"
 #include "mpi_functions.h"
@@ -156,18 +159,6 @@ bool is_free(Function *func) {
 
 bool is_free(llvm::CallBase *call) {
   return is_free(call->getCalledFunction());
-}
-
-std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
-  assert(gep->hasAllConstantIndices());
-  std::vector<unsigned int> idxs;
-  for (auto &idx : gep->indices()) {
-    auto idx_constant = dyn_cast<ConstantInt>(&idx);
-    assert(idx_constant);
-    unsigned int idx_v = idx_constant->getZExtValue();
-    idxs.push_back(idx_v);
-  }
-  return idxs;
 }
 
 void Precalculations::add_precalculations(
@@ -358,24 +349,16 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
     gep_info->ptr_info = std::make_shared<PtrUsageInfo>(gep_info);
   }
 
-  if (gep->hasAllConstantIndices()) {
-    if (isa<GetElementPtrInst>(gep_ptr_info->v)) {
-      errs() << "Use a pass that combines GEP instructions first\n";
-      assert(false);
-    }
-    std::vector<unsigned int> idxs = get_gep_idxs(gep);
-    gep_ptr_info->ptr_info->add_important_member(idxs, gep_info->ptr_info);
+  if (isa<GetElementPtrInst>(gep_ptr_info->v)) {
+    errs() << "Use a pass that combines GEP instructions first\n";
+    assert(false);
+  }
+  gep_ptr_info->ptr_info->add_important_member(gep, gep_info->ptr_info);
 
-  } else {
-    // we could not determine which fields are important, need to keep track of
-    // everything
-    // as this ptr access may override the other important fields
-    if (gep_ptr_info->ptr_info != gep_info->ptr_info) {
-      gep_ptr_info->ptr_info->merge_with(gep_info->ptr_info);
-      gep_ptr_info->ptr_info->setWholePtrIsRelevant(true);
-    }
-    assert(gep_ptr_info->ptr_info == gep_info->ptr_info);
-    assert(gep_ptr_info->ptr_info->isWholePtrIsRelevant());
+  // taint all values needed for calculating idx
+  for (auto &idx : cast<GetElementPtrInst>(gep_info->v)->indices()) {
+    auto *v = dyn_cast<Value>(idx);
+    insert_tainted_value(v, gep_info);
   }
 }
 
@@ -487,7 +470,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
       // nothing to do
     }
 
-  }else {
+  } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
     v->v->dump();
@@ -497,7 +480,6 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   if (v->is_pointer()) {
     visit_ptr_usages(v);
   }
-
 }
 
 void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
@@ -516,6 +498,13 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     // this pointer is not needed
     // if this pointer is indeed needed it will later be visited again if the
     // ptr info was initialized
+    return;
+  }
+
+  if (not ptr->ptr_info->isReadFrom()) {
+    // this pointers CONTENT (the pointee) is currently not needed
+    // if it is needed later it will be visited again
+    // if only the ptr value is needed: no need to keep track of its content
     return;
   }
 
@@ -549,9 +538,7 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     }
     if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
       // if gep is relevant
-      if (ptr->ptr_info->isWholePtrIsRelevant() ||
-          not gep->hasAllConstantIndices() ||
-          ptr->ptr_info->is_member_relevant(get_gep_idxs(gep))) {
+      if (ptr->ptr_info->is_member_relevant(gep)) {
         insert_tainted_value(gep, ptr);
         // ptr info will be constructed when the gep is visited
       }
@@ -751,10 +738,38 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
 void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
                                           std::shared_ptr<TaintedValue> ptr) {
 
+  std::set<unsigned int> ptr_given_as_arg;
+  for (unsigned int i = 0; i < call->arg_size(); ++i) {
+    if (call->getArgOperand(i) == ptr->v) {
+      ptr_given_as_arg.insert(i);
+    }
+  }
+
   if (call->getCalledOperand() == ptr->v) {
     // visit from the function ptr: nothing to check
+    assert(ptr_given_as_arg.empty() && "Function ptr getting itself as an "
+                                       "argument is currently not supported");
     return;
   }
+
+  auto *func = call->getCalledFunction();
+  if (not call->isIndirectCall() &&
+      (func == mpi_func->mpi_send || func == mpi_func->mpi_Isend ||
+       func == mpi_func->mpi_recv || func == mpi_func->mpi_Irecv)) {
+    assert(ptr_given_as_arg.size() == 1);
+    if (*ptr_given_as_arg.begin() == 0) {
+      ptr->v->dump();
+      call->dump();
+      assert(false && "Tracking Communication to get the envelope is currently "
+                      "not supported");
+    } else {
+      // we know that the other arguments are not important e.g. not written to
+      // like if the communicator is used
+      return;
+    }
+  }
+
+  assert(not ptr_given_as_arg.empty());
 
   assert(ptr->ptr_info); // otherwise no need to trace this ptr usage
 
@@ -762,14 +777,6 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
 
   errs() << "Visit\n";
   call->dump();
-
-  std::set<unsigned int> ptr_given_as_arg;
-  for (unsigned int i = 0; i < call->arg_size(); ++i) {
-    if (call->getArgOperand(i) == ptr->v) {
-      ptr_given_as_arg.insert(i);
-    }
-  }
-  assert(not ptr_given_as_arg.empty());
 
   for (auto *func : get_possible_call_targets(call)) {
 
@@ -972,6 +979,8 @@ void Precalculations::replace_calls_in_copy(
     }
   }
 
+  auto precompute_func = PrecomputeFunctions::get_instance();
+
   for (auto *call : to_replace) {
     auto callee = call->getCalledFunction();
     if (callee == mpi_func->mpi_send_init) {
@@ -979,16 +988,22 @@ void Precalculations::replace_calls_in_copy(
       auto src = get_src_value(call, true);
       IRBuilder<> builder = IRBuilder<>(call);
 
+      builder.CreateCall(precompute_func->register_precomputed_value,
+                         {builder.getInt32(SEND_ENVELOPE_DEST), src});
       CallBase *new_call = nullptr;
       if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-        new_call = builder.CreateInvoke(mpi_func->optimized.register_send_tag,
-                                        invoke->getNormalDest(),
-                                        invoke->getUnwindDest(), {src, tag});
+
+        new_call = builder.CreateInvoke(
+            precompute_func->register_precomputed_value,
+            invoke->getNormalDest(), invoke->getUnwindDest(),
+            {builder.getInt32(SEND_ENVELOPE_TAG), tag});
       } else {
-        new_call = builder.CreateCall(mpi_func->optimized.register_send_tag,
-                                      {src, tag});
+        new_call =
+            builder.CreateCall(precompute_func->register_precomputed_value,
+                               {builder.getInt32(SEND_ENVELOPE_TAG), tag});
       }
-      call->replaceAllUsesWith(new_call);
+      call->replaceAllUsesWith(
+          ImplementationSpecifics::get_instance()->SUCCESS);
       call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
       func->new_to_old_map[new_call] = old_call_v;
@@ -996,19 +1011,25 @@ void Precalculations::replace_calls_in_copy(
       continue;
     }
     if (callee == mpi_func->mpi_recv_init) {
-      auto tag = get_tag_value(call, true);
-      auto src = get_src_value(call, true);
+      auto tag = get_tag_value(call, false);
+      auto src = get_src_value(call, false);
       IRBuilder<> builder = IRBuilder<>(call);
+      builder.CreateCall(precompute_func->register_precomputed_value,
+                         {builder.getInt32(RECV_ENVELOPE_DEST), src});
       CallBase *new_call = nullptr;
       if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-        new_call = builder.CreateInvoke(mpi_func->optimized.register_recv_tag,
-                                        invoke->getNormalDest(),
-                                        invoke->getUnwindDest(), {src, tag});
+
+        new_call = builder.CreateInvoke(
+            precompute_func->register_precomputed_value,
+            invoke->getNormalDest(), invoke->getUnwindDest(),
+            {builder.getInt32(RECV_ENVELOPE_TAG), tag});
       } else {
-        new_call = builder.CreateCall(mpi_func->optimized.register_recv_tag,
-                                      {src, tag});
+        new_call =
+            builder.CreateCall(precompute_func->register_precomputed_value,
+                               {builder.getInt32(RECV_ENVELOPE_TAG), tag});
       }
-      call->replaceAllUsesWith(new_call);
+      call->replaceAllUsesWith(
+          ImplementationSpecifics::get_instance()->SUCCESS);
       call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
       func->new_to_old_map[new_call] = old_call_v;
@@ -1078,7 +1099,18 @@ void Precalculations::prune_function_copy(
     Instruction *inst = &*I;
     auto old_v = func->new_to_old_map[inst];
     if (not is_tainted(old_v)) {
-      to_prune.push_back(inst);
+      if (auto *call = dyn_cast<CallBase>(inst)) {
+        if (call->getCalledFunction() ==
+            PrecomputeFunctions::get_instance()->register_precomputed_value) {
+          // do not remove
+
+        } else {
+          to_prune.push_back(inst);
+        }
+
+      } else {
+        to_prune.push_back(inst);
+      }
     } else if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
       // an invoke can be tainted only because it may return an exception
       // but it actually is exception free for our purpose
@@ -1176,15 +1208,18 @@ void Precalculations::add_call_to_precalculation_to_main() {
   // MPIOPT_Init will later be inserted between this 2 calls
   IRBuilder<> builder(call_to_init->getNextNode());
 
+  auto precompute_funcs = PrecomputeFunctions::get_instance();
+
   // forward args of main
   std::vector<Value *> args;
   for (auto &arg : entry_point->args()) {
     args.push_back(&arg);
   }
+  builder.CreateCall(precompute_funcs->init_precompute_lib);
   builder.CreateCall(function_info->F_copy, args);
+  builder.CreateCall(precompute_funcs->finish_precomputation);
   auto re_init_fun = get_global_re_init_function();
   builder.CreateCall(re_init_fun);
-  builder.CreateCall(mpi_func->optimized.check_registered_conflicts);
 }
 
 void Precalculations::find_functions_called_indirect() {
@@ -1331,6 +1366,7 @@ void Precalculations::debug_printings() {
       break;
     }
   }
+
 }
 
 llvm::Function *Precalculations::get_global_re_init_function() {

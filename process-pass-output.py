@@ -94,7 +94,7 @@ def main():
     original_mod = full_input[begin_mod_idx[0]:end_idx[0]]
 
     success_marker_idx = get_idices_of_elem(full_input, marker_end_pass_execution)
-    assert len(success_marker_idx) == 1
+
     if success_marker_idx:
         begin_mod_idx = get_idices_of_elem(full_input, marker_begin_module_modified)
         assert len(begin_mod_idx) == 1

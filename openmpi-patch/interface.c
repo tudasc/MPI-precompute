@@ -202,9 +202,9 @@ int MPIOPT_Testsome(int incount, MPI_Request array_of_requests[], int *outcount,
     MPIOPT_Request *req = (MPIOPT_Request *)(array_of_requests[i]);
     if (req->active) {
       if (array_of_statuses == MPI_STATUSES_IGNORE) {
-        MPIOPT_Test_internal(req, &flag, MPI_STATUS_IGNORE);
+        MPIOPT_Test(&req, &flag, MPI_STATUS_IGNORE);
       } else {
-        MPIOPT_Test_internal(req, &flag, &array_of_statuses[*outcount]);
+        MPIOPT_Test(&req, &flag, &array_of_statuses[*outcount]);
       }
       if (flag) {
         array_of_indices[*outcount] = i;

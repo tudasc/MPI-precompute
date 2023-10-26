@@ -38,7 +38,7 @@ if [[ "$NO_MPI_OPT" != 1 ]]; then
 fi
 
 # rebuild with our compiler pass enabled
-export LFLAGS="-Og -g -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+export LFLAGS="-Og -g -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS -lprecompute"
 make
 #check if compiler analysis was successfull
 EXPECT_MPIOPT=1
