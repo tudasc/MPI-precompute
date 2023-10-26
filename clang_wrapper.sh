@@ -15,90 +15,85 @@ has_o_files=false
 has_flto=false
 has_fwhole_program_vtables=false
 for arg in "$@"; do
-  # Check if the current argument is "-c"
-  if [ "$arg" == "-c" ]; then
-    is_to_obj=true
-  fi
-    if [ "$arg" == "-o" ]; then
-      has_o_option=true
-    fi
-    if [[ "$arg" == *.o ]]; then
+    # Check if the current argument is "-c"
+    if [ "$arg" == "-c" ]; then
+        is_to_obj=true
+    elif [ "$arg" == "-o" ]; then
+        has_o_option=true
+    elif [[ "$arg" == *.o ]]; then
         has_o_files=true
-      fi
-          if [ "$arg" == "-flto" ]; then
-            has_flto=true
-          fi
-              if [ "$arg" == "-fwhole-program-vtables" ]; then
-                has_fwhole_program_vtables=true
-              fi
+    elif [ "$arg" == "-flto" ]; then
+        has_flto=true
+    elif [ "$arg" == "-fwhole-program-vtables" ]; then
+        has_fwhole_program_vtables=true
+    fi
 done
 
 # check if necessary flags are given
-if [ "$has_flto" == false ] || [ "$has_fwhole_program_vtables" == false ]; then
-  echo "Error, need -flto and -fwhole-program-vtables for pass to work correctly"
-  exit 1
-  fi
+if [ "$has_flto" == false ] ||
+   [ "$has_fwhole_program_vtables" == false ]; then
+    echo "Error, need -flto and -fwhole-program-vtables for pass to work correctly"
+    exit 1
+fi
 
 if ! [[ -v MPI_COMPILER_ASSISTANCE_PASS ]]; then
-  echo "The MPI_COMPILER_ASSISTANCE_PASS environment variable is not set"
-  exit 1
+    echo "The MPI_COMPILER_ASSISTANCE_PASS environment variable is not set"
+    exit 1
 fi
 
 COMPILER_INVOCATION="$compiler"
 if [ "$is_to_obj" == true ]; then
-  echo "MODE: to obj file"
-for arg in "$@"; do
-  if [ "$arg" == "-c" ]; then
-        COMPILER_INVOCATION="$COMPILER_INVOCATION -c -emit-llvm"
-
-  elif [[ "$arg" == *.o ]]; then
-    # Remove the ".o" suffix and append ".bc"
-    new_file="${arg%.o}.bc"
-    COMPILER_INVOCATION="$COMPILER_INVOCATION $new_file"
-  else
-    COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
-  fi
-done
-echo "$COMPILER_INVOCATION"
-$COMPILER_INVOCATION
-exit
+    echo "MODE: to obj file"
+    for arg in "$@"; do
+        if [ "$arg" == "-c" ]; then
+            COMPILER_INVOCATION="$COMPILER_INVOCATION -c -emit-llvm"
+        elif [[ "$arg" == *.o ]]; then
+            # Remove the ".o" suffix and append ".bc"
+            new_file="${arg%.o}.bc"
+            COMPILER_INVOCATION="$COMPILER_INVOCATION $new_file"
+        else
+            COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
+        fi
+    done
+    echo "$COMPILER_INVOCATION"
+    $COMPILER_INVOCATION
+    exit
 fi
 
 
 if [ "$has_o_files" == true ]; then
-echo "MODE: Link .o files"
-#-x ir - : read ir from stdin
-COMPILER_INVOCATION="$compiler -x ir -"
-if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
-  COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+    echo "MODE: Link .o files"
+    #-x ir - : read ir from stdin
+    COMPILER_INVOCATION="$compiler -x ir -"
+    if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
+        COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+    fi
+    LLVM_LINK_INVOCATION="llvm-link"
+    for arg in "$@"; do
+        if [[ "$arg" == *.o ]]; then
+            # Remove the ".o" suffix and append ".bc"
+            new_file="${arg%.o}.bc"
+            # remove from compiler invocation and add to file list
+            #COMPILER_INVOCATION="$COMPILER_INVOCATION $new_file"
+            LLVM_LINK_INVOCATION="$LLVM_LINK_INVOCATION $new_file"
+        else
+            COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
+        fi
+    done
+    echo "$LLVM_LINK_INVOCATION | $COMPILER_INVOCATION"
+    $LLVM_LINK_INVOCATION | $COMPILER_INVOCATION
+    exit
 fi
-LLVM_LINK_INVOCATION="llvm-link"
-for arg in "$@"; do
-     if [[ "$arg" == *.o ]]; then
-       # Remove the ".o" suffix and append ".bc"
-       new_file="${arg%.o}.bc"
-       # remove from compiler invocation and add to file list
-       #COMPILER_INVOCATION="$COMPILER_INVOCATION $new_file"
-       LLVM_LINK_INVOCATION="$LLVM_LINK_INVOCATION $new_file"
-     else
-       COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
-     fi
-  done
 
-echo "$LLVM_LINK_INVOCATION | $COMPILER_INVOCATION"
-$LLVM_LINK_INVOCATION | $COMPILER_INVOCATION
-
-exit
-fi
 
 echo "MODE: direct to Binary"
 COMPILER_INVOCATION="$compiler"
 if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
-  COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+    COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
 fi
 for arg in "$@"; do
-   COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
-  done
+    COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
+done
 echo "$COMPILER_INVOCATION"
 $COMPILER_INVOCATION
 exit
