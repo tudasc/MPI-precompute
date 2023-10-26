@@ -68,7 +68,7 @@ TYPE get_precomputed_value(int value_id, unsigned long idx) {
 
 void *allocate_memory_in_precompute(unsigned long size) {
   assert(status == IN_PRECOMPUTE);
-  void *new_ptr = malloc(size);
+  void *new_ptr = calloc(size, 1);
   allocated_ptrs.push_back(new_ptr);
   return new_ptr;
 }
