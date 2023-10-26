@@ -7,5 +7,8 @@ export OMPI_MCA_pml=ucx
 export UCX_WARN_UNUSED_ENV_VARS=n
 export UCX_UNIFIED_MODE=y
 
+OMPI_CC=clang
+OMPI_CXX=clang++
+
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/tj75qeje/mpi-comp-match/IMB-ASYNC/src_cpp/ASYNC/thirdparty/lib/
 # also set the paths for the mpi implementation
