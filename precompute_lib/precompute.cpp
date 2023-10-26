@@ -7,6 +7,12 @@
 
 #define PRINT_REGISTERED_VALUES
 
+#define MEASURE_PRECOMPUTE_TIME
+
+#ifdef MEASURE_PRECOMPUTE_TIME
+#include <chrono>
+#endif
+
 // is initialized, in precompute or in query phase
 enum status {
   UNINITIALIZED,
@@ -21,6 +27,10 @@ std::map<int, std::vector<TYPE>> precomputed_vals;
 
 std::vector<void *> allocated_ptrs;
 
+#ifdef MEASURE_PRECOMPUTE_TIME
+std::chrono::steady_clock::time_point begin;
+#endif
+
 // initialization of precompute library
 // call before the precomputation
 void init_precompute_lib() {
@@ -30,6 +40,9 @@ void init_precompute_lib() {
   allocated_ptrs = {};
 #ifdef PRINT_REGISTERED_VALUES
   std::cout << "Begin Precompute\n";
+#endif
+#ifdef MEASURE_PRECOMPUTE_TIME
+  begin = std::chrono::steady_clock::now();
 #endif
 }
 
@@ -82,6 +95,14 @@ void finish_precomputation() {
   allocated_ptrs.clear();
 #ifdef PRINT_REGISTERED_VALUES
   std::cout << "End Precompute\n";
+#endif
+#ifdef MEASURE_PRECOMPUTE_TIME
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  std::cout << "Precompute Time: "
+            << std::chrono::duration_cast<std::chrono::microseconds>(end -
+                                                                     begin)
+                   .count()
+            << " [µs]" << std::endl;
 #endif
 }
 
