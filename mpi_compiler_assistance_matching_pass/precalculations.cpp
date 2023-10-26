@@ -1224,7 +1224,10 @@ void Precalculations::add_call_to_precalculation_to_main() {
   auto pos = std::find_if(
       functions_to_include.begin(), functions_to_include.end(),
       [this](const auto p) { return p->F_orig == this->entry_point; });
-  assert(pos != functions_to_include.end());
+  if (pos == functions_to_include.end()) {
+    // nothing to precalculate
+    return;
+  }
   const auto &function_info = *pos;
   auto entry_to_precalc = function_info->F_copy;
 
