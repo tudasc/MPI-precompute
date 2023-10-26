@@ -45,9 +45,16 @@ PrecomputeFunctions::PrecomputeFunctions(Module &M) {
       cast<Function>(M.getOrInsertFunction("init_precompute_lib", ftype, {})
                          .getCallee()
                          ->stripPointerCasts());
-
   finish_precomputation =
       cast<Function>(M.getOrInsertFunction("finish_precomputation", ftype, {})
                          .getCallee()
                          ->stripPointerCasts());
+
+  ftype = FunctionType::get(Type::getInt8PtrTy(M.getContext()),
+                            {Type::getInt64Ty(M.getContext())}, false);
+
+  allocate_memory = cast<Function>(
+      M.getOrInsertFunction("allocate_memory_in_precompute", ftype, {})
+          .getCallee()
+          ->stripPointerCasts());
 }

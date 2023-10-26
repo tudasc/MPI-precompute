@@ -44,6 +44,7 @@ public:
   llvm::Function *init_precompute_lib;
   llvm::Function *finish_precomputation;
   llvm::Function *register_precomputed_value;
+  llvm::Function *allocate_memory;
 };
 
 #endif /* MACH_PRECOMPUTE_FUNCS_H_ */
