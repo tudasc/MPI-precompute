@@ -594,16 +594,23 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
     auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
     functions_to_include.insert(fun_to_precalc);
 
+    // used outside of a call
+    bool is_func_ptr_captured = false;
+
     for (auto u : func->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
         auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
         continue;
+      } else {
+        is_func_ptr_captured = true;
       }
     }
     // indirect calls
-    taint_all_indirect_calls(func);
+    if (is_func_ptr_captured) {
+      taint_all_indirect_calls(func);
+    } // otherwise no indirect calls to this possible
 
     return fun_to_precalc;
   } else {
@@ -1337,6 +1344,7 @@ Precalculations::get_possible_call_targets(llvm::CallBase *call) {
     // TODO can we check that we will not be able to get a ptr to a function
     // outside of the module?
   }
+
   assert(not possible_targets.empty() && "could not find tgts of call");
   return possible_targets;
 }
@@ -1368,6 +1376,8 @@ void Precalculations::taint_all_indirect_call_args(
 }
 
 void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
+  errs() << "INDIRECT CALLS TO: " << func->getName() << "\n";
+
   // TODO this could be done more efficient...
   // TODO duplicate code with taint_all_indirect_call_args
   for (auto &f : M.functions()) {
