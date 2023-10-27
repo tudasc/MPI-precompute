@@ -1,9 +1,11 @@
 #!/bin/bash
 
-# wrapper to invoke clang for compilation with the ass using multiple object files
+# wrapper to invoke clang for compilation with the as using multiple object files
 
-echo "INVOKE CLANG_WRAPPER"
-echo "clang_wrapper $@"
+if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
+    echo "INVOKE CLANG_WRAPPER"
+    echo "clang_wrapper $@"
+fi
 
 USE_MPI_COMPILER_ASSISTANCE_PASS=${MPI_COMPILER_ASSISTANCE_PASS:false}
 
@@ -43,7 +45,9 @@ fi
 
 COMPILER_INVOCATION="$compiler"
 if [ "$is_to_obj" == true ]; then
-    echo "MODE: to obj file"
+    if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
+        echo "MODE: to obj file"
+    fi
     for arg in "$@"; do
         if [ "$arg" == "-c" ]; then
             COMPILER_INVOCATION="$COMPILER_INVOCATION -c -emit-llvm"
@@ -55,14 +59,18 @@ if [ "$is_to_obj" == true ]; then
             COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
         fi
     done
-    echo "$COMPILER_INVOCATION"
+    if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
+        echo "$COMPILER_INVOCATION"
+    fi
     $COMPILER_INVOCATION
     exit
 fi
 
 
 if [ "$has_o_files" == true ]; then
-    echo "MODE: Link .o files"
+    if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
+        echo "MODE: Link .o files"
+    fi
     #-x ir - : read ir from stdin
     COMPILER_INVOCATION="$compiler -x ir -"
     if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
@@ -90,13 +98,16 @@ if [ "$has_o_files" == true ]; then
             COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
         fi
     done
-    echo "$LLVM_LINK_INVOCATION | $COMPILER_INVOCATION"
+    if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
+        echo "$LLVM_LINK_INVOCATION | $COMPILER_INVOCATION"
+    fi
     $LLVM_LINK_INVOCATION | $COMPILER_INVOCATION
     exit
 fi
 
-
-echo "MODE: direct to Binary"
+if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
+    echo "MODE: direct to Binary"
+fi
 COMPILER_INVOCATION="$compiler"
 if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
     COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
@@ -104,7 +115,9 @@ fi
 for arg in "$@"; do
     COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
 done
-echo "$COMPILER_INVOCATION"
+if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
+    echo "$COMPILER_INVOCATION"
+fi
 $COMPILER_INVOCATION
 exit
 

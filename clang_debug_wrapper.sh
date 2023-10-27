@@ -4,8 +4,6 @@
 
 CLANG_WRAPPER=/work/home/tj75qeje/mpi-comp-match/clang_wrapper.sh
 
-echo "$CLANG_WRAPPER $@" >> /home/tj75qeje/mpi-comp-match/build/clang_invoke_log
+# echo "$CLANG_WRAPPER $@" >> /home/tj75qeje/mpi-comp-match/build/clang_invoke_log
 
-# cp "${@: -1}" /home/tj75qeje/mpi-comp-match/build/test_mpi.cpp
-
-$CLANG_WRAPPER "$@" >> /home/tj75qeje/mpi-comp-match/build/clang_invoke_log
+DEBUG_CLANG_WRAPPER=true $CLANG_WRAPPER "$@" >> /home/tj75qeje/mpi-comp-match/build/clang_invoke_log
