@@ -38,7 +38,10 @@ add_custom_target(setup_env.sh ALL
         echo "export LIBRARY_PATH=\\$$LIBRARY_PATH:${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export LD_LIBRARY_PATH=\\$$LD_LIBRARY_PATH:${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPI_COMPILER_ASSISTANCE_PASS=${PASS_LIB}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export WHOLE_PROGRAM_DEVIRT_ANALYSIS_PASS=${CMAKE_BINARY_DIR}/WholeProgramDevirtAnalysisPass/libwholeProgramDevirtAnalysisPass.so" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
+        echo "export WHOLE_PROGRAM_DEVIRT_ANALYSIS_PASS=${CMAKE_BINARY_DIR}/WholeProgramDevirtAnalysisPass/libwholeProgramDevirtAnalysisPass.so" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export OMPI_CC=${CMAKE_BINARY_DIR}/clang_wrap_cc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export OMPI_CXX=${CMAKE_BINARY_DIR}/clang_wrap_cxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh 
 
         DEPENDS setup_env.sh.in)
 
