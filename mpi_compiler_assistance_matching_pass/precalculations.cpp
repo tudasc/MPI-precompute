@@ -123,6 +123,7 @@ bool should_exclude_function_for_debugging(llvm::Function *func) {
 }
 
 bool is_allocation(Function *func) {
+  assert(func);
   // operator new
   if (func->getName() == "_Znwm") {
     return true;
@@ -151,6 +152,7 @@ bool is_allocation(llvm::CallBase *call) {
 }
 
 bool is_free(Function *func) {
+  assert(func);
   // operator delete
   if (func->getName() == "_ZdlPv") {
     return true;
