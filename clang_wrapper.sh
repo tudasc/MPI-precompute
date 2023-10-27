@@ -73,7 +73,7 @@ if [ "$has_o_files" == true ]; then
     #-x ir - : read ir from stdin
     COMPILER_INVOCATION="$compiler -x ir -"
     if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
-        COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+        COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS -lprecompute"
     fi
     LLVM_LINK_INVOCATION="llvm-link"
     for arg in "$@"; do
@@ -109,7 +109,7 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
 fi
 COMPILER_INVOCATION="$compiler"
 if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
-    COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS"
+    COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS -l precompute"
 fi
 for arg in "$@"; do
     COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
