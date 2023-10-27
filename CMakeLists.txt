@@ -47,5 +47,13 @@ add_custom_target(run.sh ALL
 
         DEPENDS run.sh)
 
+add_custom_target(clang_wrap_cc ALL
+        COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/clang_wrapper.sh ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc && sed -i '3s/.*/compiler=clang/' ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc
+        DEPENDS clang_wrapper.sh)
+
+add_custom_target(clang_wrap_cpp ALL
+        COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/clang_wrapper.sh ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cpp && sed -i '3s/.*/compiler=clang++/' ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cpp
+        DEPENDS clang_wrapper.sh)
+
 enable_testing()
 add_subdirectory(tests)

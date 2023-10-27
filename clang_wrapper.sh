@@ -1,6 +1,7 @@
 #!/bin/bash
-
 # wrapper to invoke clang for compilation with the as using multiple object files
+compiler=clang++
+#compiler= variable needs to be set on line 3 as it will be replaced with clang or clang++ depending if c or cpp wrapper is generated
 
 if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     echo "INVOKE CLANG_WRAPPER"
@@ -8,8 +9,6 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
 fi
 
 USE_MPI_COMPILER_ASSISTANCE_PASS=${MPI_COMPILER_ASSISTANCE_PASS:false}
-
-compiler=clang++
 
 is_to_obj=false
 has_o_option=false
