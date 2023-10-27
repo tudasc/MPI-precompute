@@ -15,9 +15,9 @@ if [ ! -d "$TEST_DIR" ]; then
   exit 1
 fi
 
-cd $TEST_DIR
-mkdir build
-cd build
+TEST_DIR_NAME=$(basename "$TEST_DIR")
+mkdir -p $TEST_DIR_NAME
+cd $TEST_DIR_NAME
 
 # without pass enabled to get the original application
 export USE_MPI_COMPILER_ASSISTANCE_PASS=false
