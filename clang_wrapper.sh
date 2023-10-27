@@ -8,7 +8,7 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     echo "clang_wrapper $@"
 fi
 
-USE_MPI_COMPILER_ASSISTANCE_PASS=${MPI_COMPILER_ASSISTANCE_PASS:false}
+USE_MPI_COMPILER_ASSISTANCE_PASS=${USE_MPI_COMPILER_ASSISTANCE_PASS:false}
 
 is_to_obj=false
 has_o_option=false
