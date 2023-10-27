@@ -54,6 +54,8 @@ if [ "$is_to_obj" == true ]; then
             # Remove the ".o" suffix and append ".bc"
             new_file="${arg%.o}.bc"
             COMPILER_INVOCATION="$COMPILER_INVOCATION $new_file"
+            # create .o and update timestamp so build-systems work as intended if they use this information
+            touch $arg
         else
             COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
         fi
