@@ -2,8 +2,10 @@
 
 # wrapper to debug clang invocations with more complicated build systems
 
-echo "clang++ $@" >> /home/tj75qeje/mpi-comp-match/build/clang_invoke_log
+CLANG_WRAPPER=/work/home/tj75qeje/mpi-comp-match/clang_wrapper.sh
 
-cp "${@: -1}" /home/tj75qeje/mpi-comp-match/build/test_mpi.cpp
+echo "$CLANG_WRAPPER $@" >> /home/tj75qeje/mpi-comp-match/build/clang_invoke_log
 
-clang++ "$@"
+# cp "${@: -1}" /home/tj75qeje/mpi-comp-match/build/test_mpi.cpp
+
+$CLANG_WRAPPER "$@" >> /home/tj75qeje/mpi-comp-match/build/clang_invoke_log

@@ -7,7 +7,7 @@ echo "clang_wrapper $@"
 
 USE_MPI_COMPILER_ASSISTANCE_PASS=${MPI_COMPILER_ASSISTANCE_PASS:false}
 
-compiler=clang
+compiler=clang++
 
 is_to_obj=false
 has_o_option=false
@@ -76,6 +76,16 @@ if [ "$has_o_files" == true ]; then
             # remove from compiler invocation and add to file list
             #COMPILER_INVOCATION="$COMPILER_INVOCATION $new_file"
             LLVM_LINK_INVOCATION="$LLVM_LINK_INVOCATION $new_file"
+        elif [[ "$arg" == *.so ]]; then
+            # in our mode we cannot enter .o and .so files so we need to tell it to link it with -l
+            basefilename=$(basename "$arg")
+            # Use parameter expansion to remove file extensions
+            lib_fname="${basefilename%%.*}"
+            # Use parameter expansion to remove "lib" from the beginning
+            lib_name="${lib_fname#lib}"
+            # Use dirname to get the directory part (will at least result in ".")
+            directory=$(dirname "$arg")
+            COMPILER_INVOCATION="$COMPILER_INVOCATION -L$directory -l$lib_name"
         else
             COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
         fi
