@@ -674,13 +674,6 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   assert(!call_info->visited);
   call_info->visited = true;
 
-  if (isa<InvokeInst>(call) && call_info->reason == TaintReason::CONTROL_FLOW) {
-    // this call is only tainted because we need the instruction to advance the
-    // control flow to the normal dest it can be replaced with unconditional
-    // branch: no need to further analyze
-    return;
-  }
-
   std::vector<Function *> possible_targets = get_possible_call_targets(call);
 
   bool need_return_val = is_retval_of_call_used(call);
