@@ -123,6 +123,7 @@ bool should_exclude_function_for_debugging(llvm::Function *func) {
 }
 
 bool is_allocation(Function *func) {
+  assert(func);
   // operator new
   if (func->getName() == "_Znwm") {
     return true;
@@ -137,6 +138,10 @@ bool is_allocation(Function *func) {
 }
 
 bool is_allocation(llvm::CallBase *call) {
+
+  if (call->isIndirectCall()) {
+    return false;
+  }
   // operator new
   if (call->getCalledFunction()->getName() == "_Znwm") {
     assert(isa<Constant>(call->getArgOperand(0)) &&
@@ -147,6 +152,7 @@ bool is_allocation(llvm::CallBase *call) {
 }
 
 bool is_free(Function *func) {
+  assert(func);
   // operator delete
   if (func->getName() == "_ZdlPv") {
     return true;
@@ -158,6 +164,10 @@ bool is_free(Function *func) {
 }
 
 bool is_free(llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    return false;
+  }
+
   return is_free(call->getCalledFunction());
 }
 
@@ -584,16 +594,23 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
     auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
     functions_to_include.insert(fun_to_precalc);
 
+    // used outside of a call
+    bool is_func_ptr_captured = false;
+
     for (auto u : func->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
         auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
         continue;
+      } else {
+        is_func_ptr_captured = true;
       }
     }
     // indirect calls
-    taint_all_indirect_calls(func);
+    if (is_func_ptr_captured) {
+      taint_all_indirect_calls(func);
+    } // otherwise no indirect calls to this possible
 
     return fun_to_precalc;
   } else {
@@ -768,6 +785,10 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       return;
     }
   }
+  if (not call->isIndirectCall() && is_free(call)) {
+    // the precompute library will take care of free, so no need to taint it
+    return;
+  }
 
   assert(not ptr_given_as_arg.empty());
 
@@ -805,8 +826,9 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       // something important
       continue;
     }
-    if (is_allocation(func) || is_free(func)) {
-      // skip: alloc/free need to be handled differently
+    if (is_allocation(func)) {
+      // skip: alloc needs to be handled differently
+      // but needs to be tainted so it will be replaced later
       continue;
     }
 
@@ -932,6 +954,34 @@ void FunctionToPrecalculate::initialize_copy() {
   }
 }
 
+void Precalculations::replace_allocation_call(llvm::CallBase *call) {
+  assert(call);
+  assert(is_allocation(call));
+  assert(isa<CallInst>(call));
+  // no invoke for malloc
+
+  Value *size = nullptr;
+  IRBuilder<> builder = IRBuilder<>(call);
+
+  if (call->arg_size() == 1) {
+    size = call->getArgOperand(0);
+  } else {
+    // calloc has num elements and size of elements
+    assert(call->arg_size() == 2);
+    assert(call->getCalledFunction()->getName() == "calloc");
+    // TODO if both are constant, we should do constant propergation
+    size = builder.CreateMul(call->getArgOperand(0), call->getArgOperand(1));
+  }
+  assert(size);
+
+  auto *new_call =
+      builder.CreateCall(PrecomputeFunctions::get_instance()->allocate_memory,
+                         {size}, call->getName());
+
+  call->replaceAllUsesWith(new_call);
+  call->eraseFromParent();
+}
+
 void Precalculations::replace_calls_in_copy(
     std::shared_ptr<FunctionToPrecalculate> func) {
   std::vector<CallBase *> to_replace;
@@ -956,6 +1006,10 @@ void Precalculations::replace_calls_in_copy(
         continue;
       }
       // end handling calls to MPI
+      if (is_allocation(call)) {
+        to_replace.push_back(call);
+        continue;
+      }
 
       // TODO code duplication wir auto pos=
       auto pos =
@@ -1038,6 +1092,11 @@ void Precalculations::replace_calls_in_copy(
     }
     // end handling calls to MPI
 
+    if (is_allocation(call)) {
+      replace_allocation_call(call);
+      continue;
+    }
+
     auto pos = std::find_if(functions_to_include.begin(),
                             functions_to_include.end(), [&call](const auto p) {
                               if (call->isIndirectCall()) {
@@ -1100,8 +1159,7 @@ void Precalculations::prune_function_copy(
     auto old_v = func->new_to_old_map[inst];
     if (not is_tainted(old_v)) {
       if (auto *call = dyn_cast<CallBase>(inst)) {
-        if (call->getCalledFunction() ==
-            PrecomputeFunctions::get_instance()->register_precomputed_value) {
+        if (PrecomputeFunctions::get_instance()->is_call_to_precompute(call)) {
           // do not remove
 
         } else {
@@ -1175,7 +1233,10 @@ void Precalculations::add_call_to_precalculation_to_main() {
   auto pos = std::find_if(
       functions_to_include.begin(), functions_to_include.end(),
       [this](const auto p) { return p->F_orig == this->entry_point; });
-  assert(pos != functions_to_include.end());
+  if (pos == functions_to_include.end()) {
+    // nothing to precalculate
+    return;
+  }
   const auto &function_info = *pos;
   auto entry_to_precalc = function_info->F_copy;
 
@@ -1283,6 +1344,7 @@ Precalculations::get_possible_call_targets(llvm::CallBase *call) {
     // TODO can we check that we will not be able to get a ptr to a function
     // outside of the module?
   }
+
   assert(not possible_targets.empty() && "could not find tgts of call");
   return possible_targets;
 }
@@ -1314,6 +1376,8 @@ void Precalculations::taint_all_indirect_call_args(
 }
 
 void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
+  errs() << "INDIRECT CALLS TO: " << func->getName() << "\n";
+
   // TODO this could be done more efficient...
   // TODO duplicate code with taint_all_indirect_call_args
   for (auto &f : M.functions()) {
@@ -1366,7 +1430,6 @@ void Precalculations::debug_printings() {
       break;
     }
   }
-
 }
 
 llvm::Function *Precalculations::get_global_re_init_function() {

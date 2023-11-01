@@ -130,6 +130,8 @@ public:
                            std::shared_ptr<TaintedValue> ptr);
   void visit_ptr_usages(std::shared_ptr<TaintedValue> ptr);
 
+  void replace_allocation_call(llvm::CallBase *call);
+
   bool is_tainted(llvm::Value *v) {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) { return vv->v == v; }) !=

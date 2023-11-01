@@ -29,24 +29,24 @@ void init_communication(int rank, int size) {
   tag_to_use++;
 }
 
-void begin_halo_receive(void) {
+void begin_halo_receive() {
   MPI_Start(&comm_requests[1]);
   MPI_Start(&comm_requests[3]);
 }
 
-void begin_halo_send(void) {
+void begin_halo_send() {
   MPI_Start(&comm_requests[0]);
   MPI_Start(&comm_requests[2]);
 }
 
-void end_halo_exchange(void) {
+void end_halo_exchange() {
   // could also use MPI_waitall
   for (int i = 0; i < 4; ++i) {
     MPI_Wait(&comm_requests[i], MPI_STATUS_IGNORE);
   }
 }
 
-void free_communication(void) {
+void free_communication() {
   /* for (int i = 0; i < 4; ++i) { */
   /*     if (comm_requests[i] != MPI_REQUEST_NULL) { */
   /*         MPI_Request_free(&comm_requests[i]); */
