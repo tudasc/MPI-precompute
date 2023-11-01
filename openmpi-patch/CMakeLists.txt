@@ -27,7 +27,9 @@ ExternalProject_Add(
         URL https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.1.tar.gz
         URL_HASH MD5=8239df775478285fb14edf37d02f5bfa
         PATCH_COMMAND patch <SOURCE_DIR>/ompi/mca/osc/ucx/Makefile.in ${CMAKE_CURRENT_SOURCE_DIR}/patches/ompi_makefile.patch && patch <SOURCE_DIR>/ompi/mca/osc/ucx/osc_ucx_component.c ${CMAKE_CURRENT_SOURCE_DIR}/patches/ompi_osc_ucx_component.patch
-        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix <INSTALL_DIR> CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} ${OMPI_CONFIGURE_FLAGS}
+        CONFIGURE_COMMAND
+        ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${CMAKE_BINARY_DIR}/precompute_lib
+        <SOURCE_DIR>/configure --prefix <INSTALL_DIR> CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} ${OMPI_CONFIGURE_FLAGS}
         BUILD_COMMAND $(MAKE)
         DOWNLOAD_EXTRACT_TIMESTAMP true
         DEPENDS precompute
