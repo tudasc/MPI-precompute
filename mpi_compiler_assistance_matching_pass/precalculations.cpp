@@ -479,7 +479,10 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     } else {
       // nothing to do
     }
-
+  } else if (auto *sw = dyn_cast<SwitchInst>(v->v)) {
+    assert(v->reason == TaintReason::CONTROL_FLOW);
+    v->visited = true;
+    insert_tainted_value(sw->getCondition(), v);
   } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -670,6 +673,13 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   auto *call = cast<CallBase>(call_info->v);
   assert(!call_info->visited);
   call_info->visited = true;
+
+  if (isa<InvokeInst>(call) && call_info->reason == TaintReason::CONTROL_FLOW) {
+    // this call is only tainted because we need the instruction to advance the
+    // control flow to the normal dest it can be replaced with unconditional
+    // branch: no need to further analyze
+    return;
+  }
 
   std::vector<Function *> possible_targets = get_possible_call_targets(call);
 
@@ -933,7 +943,18 @@ void Precalculations::insert_necessary_control_flow(Value *v) {
       // here
       for (auto pred_bb : predecessors(bb)) {
         auto *term = pred_bb->getTerminator();
-        insert_tainted_value(term, TaintReason::CONTROL_FLOW);
+        auto new_val = insert_tainted_value(term, TaintReason::CONTROL_FLOW);
+        if (auto *invoke = dyn_cast<InvokeInst>(term)) {
+          if (invoke->getUnwindDest() == bb) {
+            new_val->reason =
+                new_val->reason | TaintReason::CONTROL_FLOW_EXCEPTION;
+            // it may need to be re-visited if we find out that we do need the
+            // exception path
+            new_val->visited = false;
+          } else {
+            assert(invoke->getNormalDest() == bb);
+          }
+        }
       }
     } else {
       // BB is function entry block
@@ -1343,6 +1364,10 @@ Precalculations::get_possible_call_targets(llvm::CallBase *call) {
     }
     // TODO can we check that we will not be able to get a ptr to a function
     // outside of the module?
+  }
+
+  if (possible_targets.empty()) {
+    call->dump();
   }
 
   assert(not possible_targets.empty() && "could not find tgts of call");

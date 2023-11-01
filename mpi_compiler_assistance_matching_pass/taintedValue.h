@@ -24,10 +24,13 @@ Licensed under the Apache License, Version 2.0 (the "License");
 class PtrUsageInfo;
 
 enum TaintReason : int {
-  OTHER = 0, // unspecified
-  CONTROL_FLOW = 1 << 0,
+  OTHER = 0,             // unspecified
+  CONTROL_FLOW = 1 << 0, // for invoke: only needed in noexcept case as
+                         // exception handling is not relevant
   COMPUTE_TAG = 1 << 1,
   COMPUTE_DEST = 1 << 2,
+  CONTROL_FLOW_EXCEPTION =
+      CONTROL_FLOW | 1 << 3, // for invoke: also needed to check for exception
 };
 
 struct TaintedValue {
