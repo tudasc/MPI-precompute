@@ -14,7 +14,10 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/Casting.h"
 #include <memory>
 
 #ifndef MACH_TAINTED_VALUE_H
@@ -52,7 +55,22 @@ private:
 
 public:
   int getReason() const { return _reason; }
-  void addReason(int reason) { _reason = _reason | reason; }
+  void addReason(int reason) {
+    _reason = _reason | reason;
+
+    if (_reason & CONTROL_FLOW_CALLEE_NEEDED) {
+      assert(llvm::isa<llvm::CallBase>(v));
+    }
+    if (_reason & CONTROL_FLOW_RETURN_VALUE_NEEDED) {
+      assert(llvm::isa<llvm::CallBase>(v));
+    }
+    if (_reason & CONTROL_FLOW_EXCEPTION_NEEDED) {
+      assert(llvm::isa<llvm::InvokeInst>(v));
+    }
+    if (_reason & CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
+      assert(llvm::isa<llvm::InvokeInst>(v));
+    }
+  }
 
 public:
   bool visited = false;
