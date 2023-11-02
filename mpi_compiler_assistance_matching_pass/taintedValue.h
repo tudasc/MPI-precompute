@@ -58,16 +58,16 @@ public:
   void addReason(int reason) {
     _reason = _reason | reason;
 
-    if (_reason & CONTROL_FLOW_CALLEE_NEEDED) {
+    if (_reason & (CONTROL_FLOW_CALLEE_NEEDED xor CONTROL_FLOW)) {
       assert(llvm::isa<llvm::CallBase>(v));
     }
-    if (_reason & CONTROL_FLOW_RETURN_VALUE_NEEDED) {
+    if (_reason & (CONTROL_FLOW_RETURN_VALUE_NEEDED xor CONTROL_FLOW)) {
       assert(llvm::isa<llvm::CallBase>(v));
     }
-    if (_reason & CONTROL_FLOW_EXCEPTION_NEEDED) {
+    if (_reason & (CONTROL_FLOW_EXCEPTION_NEEDED xor CONTROL_FLOW)) {
       assert(llvm::isa<llvm::InvokeInst>(v));
     }
-    if (_reason & CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
+    if (_reason & (CONTROL_FLOW_ONLY_PRESENCE_NEEDED xor CONTROL_FLOW)) {
       assert(llvm::isa<llvm::InvokeInst>(v));
     }
   }

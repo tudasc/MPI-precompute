@@ -922,22 +922,38 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
 std::shared_ptr<TaintedValue>
 Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
 
-  auto dummy = std::make_shared<TaintedValue>(nullptr);
-  dummy->addReason(reason);
+  std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
-  return insert_tainted_value(v, dummy);
+  if (not is_tainted(v)) {
+    // only if not already in set
+    inserted_elem = std::make_shared<TaintedValue>(v);
+    tainted_values.insert(inserted_elem);
+    // insert what is necessary for Control flow to go here
+    insert_necessary_control_flow(v);
+  } else {
+    // the present value form the set
+    inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
+                                  [&v](const auto &vv) { return vv->v == v; });
+  }
+
+  inserted_elem->addReason(reason);
+
+  assert(inserted_elem != nullptr);
+  return inserted_elem;
 }
 
 std::shared_ptr<TaintedValue>
-Precalculations::insert_tainted_value(llvm::Value *v,
-                                      std::shared_ptr<TaintedValue> from) {
+Precalculations::insert_tainted_value(llvm::Value *v, const std::shared_ptr<TaintedValue> &from) {
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
   if (not is_tainted(v)) {
     // only if not already in set
     inserted_elem = std::make_shared<TaintedValue>(v);
     if (from != nullptr) {
-      inserted_elem->addReason(from->getReason());
+      // we dont care why the Control flow was tagged for te parent
+      inserted_elem->addReason(from->getReason() & (TaintReason::COMPUTE_DEST |
+                                                    TaintReason::COMPUTE_TAG |
+                                                    TaintReason::CONTROL_FLOW));
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
     }
@@ -951,7 +967,10 @@ Precalculations::insert_tainted_value(llvm::Value *v,
     if (from != nullptr) {
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
-      inserted_elem->addReason(inserted_elem->getReason());
+      // we dont care why the Control flow was tagged for te parent
+      inserted_elem->addReason(from->getReason() & (TaintReason::COMPUTE_DEST |
+                                                    TaintReason::COMPUTE_TAG |
+                                                    TaintReason::CONTROL_FLOW));
     }
   }
 

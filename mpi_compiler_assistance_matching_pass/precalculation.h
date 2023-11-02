@@ -92,7 +92,7 @@ public:
 
   std::shared_ptr<TaintedValue>
   insert_tainted_value(llvm::Value *v,
-                       std::shared_ptr<TaintedValue> from = nullptr);
+                       const std::shared_ptr<TaintedValue> &from = nullptr);
 
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
