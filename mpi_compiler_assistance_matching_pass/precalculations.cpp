@@ -14,6 +14,8 @@
  limitations under the License.
  */
 
+#include <random>
+
 #include "CompilerPassConstants.h"
 #include "analysis_results.h"
 #include "conflict_detection.h"
@@ -35,6 +37,10 @@
 
 #include "debug.h"
 using namespace llvm;
+
+// for more scrutiny under testing:
+// the order of visiting the values should make no difference
+// #define SHUFFLE_VALUES_FOR_TESTING
 
 void print_childrens(std::shared_ptr<TaintedValue> parent,
                      unsigned int indent = 0) {
@@ -237,6 +243,13 @@ void Precalculations::find_all_tainted_vals() {
     std::copy_if(tainted_values.begin(), tainted_values.end(),
                  std::back_inserter(to_visit),
                  [](const auto &v) { return !v->visited; });
+
+#ifdef SHUFFLE_VALUES_FOR_TESTING
+    // for more scrutiny under testing:
+    // the order of visiting the values should make no difference
+    std::shuffle(to_visit.begin(), to_visit.end(),
+                 std::mt19937(std::random_device()()));
+#endif
 
     for (const auto &v : to_visit) {
       visit_val(v);
