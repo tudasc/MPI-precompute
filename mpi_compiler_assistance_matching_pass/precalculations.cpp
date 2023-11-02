@@ -171,6 +171,25 @@ bool is_free(llvm::CallBase *call) {
   return is_free(call->getCalledFunction());
 }
 
+bool is_func_from_std(llvm::Function *func) {
+  return (func->getName().starts_with("_ZNSt"));
+}
+
+bool is_call_to_std(llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    return false;
+  }
+
+  return is_func_from_std(call->getCalledFunction());
+}
+
+// is function known to not throw an exception during precompute
+// if one of those throws: the whole precompute has to abort anyway
+bool is_func_known_to_be_safe(llvm::Function *func) {
+  return is_allocation(func) || func == mpi_func->mpi_comm_size ||
+         func == mpi_func->mpi_comm_rank;
+}
+
 void Precalculations::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;
@@ -662,10 +681,12 @@ bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) {
   // check if this is tainted as the ret val is used
 
   std::set<Value *> users_of_retval;
-  std::transform(call->use_begin(), call->use_end(),
+  std::transform(call->user_begin(), call->user_end(),
                  std::inserter(users_of_retval, users_of_retval.begin()),
-                 [](const auto &u) { return dyn_cast<Value>(&u); });
-  bool need_return_val = not is_none_tainted(users_of_retval);
+                 [](auto *u) { return dyn_cast<Value>(u); });
+  bool need_return_val =
+      not users_of_retval.empty() && not is_none_tainted(users_of_retval);
+
   return need_return_val;
 }
 
@@ -696,6 +717,8 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
         if (func->isDeclaration()) {
           errs() << "\n";
           call->dump();
+          func->dump();
+          errs() << "In: " << call->getFunction()->getName() << "\n";
         }
         assert(not func->isDeclaration() &&
                "cannot analyze if calling external function for return value "
@@ -730,6 +753,14 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
              func->getIntrinsicID() == Intrinsic::type_checked_load)) {
           // ignore intrinsics
           continue;
+        }
+        if (is_func_known_to_be_safe(func)) {
+          continue;
+        }
+        if (func->isDeclaration()) {
+          call->dump();
+          func->dump();
+          errs() << "In: " << call->getFunction()->getName() << "\n";
         }
         assert(not func->isDeclaration() &&
                "cannot analyze if external function may throw an exception");
