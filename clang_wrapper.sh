@@ -8,6 +8,8 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     echo "clang_wrapper $@"
 fi
 
+#TODO add check that at least -O1 is used as we require some optimizations done in O1
+
 USE_MPI_COMPILER_ASSISTANCE_PASS=${USE_MPI_COMPILER_ASSISTANCE_PASS:false}
 
 is_to_obj=false
