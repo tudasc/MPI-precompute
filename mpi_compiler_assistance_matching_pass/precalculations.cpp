@@ -625,6 +625,8 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
         call->dump();
         auto new_val =
             insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
+        new_val->visited =
+            false; // may need to be re-visited if we discover it is important
         continue;
       } else {
         is_func_ptr_captured = true;
@@ -658,6 +660,8 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         auto *operand = call->getArgOperand(arg->getArgNo());
         auto new_val = insert_tainted_value(operand, arg_info);
+        new_val->visited =
+            false; // may need to re visit if we discover it is important
         if (arg_info->is_pointer()) {
           if (new_val->ptr_info == nullptr) {
             new_val->ptr_info = arg_info->ptr_info;
@@ -690,9 +694,14 @@ bool Precalculations::is_retval_of_call_needed(llvm::CallBase *call) {
   for (auto *v : users_of_retval) {
     if (is_tainted(v)) {
       auto taint_info = insert_tainted_value(v);
-      if (taint_info->getReason() !=
-          TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
+      if (taint_info->has_specific_reason() &&
+          taint_info->getReason() !=
+              TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
         need_return_val = true;
+
+        errs() << "NEEDED IN:\n";
+        v->dump();
+        errs() << "Reason: " << taint_info->getReason() << " \n";
         return true;
       }
     }
@@ -711,6 +720,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   if (need_return_val) {
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
+      // TODO do we need to taint the arguments?
 
     } else {
       for (auto func : possible_targets) {
@@ -854,8 +864,10 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
         // the needed value is the result of reading the comm
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
         auto new_val = insert_tainted_value(call, ptr);
-        insert_tainted_value(call->getArgOperand(0),
-                             ptr); // we also need to keep the comm
+        new_val = insert_tainted_value(call->getArgOperand(0),
+                                       ptr); // we also need to keep the comm
+        new_val->visited = false; // may need to be revisited it we discover
+                                  // that this is important
       }
       continue;
     }
@@ -1425,6 +1437,8 @@ void Precalculations::taint_all_indirect_call_args(
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
           auto new_info =
               insert_tainted_value(call->getArgOperand(ArgNo), arg_info);
+          new_info->visited =
+              false; // may need to re-visit if we discover it is important
           if (arg_info->is_pointer()) {
             assert(arg_info->ptr_info);
             if (new_info->ptr_info == nullptr) {

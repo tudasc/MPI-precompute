@@ -60,7 +60,7 @@ private:
 
 public:
   int getReason() const { return _reason; }
-  void addReason(int reason) {
+  inline void addReason(int reason) {
     _reason = _reason | reason;
 
     if (_reason & (CONTROL_FLOW_CALLEE_NEEDED xor CONTROL_FLOW)) {
@@ -76,6 +76,14 @@ public:
       assert(llvm::isa<llvm::InvokeInst>(v));
     }
   }
+  inline bool has_specific_reason() const {
+    if (not llvm::isa<llvm::CallBase>(v)) {
+      assert(not(_reason & ~REASONS_TO_PROPERGATE));
+      return true;
+    } else {
+      return _reason & ~REASONS_TO_PROPERGATE;
+    }
+  };
 
 public:
   bool visited = false;
