@@ -1433,6 +1433,7 @@ Precalculations::get_possible_call_targets(llvm::CallBase *call) {
 
   if (possible_targets.empty()) {
     call->dump();
+    errs() << "In: " << call->getFunction()->getName() << "\n";
   }
 
   assert(not possible_targets.empty() && "could not find tgts of call");
