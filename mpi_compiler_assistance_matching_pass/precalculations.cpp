@@ -491,7 +491,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     v->visited = true;
 
   } else if (auto *br = dyn_cast<BranchInst>(v->v)) {
-    assert(v->reason == TaintReason::CONTROL_FLOW);
+    assert(v->getReason() == TaintReason::CONTROL_FLOW);
     v->visited = true;
     if (br->isConditional()) {
       insert_tainted_value(br->getCondition(), v);
@@ -499,7 +499,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
       // nothing to do
     }
   } else if (auto *sw = dyn_cast<SwitchInst>(v->v)) {
-    assert(v->reason == TaintReason::CONTROL_FLOW);
+    assert(v->getReason() == TaintReason::CONTROL_FLOW);
     v->visited = true;
     insert_tainted_value(sw->getCondition(), v);
   } else {
@@ -623,7 +623,8 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         errs() << "Visit\n";
         call->dump();
-        auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
+        auto new_val =
+            insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
         continue;
       } else {
         is_func_ptr_captured = true;
@@ -913,19 +914,9 @@ std::shared_ptr<TaintedValue>
 Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
 
   auto dummy = std::make_shared<TaintedValue>(nullptr);
-  dummy->reason = reason;
+  dummy->addReason(reason);
 
   return insert_tainted_value(v, dummy);
-}
-
-void propergate_state_to_children(const std::shared_ptr<TaintedValue> &parent) {
-  assert(parent != nullptr);
-  for (auto child : parent->children) {
-    if (child != nullptr && child->reason != parent->reason) {
-      child->reason = child->reason | parent->reason;
-      propergate_state_to_children(child);
-    }
-  }
 }
 
 std::shared_ptr<TaintedValue>
@@ -937,7 +928,7 @@ Precalculations::insert_tainted_value(llvm::Value *v,
     // only if not already in set
     inserted_elem = std::make_shared<TaintedValue>(v);
     if (from != nullptr) {
-      inserted_elem->reason = from->reason;
+      inserted_elem->addReason(from->getReason());
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
     }
@@ -951,7 +942,7 @@ Precalculations::insert_tainted_value(llvm::Value *v,
     if (from != nullptr) {
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
-      propergate_state_to_children(from); // propergate the taint Reason
+      inserted_elem->addReason(inserted_elem->getReason());
     }
   }
 
@@ -970,8 +961,7 @@ void Precalculations::insert_necessary_control_flow(Value *v) {
         auto new_val = insert_tainted_value(term, TaintReason::CONTROL_FLOW);
         if (auto *invoke = dyn_cast<InvokeInst>(term)) {
           if (invoke->getUnwindDest() == bb) {
-            new_val->reason =
-                new_val->reason | TaintReason::CONTROL_FLOW_EXCEPTION;
+            new_val->addReason(TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
             // it may need to be re-visited if we find out that we do need the
             // exception path
             new_val->visited = false;
@@ -1434,7 +1424,7 @@ void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         auto targets = get_possible_call_targets(call);
         if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
-          insert_tainted_value(call, TaintReason::CONTROL_FLOW);
+          insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
         }
       }
     }
@@ -1444,22 +1434,22 @@ void Precalculations::print_analysis_result_remarks() {
 
   for (auto v : tainted_values) {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
-      if (v->reason & TaintReason::CONTROL_FLOW) {
+      if (v->getReason() & TaintReason::CONTROL_FLOW) {
         errs() << "need for control flow:\n";
         errs() << inst->getFunction()->getName() << "\n";
         inst->dump();
       }
-      if (v->reason & TaintReason::COMPUTE_TAG) {
+      if (v->getReason() & TaintReason::COMPUTE_TAG) {
         errs() << "need for tag compute:\n";
         errs() << inst->getFunction()->getName() << "\n";
         inst->dump();
       }
-      if (v->reason & TaintReason::COMPUTE_DEST) {
+      if (v->getReason() & TaintReason::COMPUTE_DEST) {
         errs() << "need for dest compute:\n";
         errs() << inst->getFunction()->getName() << "\n";
         inst->dump();
       }
-      if (v->reason == TaintReason::OTHER) {
+      if (v->getReason() == TaintReason::OTHER) {
         errs() << "need for other reason:\n";
         errs() << inst->getFunction()->getName() << "\n";
         inst->dump();

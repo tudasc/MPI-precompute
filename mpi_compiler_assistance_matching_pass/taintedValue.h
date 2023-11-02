@@ -24,20 +24,37 @@ Licensed under the Apache License, Version 2.0 (the "License");
 class PtrUsageInfo;
 
 enum TaintReason : int {
-  OTHER = 0,             // unspecified
-  CONTROL_FLOW = 1 << 0, // for invoke: only needed in noexcept case as
-                         // exception handling is not relevant
-  COMPUTE_TAG = 1 << 1,
-  COMPUTE_DEST = 1 << 2,
-  CONTROL_FLOW_EXCEPTION =
-      CONTROL_FLOW | 1 << 3, // for invoke: also needed to check for exception
+  OTHER = 0, // unspecified
+  COMPUTE_TAG = 1 << 0,
+  COMPUTE_DEST = 1 << 1,
+
+  CONTROL_FLOW = 1 << 2,
+  // need the return value of a call not only its presence:
+  // implies that the control flow need to pass to the callee to calculate
+  // return value
+  CONTROL_FLOW_RETURN_VALUE_NEEDED = CONTROL_FLOW | 1 << 3,
+  // need the control flow to pass this call to reach callee
+  CONTROL_FLOW_CALLEE_NEEDED = CONTROL_FLOW | 1 << 4,
+  // need the control flow to call this call to check for exception
+  CONTROL_FLOW_EXCEPTION_NEEDED = CONTROL_FLOW | 1 << 5,
+  // for invoke: this invoke can be replaced with an unconditional br to normal
+  // dest as exception handling code is not relevant for precompute nor is the
+  // return value
+  CONTROL_FLOW_ONLY_PRESENCE_NEEDED = CONTROL_FLOW | 1 << 6,
 };
 
 struct TaintedValue {
   TaintedValue(llvm::Value *v) : v(v){};
-  llvm::Value *v;
-  int reason = OTHER;
+  llvm::Value *v = nullptr;
 
+private:
+  int _reason = OTHER;
+
+public:
+  int getReason() const { return _reason; }
+  void addReason(int reason) { _reason = _reason | reason; }
+
+public:
   bool visited = false;
 
   // one can have multiple children and parents e.g. one call with several args
