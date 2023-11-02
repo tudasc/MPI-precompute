@@ -32,6 +32,11 @@ enum TaintReason : int {
   COMPUTE_DEST = 1 << 1,
 
   CONTROL_FLOW = 1 << 2,
+
+  // Bitmask to select only the genreal reasons to propergate tot the specific
+  // reason
+  REASONS_TO_PROPERGATE = COMPUTE_TAG | COMPUTE_DEST | CONTROL_FLOW,
+
   // need the return value of a call not only its presence:
   // implies that the control flow need to pass to the callee to calculate
   // return value

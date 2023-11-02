@@ -951,9 +951,8 @@ Precalculations::insert_tainted_value(llvm::Value *v, const std::shared_ptr<Tain
     inserted_elem = std::make_shared<TaintedValue>(v);
     if (from != nullptr) {
       // we dont care why the Control flow was tagged for te parent
-      inserted_elem->addReason(from->getReason() & (TaintReason::COMPUTE_DEST |
-                                                    TaintReason::COMPUTE_TAG |
-                                                    TaintReason::CONTROL_FLOW));
+      inserted_elem->addReason(from->getReason() &
+                               TaintReason::REASONS_TO_PROPERGATE);
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
     }
@@ -968,9 +967,8 @@ Precalculations::insert_tainted_value(llvm::Value *v, const std::shared_ptr<Tain
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
       // we dont care why the Control flow was tagged for te parent
-      inserted_elem->addReason(from->getReason() & (TaintReason::COMPUTE_DEST |
-                                                    TaintReason::COMPUTE_TAG |
-                                                    TaintReason::CONTROL_FLOW));
+      inserted_elem->addReason(from->getReason() &
+                               TaintReason::REASONS_TO_PROPERGATE);
     }
   }
 
