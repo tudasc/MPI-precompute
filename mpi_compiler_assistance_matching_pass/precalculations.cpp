@@ -678,16 +678,25 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
   }
 }
 
-bool Precalculations::is_retval_of_call_used(llvm::CallBase *call) {
+bool Precalculations::is_retval_of_call_needed(llvm::CallBase *call) {
   // check if this is tainted as the ret val is used
 
   std::set<Value *> users_of_retval;
   std::transform(call->user_begin(), call->user_end(),
                  std::inserter(users_of_retval, users_of_retval.begin()),
                  [](auto *u) { return dyn_cast<Value>(u); });
-  bool need_return_val =
-      not users_of_retval.empty() && not is_none_tainted(users_of_retval);
+  bool need_return_val = false;
 
+  for (auto *v : users_of_retval) {
+    if (is_tainted(v)) {
+      auto taint_info = insert_tainted_value(v);
+      if (taint_info->getReason() !=
+          TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
+        need_return_val = true;
+        return true;
+      }
+    }
+  }
   return need_return_val;
 }
 
@@ -698,7 +707,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
 
   std::vector<Function *> possible_targets = get_possible_call_targets(call);
 
-  bool need_return_val = is_retval_of_call_used(call);
+  bool need_return_val = is_retval_of_call_needed(call);
   if (need_return_val) {
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
@@ -1210,7 +1219,7 @@ void Precalculations::prune_function_copy(
       // meaning if it throws no MPI is used
       if (not is_invoke_necessary_for_control_flow(
               dyn_cast<InvokeInst>(old_v)) &&
-          not is_retval_of_call_used(dyn_cast<InvokeInst>(old_v))) {
+          not is_retval_of_call_needed(dyn_cast<InvokeInst>(old_v))) {
         to_prune.push_back(inst);
       }
     }

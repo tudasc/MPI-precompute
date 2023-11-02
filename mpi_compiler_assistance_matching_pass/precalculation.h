@@ -154,7 +154,7 @@ public:
         [this](auto accu, auto v) { return accu || is_tainted(v); });
   };
 
-  bool is_retval_of_call_used(llvm::CallBase *call);
+  bool is_retval_of_call_needed(llvm::CallBase *call);
 
   void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
                                     std::shared_ptr<TaintedValue> arg_info);
