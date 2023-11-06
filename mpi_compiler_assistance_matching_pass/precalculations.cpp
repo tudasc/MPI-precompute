@@ -178,7 +178,10 @@ bool is_free(llvm::CallBase *call) {
 }
 
 bool is_func_from_std(llvm::Function *func) {
-  return (func->getName().starts_with("_ZNSt"));
+  return (func->getName().starts_with("_ZNSt")
+          // gnu c++ implementation
+          // TODO force to use the llvm one?
+          || func->getName().starts_with("_ZN9__gnu_cxx"));
 }
 
 bool is_call_to_std(llvm::CallBase *call) {
@@ -626,6 +629,14 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
 
   if (pos == functions_to_include.end()) {
     errs() << "include function: " << func->getName() << "\n";
+    if (is_func_from_std(func)) {
+      errs() << "this function is from std::\n";
+
+      assert(false);
+      // TODO treat std functions special?
+      //  sometimes the definition is also present (templated funcs from header)
+    }
+
     auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
     functions_to_include.insert(fun_to_precalc);
 
@@ -1474,6 +1485,12 @@ void Precalculations::taint_all_indirect_calls(llvm::Function *func) {
   // TODO this could be done more efficient...
   // TODO duplicate code with taint_all_indirect_call_args
   for (auto &f : M.functions()) {
+    if (is_func_from_std(&f)) {
+      // avoid messing with std::'s internals
+      // if std:: indireclty calls a user function, it needs to be given as an
+      // argument anyway
+      continue;
+    }
     for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         auto targets = get_possible_call_targets(call);
