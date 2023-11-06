@@ -758,6 +758,13 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           // ignore intrinsics
           continue;
         }
+        if (is_func_from_std(func)) {
+          // calling into std is safe, as no side effects will occur (other than
+          // for the given parameters)
+          //  as std is designed to haf as fw side effects as possible
+          // TODO implement check for exception std::rand and std::cout/cin
+          continue;
+        }
         if (func->isDeclaration()) {
           errs() << "\n";
           call->dump();
@@ -799,6 +806,13 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           continue;
         }
         if (is_func_known_to_be_safe(func)) {
+          continue;
+        }
+        if (is_func_from_std(func)) {
+          // calling into std is safe, as no side effects will occur (other than
+          // for the given parameters)
+          //  as std is designed to haf as fw side effects as possible
+          // TODO implement check for exception std::rand and std::cout/cin
           continue;
         }
         if (func->isDeclaration()) {
