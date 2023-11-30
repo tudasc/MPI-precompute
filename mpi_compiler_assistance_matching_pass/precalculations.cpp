@@ -517,7 +517,12 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     v->visited = true;
     insert_tainted_value(sw->getCondition(), v);
   } else if (auto *resume = dyn_cast<ResumeInst>(v->v)) {
+    assert(v->getReason() == TaintReason::CONTROL_FLOW);
     // resume exception: nothing to do just keep it
+    insert_tainted_value(resume->getOperand(0), v);
+  } else if (auto *ret = dyn_cast<ReturnInst>(v->v)) {
+    assert(v->getReason() == TaintReason::CONTROL_FLOW);
+    insert_tainted_value(ret->getOperand(0), v);
 
   } else {
 
@@ -525,6 +530,7 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     v->v->dump();
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
       errs() << "In: " << inst->getFunction()->getName() << "\n";
+      errs() << "Reason:" << v->getReason() << "\n";
     }
     assert(false);
   }
