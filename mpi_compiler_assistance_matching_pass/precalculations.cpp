@@ -1470,6 +1470,12 @@ void Precalculations::taint_all_indirect_call_args(
     std::shared_ptr<TaintedValue> arg_info) {
   // TODO this could be done more efficient...
   for (auto &f : M.functions()) {
+    if (is_func_from_std(&f)) {
+      // avoid messing with std::'s internals
+      // if std:: indirectely calls a user function, it needs to be given as an
+      // argument anyway
+      continue;
+    }
     for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
       if (auto *call = dyn_cast<CallBase>(&*I)) {
         auto targets = get_possible_call_targets(call);
