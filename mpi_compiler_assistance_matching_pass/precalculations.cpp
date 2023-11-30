@@ -178,7 +178,8 @@ bool is_free(llvm::CallBase *call) {
 }
 
 bool is_func_from_std(llvm::Function *func) {
-  return (func->getName().starts_with("_ZNSt")
+  return (func->getName().starts_with("_ZSt") ||
+          func->getName().starts_with("_ZNSt")
           // gnu c++ implementation
           // TODO force to use the llvm one?
           || func->getName().starts_with("_ZN9__gnu_cxx"));
@@ -515,10 +516,16 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     assert(v->getReason() == TaintReason::CONTROL_FLOW);
     v->visited = true;
     insert_tainted_value(sw->getCondition(), v);
+  } else if (auto *resume = dyn_cast<ResumeInst>(v->v)) {
+    // resume exception: nothing to do just keep it
+
   } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
     v->v->dump();
+    if (auto *inst = dyn_cast<Instruction>(v->v)) {
+      errs() << "In: " << inst->getFunction()->getName() << "\n";
+    }
     assert(false);
   }
 
@@ -730,6 +737,34 @@ bool Precalculations::is_retval_of_call_needed(llvm::CallBase *call) {
   return need_return_val;
 }
 
+bool should_ignore_intrinsic(Intrinsic::ID id) {
+  return
+      // intrinsics serving as additional annotations to the IR:
+      id == Intrinsic::lifetime_start || id == Intrinsic::lifetime_end ||
+      id == Intrinsic::type_test || id == Intrinsic::public_type_test ||
+      id == Intrinsic::assume || id == Intrinsic::type_checked_load ||
+
+      // std:: functions
+      // (https://llvm.org/docs/LangRef.html#standard-c-c-library-intrinsics):
+      id == Intrinsic::abs || id == Intrinsic::smax || id == Intrinsic::smin ||
+      id == Intrinsic::umax || id == Intrinsic::umin ||
+      id == Intrinsic::memcpy || id == Intrinsic::memcpy_inline ||
+      id == Intrinsic::memmove || id == Intrinsic::memset ||
+      id == Intrinsic::memset_inline || id == Intrinsic::sqrt ||
+      id == Intrinsic::powi || id == Intrinsic::sin || id == Intrinsic::cos ||
+      id == Intrinsic::pow || id == Intrinsic::exp || id == Intrinsic::exp2 ||
+      id == Intrinsic::exp || id == Intrinsic::log || id == Intrinsic::log10 ||
+      id == Intrinsic::log2 || id == Intrinsic::fma || id == Intrinsic::fabs ||
+      id == Intrinsic::minnum || id == Intrinsic::maxnum ||
+      id == Intrinsic::minimum || id == Intrinsic::maximum ||
+      id == Intrinsic::copysign || id == Intrinsic::floor ||
+      id == Intrinsic::ceil || id == Intrinsic::trunc ||
+      id == Intrinsic::rint || id == Intrinsic::nearbyint ||
+      id == Intrinsic::round || id == Intrinsic::roundeven ||
+      id == Intrinsic::lround || id == Intrinsic::llround ||
+      id == Intrinsic::lrint || id == Intrinsic::llrint;
+}
+
 void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   auto *call = cast<CallBase>(call_info->v);
   assert(!call_info->visited);
@@ -746,12 +781,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
     } else {
       for (auto func : possible_targets) {
         if (func->isIntrinsic() &&
-            (func->getIntrinsicID() == Intrinsic::lifetime_start ||
-             func->getIntrinsicID() == Intrinsic::lifetime_end ||
-             func->getIntrinsicID() == Intrinsic::type_test ||
-             func->getIntrinsicID() == Intrinsic::public_type_test ||
-             func->getIntrinsicID() == Intrinsic::assume ||
-             func->getIntrinsicID() == Intrinsic::type_checked_load)) {
+            should_ignore_intrinsic(func->getIntrinsicID())) {
           // ignore intrinsics
           continue;
         }
@@ -766,7 +796,8 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           errs() << "\n";
           call->dump();
           func->dump();
-          errs() << "In: " << call->getFunction()->getName() << "\n";
+          errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
+                 << func->isIntrinsic() << "\n";
         }
         assert(not func->isDeclaration() &&
                "cannot analyze if calling external function for return value "
@@ -930,13 +961,16 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
     }
 
     if (func->isIntrinsic() &&
-        (func->getIntrinsicID() == Intrinsic::lifetime_start ||
-         func->getIntrinsicID() == Intrinsic::lifetime_end ||
-         func->getIntrinsicID() == Intrinsic::type_test ||
-         func->getIntrinsicID() == Intrinsic::public_type_test ||
-         func->getIntrinsicID() == Intrinsic::assume ||
-         func->getIntrinsicID() == Intrinsic::type_checked_load)) {
+        should_ignore_intrinsic(func->getIntrinsicID())) {
       // ignore intrinsics
+      continue;
+    }
+
+    if (is_func_from_std(func)) {
+      // calling into std is safe, as no side effects will occur (other than
+      // for the given parameters)
+      //  as std is designed to haf as fw side effects as possible
+      // TODO implement check for exception std::rand and std::cout/cin
       continue;
     }
 
@@ -989,8 +1023,8 @@ Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
   return inserted_elem;
 }
 
-std::shared_ptr<TaintedValue>
-Precalculations::insert_tainted_value(llvm::Value *v, const std::shared_ptr<TaintedValue> &from) {
+std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
+    llvm::Value *v, const std::shared_ptr<TaintedValue> &from) {
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
   if (not is_tainted(v)) {
