@@ -465,14 +465,11 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
     v->visited = true;
-  } else if (auto *op = dyn_cast<CmpInst>(v->v)) {
+  } else if (auto *cmp = dyn_cast<CmpInst>(v->v)) {
     // cmp
-    assert(op->getNumOperands() == 2);
-    // TODO do wen need handle pointer case special?
-    assert(not op->getOperand(0)->getType()->isPointerTy());
-    assert(not op->getOperand(1)->getType()->isPointerTy());
-    insert_tainted_value(op->getOperand(0), v);
-    insert_tainted_value(op->getOperand(1), v);
+    assert(cmp->getNumOperands() == 2);
+    insert_tainted_value(cmp->getOperand(0), v);
+    insert_tainted_value(cmp->getOperand(1), v);
     v->visited = true;
   } else if (auto *select = dyn_cast<SelectInst>(v->v)) {
     insert_tainted_value(select->getCondition(), v);
