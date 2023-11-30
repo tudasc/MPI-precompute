@@ -33,6 +33,7 @@
 #include "llvm/IR/InstIterator.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Verifier.h"
 
 #include "debug.h"
@@ -178,11 +179,10 @@ bool is_free(llvm::CallBase *call) {
 }
 
 bool is_func_from_std(llvm::Function *func) {
-  return (func->getName().starts_with("_ZSt") ||
-          func->getName().starts_with("_ZNSt")
-          // gnu c++ implementation
-          // TODO force to use the llvm one?
-          || func->getName().starts_with("_ZN9__gnu_cxx"));
+
+  auto demangled = llvm::demangle(func->getName().str());
+  // startswith
+  return (demangled.rfind("std::", 0) == 0);
 }
 
 bool is_call_to_std(llvm::CallBase *call) {
@@ -523,6 +523,9 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   } else if (auto *ret = dyn_cast<ReturnInst>(v->v)) {
     assert(v->getReason() == TaintReason::CONTROL_FLOW);
     insert_tainted_value(ret->getOperand(0), v);
+  } else if (auto *lpad = dyn_cast<LandingPadInst>(v->v)) {
+    // nothing to do, just keep around
+    assert(v->getReason() == TaintReason::CONTROL_FLOW);
 
   } else {
 
