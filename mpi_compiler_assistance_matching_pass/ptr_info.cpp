@@ -66,6 +66,19 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
       ptr->ptr_info = shared_from_this();
       ptrs_with_this_info.insert(ptr);
     }
+    // merge parents
+    for (auto &ptr : other->parents) {
+      int count_parents = 0;
+      for (const auto &pair : ptr->important_members) {
+        if (pair.second == other) {
+          count_parents++;
+          auto gep_idx = pair.first;
+          ptr->important_members[gep_idx] = shared_from_this();
+          parents.insert(ptr);
+        }
+      }
+      assert(count_parents > 0);
+    }
 
     if (other->is_used_directly) {
       this->setIsUsedDirectly(true, other->info_of_direct_usage);
@@ -104,9 +117,10 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     // assert(other.use_count()==1);
 #ifndef NDEBUG
     other->is_valid = false;
-    errs() << "Invalidate:\n";
-    auto info = *other->ptrs_with_this_info.begin();
-    info->v->dump();
+    // errs() << "Invalidate:\n";
+    // auto info = *other->ptrs_with_this_info.begin();
+    // info->v->dump();
+    // errs() << other.get() << "\n";
 #endif
     for (auto u : ptrs_with_this_info) {
       assert(u->ptr_info != other);
@@ -163,6 +177,7 @@ void PtrUsageInfo::add_important_member(
 
   if (existing_info.second == nullptr) {
     important_members[member_idx] = result_ptr;
+    result_ptr->parents.insert(shared_from_this());
 
   } else { // info already present
     if (not existing_info.first && member_idx[member_idx.size() - 1]) {
@@ -177,8 +192,8 @@ void PtrUsageInfo::add_important_member(
         }
       }
       for (auto &m : to_merge) {
-        m->dump();
-
+        // a ptr may not be its own GEP result
+        assert(m != shared_from_this());
         result_ptr->merge_with(m);
       }
 
@@ -192,6 +207,7 @@ void PtrUsageInfo::add_important_member(
         }
       }
       important_members[member_idx] = result_ptr;
+      result_ptr->parents.insert(shared_from_this());
 
     } else {
       // exact match regarding wildcards
@@ -209,6 +225,7 @@ void PtrUsageInfo::propergate_changes() {
   for (const auto &tv : ptrs_with_this_info) {
     tv->visited = false;
   }
+  // TODO do we need to re-visit all the parents or childrens as well?
 }
 
 bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
