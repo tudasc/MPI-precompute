@@ -99,9 +99,8 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
       propergate_changes();
     }
 
-    // assert that other will not e used when it leaves scope
-    // should be freed, when all stackframes that may still hold a reference
-    // leaves scope
+    // TODO no one should be able to retain a reference to other
+    // assert(other.use_count()==1);
 #ifndef NDEBUG
     other->is_valid = false;
 #endif
@@ -163,10 +162,15 @@ void PtrUsageInfo::add_important_member(
       // new usage has wildcard but old usage not
       // we need to combine all usages that match this wildcard
 
-      for (auto pair : important_members) {
+      std::set<std::shared_ptr<PtrUsageInfo>> to_merge;
+      // the set removes duplicates
+      for (const auto &pair : important_members) {
         if (is_member_matching(member_idx, pair.first)) {
-          result_ptr->merge_with(pair.second);
+          to_merge.insert(pair.second);
         }
+      }
+      for (auto &m : to_merge) {
+        result_ptr->merge_with(m);
       }
 
       // std::erase_if in c++20

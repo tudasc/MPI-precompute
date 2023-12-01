@@ -98,7 +98,7 @@ public:
     return info_of_direct_usage;
   };
 
-  void add_ptr_info_user(std::shared_ptr<TaintedValue> v) {
+  void add_ptr_info_user(const std::shared_ptr<TaintedValue> &v) {
     assert(is_valid);
     assert(v != nullptr);
     assert(v->ptr_info == shared_from_this());
