@@ -87,6 +87,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
 
     // merge important_members
     for (auto pos : other->important_members) {
+      // TODO wildcard usage!
       if (important_members.find(pos.first) != important_members.end()) {
         // merge the information
         important_members[pos.first]->merge_with(pos.second);
@@ -103,7 +104,13 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     // assert(other.use_count()==1);
 #ifndef NDEBUG
     other->is_valid = false;
+    errs() << "Invalidate:\n";
+    auto info = *other->ptrs_with_this_info.begin();
+    info->v->dump();
 #endif
+    for (auto u : ptrs_with_this_info) {
+      assert(u->ptr_info != other);
+    }
   }
 }
 
@@ -159,7 +166,7 @@ void PtrUsageInfo::add_important_member(
 
   } else { // info already present
     if (not existing_info.first && member_idx[member_idx.size() - 1]) {
-      // new usage has wildcard but old usage not
+      // new usage has wildcard but old usages may not
       // we need to combine all usages that match this wildcard
 
       std::set<std::shared_ptr<PtrUsageInfo>> to_merge;
@@ -170,6 +177,8 @@ void PtrUsageInfo::add_important_member(
         }
       }
       for (auto &m : to_merge) {
+        m->dump();
+
         result_ptr->merge_with(m);
       }
 
@@ -225,8 +234,13 @@ PtrUsageInfo::find_info_for_gep_idx(
 }
 
 void PtrUsageInfo::dump() {
-  assert(is_valid);
+
   errs() << "PtrUsageInfo:\n";
+#ifndef NDEBUG
+  if (not is_valid) {
+    errs() << "INVALID\n";
+  }
+#endif
   errs() << "Users:\n";
   for (const auto &u : ptrs_with_this_info) {
     errs() << "\t";
