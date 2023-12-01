@@ -38,7 +38,7 @@ using namespace llvm;
 void PtrUsageInfo::setIsUsedDirectly(
     bool isUsedDirectly,
     const std::shared_ptr<PtrUsageInfo> &direct_usage_info) {
-
+  assert(is_valid);
   if (not is_used_directly) {
     is_used_directly = true;
     propergate_changes();
@@ -54,11 +54,14 @@ void PtrUsageInfo::setIsUsedDirectly(
 }
 
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
+  assert(is_valid);
   if (other != shared_from_this()) {
+    assert(other->is_valid);
     // if other == shared_from_this(): nothing to do already the same ptr info
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
+      assert(ptr->ptr_info == other);
       assert(ptr->ptr_info != shared_from_this());
       ptr->ptr_info = shared_from_this();
       ptrs_with_this_info.insert(ptr);
@@ -95,6 +98,13 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     if (changed) {
       propergate_changes();
     }
+
+    // assert that other will not e used when it leaves scope
+    // should be freed, when all stackframes that may still hold a reference
+    // leaves scope
+#ifndef NDEBUG
+    other->is_valid = false;
+#endif
   }
 }
 
@@ -139,6 +149,7 @@ bool is_member_matching(const std::vector<unsigned int> &member_idx,
 
 void PtrUsageInfo::add_important_member(
     llvm::GetElementPtrInst *gep, std::shared_ptr<PtrUsageInfo> result_ptr) {
+  assert(is_valid);
 
   auto member_idx = get_gep_idxs(gep);
 
@@ -180,6 +191,7 @@ void PtrUsageInfo::add_important_member(
 }
 
 void PtrUsageInfo::propergate_changes() {
+  assert(is_valid);
   // re-visit all users of ptr as something has changed
   for (const auto &tv : ptrs_with_this_info) {
     tv->visited = false;
@@ -187,12 +199,14 @@ void PtrUsageInfo::propergate_changes() {
 }
 
 bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
+  assert(is_valid);
   return find_info_for_gep_idx(get_gep_idxs(gep)).second != nullptr;
 }
 
 std::pair<bool, std::shared_ptr<PtrUsageInfo>>
 PtrUsageInfo::find_info_for_gep_idx(
     const std::vector<unsigned int> &member_idx) {
+  assert(is_valid);
   auto pos = std::find_if(important_members.begin(), important_members.end(),
                           [&member_idx](auto pair) {
                             auto idxs = pair.first;
@@ -207,6 +221,7 @@ PtrUsageInfo::find_info_for_gep_idx(
 }
 
 void PtrUsageInfo::dump() {
+  assert(is_valid);
   errs() << "PtrUsageInfo:\n";
   errs() << "Users:\n";
   for (const auto &u : ptrs_with_this_info) {

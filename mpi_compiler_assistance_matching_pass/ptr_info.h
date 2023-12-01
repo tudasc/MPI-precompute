@@ -41,44 +41,65 @@ public:
     }
   }
 
-  bool isWrittenTo() const { return is_written_to; }
+  bool isWrittenTo() const {
+    assert(is_valid);
+    return is_written_to;
+  }
   void setIsWrittenTo(bool isWrittenTo) {
+    assert(is_valid);
     if ((not is_written_to) && isWrittenTo) {
       propergate_changes();
     }
     is_written_to = is_written_to | isWrittenTo;
   }
-  bool isCalled() const { return is_called; }
+  bool isCalled() const {
+    assert(is_valid);
+    return is_called;
+  }
   void setIsCalled(bool isCalled) {
+    assert(is_valid);
     if ((not is_called) && isCalled) {
       propergate_changes();
     }
     is_called = is_called | isCalled;
   }
-  bool isUsedDirectly() const { return is_used_directly; }
+  bool isUsedDirectly() const {
+    assert(is_valid);
+    return is_used_directly;
+  }
   void setIsUsedDirectly(
       bool isUsedDirectly,
       const std::shared_ptr<PtrUsageInfo> &direct_usage_info = nullptr);
-  bool isReadFrom() const { return is_read_from; }
+  bool isReadFrom() const {
+    assert(is_valid);
+    return is_read_from;
+  }
   void setIsReadFrom(bool isReadFrom) {
+    assert(is_valid);
     if ((not is_read_from) && isReadFrom) {
       propergate_changes();
     }
     is_read_from = is_read_from | isReadFrom;
   }
-  bool isWholePtrIsRelevant() const { return whole_ptr_is_relevant; }
+  bool isWholePtrIsRelevant() const {
+    assert(is_valid);
+    return whole_ptr_is_relevant;
+  }
   void setWholePtrIsRelevant(bool wholePtrIsRelevant) {
+    assert(is_valid);
     if ((not whole_ptr_is_relevant) && wholePtrIsRelevant) {
       propergate_changes();
     }
     whole_ptr_is_relevant = whole_ptr_is_relevant | wholePtrIsRelevant;
   }
   const std::shared_ptr<PtrUsageInfo> &getInfoOfDirectUsage() const {
+    assert(is_valid);
     assert(is_used_directly);
     return info_of_direct_usage;
   };
 
   void add_ptr_info_user(std::shared_ptr<TaintedValue> v) {
+    assert(is_valid);
     assert(v != nullptr);
     assert(v->ptr_info == shared_from_this());
     ptrs_with_this_info.insert(v);
@@ -98,6 +119,9 @@ private:
   // important has changed
   void propergate_changes();
   bool is_used_directly = false;
+#ifndef NDEBUG
+  bool is_valid = true;
+#endif
 
   // returns bool true, if wildcard usage was found
   // false if the known usage has no wildcard
