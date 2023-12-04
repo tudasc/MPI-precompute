@@ -186,6 +186,24 @@ bool is_func_from_std(llvm::Function *func) {
   if (demangled.rfind("std::", 0) == 0) {
     return true;
   }
+  // internals of gnu implementation
+  if (demangled.rfind("__gnu_cxx::", 0) == 0) {
+    return true;
+  }
+
+  // internals of gnu implementation
+  if (demangled.rfind("int __gnu_cxx::", 0) == 0) {
+    return true;
+  }
+  // internals of gnu implementation
+  if (demangled.rfind("float __gnu_cxx::", 0) == 0) {
+    return true;
+  }
+  // internals of gnu implementation
+  if (demangled.rfind("double __gnu_cxx::", 0) == 0) {
+    return true;
+  }
+
   // TODO more functions from the C api?
   if (func->getName() == "atof") {
     return true;
@@ -246,7 +264,15 @@ bool is_call_to_std(llvm::CallBase *call) {
 // if one of those throws: the whole precompute has to abort anyway
 bool is_func_known_to_be_safe(llvm::Function *func) {
   return is_allocation(func) || func == mpi_func->mpi_comm_size ||
-         func == mpi_func->mpi_comm_rank;
+         func == mpi_func->mpi_comm_rank ||
+         // if barrier in precompute: all ranks can call them (if not all ranks
+         // arrive at this point programm will deadlock anyway)
+         func == mpi_func->mpi_barrier ||
+         func->getName() ==
+             "MPI_Abort" // calling would also abort main program, calling it
+                         // during precompute is "safe" in that regard
+
+      ;
 }
 
 void Precalculations::add_precalculations(
@@ -730,6 +756,12 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
 void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
   auto *arg = cast<Argument>(arg_info->v);
   arg_info->visited = true;
+
+  if (arg_info->v->getType()->isPointerTy()) {
+    if (arg_info->ptr_info == nullptr) {
+      arg_info->ptr_info = std::make_shared<PtrUsageInfo>(arg_info);
+    }
+  }
 
   auto *func = arg->getParent();
 
