@@ -453,7 +453,6 @@ void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
 
   if (phi->getType()->isPointerTy()) {
     auto ptr_info = phi_info->ptr_info;
-    bool ptr_info_was_present = (ptr_info != nullptr);
     if (not ptr_info) {
       phi_info->ptr_info = std::make_shared<PtrUsageInfo>(phi_info);
       ptr_info = phi_info->ptr_info;
@@ -463,14 +462,12 @@ void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
       auto new_val = insert_tainted_value(vv, phi_info);
 
       if (new_val->ptr_info) {
-        ptr_info_was_present = true;
         ptr_info->merge_with(new_val->ptr_info);
       } else {
         new_val->ptr_info = ptr_info;
         ptr_info->add_ptr_info_user(new_val);
       }
     }
-    assert(ptr_info_was_present);
   } else {
     // no ptr
     for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
