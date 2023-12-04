@@ -416,7 +416,8 @@ void Precalculations::visit_phi(const std::shared_ptr<TaintedValue> &phi_info) {
     auto ptr_info = phi_info->ptr_info;
     bool ptr_info_was_present = (ptr_info != nullptr);
     if (not ptr_info) {
-      ptr_info = std::make_shared<PtrUsageInfo>(phi_info);
+      phi_info->ptr_info = std::make_shared<PtrUsageInfo>(phi_info);
+      ptr_info = phi_info->ptr_info;
     }
     for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
       auto vv = phi->getIncomingValue(i);

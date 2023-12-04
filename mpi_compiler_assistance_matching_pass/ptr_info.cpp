@@ -54,6 +54,7 @@ void PtrUsageInfo::setIsUsedDirectly(
 }
 
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
+  assert(other != nullptr);
   assert(is_valid);
   if (other != shared_from_this()) {
     assert(other->is_valid);
@@ -67,14 +68,14 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
       ptrs_with_this_info.insert(ptr);
     }
     // merge parents
-    for (auto &ptr : other->parents) {
+    for (auto &parent : other->parents) {
       int count_parents = 0;
-      for (const auto &pair : ptr->important_members) {
+      for (const auto &pair : parent->important_members) {
         if (pair.second == other) {
           count_parents++;
           auto gep_idx = pair.first;
-          ptr->important_members[gep_idx] = shared_from_this();
-          parents.insert(ptr);
+          parent->important_members[gep_idx] = shared_from_this();
+          parents.insert(parent);
         }
       }
       assert(count_parents > 0);
