@@ -1104,6 +1104,10 @@ Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
     // only if not already in set
     inserted_elem = std::make_shared<TaintedValue>(v);
     tainted_values.insert(inserted_elem);
+    if (v->getType()->isPointerTy()) {
+      // create empty info
+      inserted_elem->ptr_info = std::make_shared<PtrUsageInfo>(inserted_elem);
+    }
     // insert what is necessary for Control flow to go here
     insert_necessary_control_flow(v);
   } else {
