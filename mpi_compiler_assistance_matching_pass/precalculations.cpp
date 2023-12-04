@@ -221,6 +221,16 @@ bool is_func_from_std(llvm::Function *func) {
     return true;
   }
 
+  // readonly
+  if (func->getName() == "memcmp") {
+    return true;
+  }
+
+  // more like a stack ptr than a function call
+  if (func->getName() == "__errno_location") {
+    return true;
+  }
+
   return false;
 }
 
@@ -836,6 +846,10 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           // for the given parameters)
           //  as std is designed to haf as fw side effects as possible
           // TODO implement check for exception std::rand and std::cout/cin
+          // we just need to make shure all parameters are given
+          for (auto &arg : call->args()) {
+            insert_tainted_value(arg, call_info);
+          }
           continue;
         }
         if (func->isDeclaration()) {
@@ -887,6 +901,9 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           // for the given parameters)
           //  as std is designed to haf as fw side effects as possible
           // TODO implement check for exception std::rand and std::cout/cin
+          for (auto &arg : call->args()) {
+            insert_tainted_value(arg, call_info);
+          }
           continue;
         }
         if (func->isDeclaration()) {
