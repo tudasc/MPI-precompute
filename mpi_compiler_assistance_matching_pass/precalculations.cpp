@@ -181,11 +181,12 @@ bool is_free(llvm::CallBase *call) {
 bool is_func_from_std(llvm::Function *func) {
 
   auto demangled = llvm::demangle(func->getName().str());
+
   // startswith std::
   if (demangled.rfind("std::", 0) == 0) {
     return true;
   }
-  // TODO more functions from the C api=
+  // TODO more functions from the C api?
   if (func->getName() == "atof") {
     return true;
   }
@@ -1076,6 +1077,11 @@ std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
   if (not is_tainted(v)) {
+    if (auto *inst = dyn_cast<Instruction>(v)) {
+      // dont analyze std::s internals
+      assert(not is_func_from_std(inst->getFunction()));
+    }
+
     // only if not already in set
     inserted_elem = std::make_shared<TaintedValue>(v);
     if (from != nullptr) {
