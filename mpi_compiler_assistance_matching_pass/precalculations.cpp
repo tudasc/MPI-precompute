@@ -181,8 +181,46 @@ bool is_free(llvm::CallBase *call) {
 bool is_func_from_std(llvm::Function *func) {
 
   auto demangled = llvm::demangle(func->getName().str());
-  // startswith
-  return (demangled.rfind("std::", 0) == 0);
+  // startswith std::
+  if (demangled.rfind("std::", 0) == 0) {
+    return true;
+  }
+  // TODO more functions from the C api=
+  if (func->getName() == "atof") {
+    return true;
+  }
+  if (func->getName() == "atoi") {
+    return true;
+  }
+  if (func->getName() == "atol") {
+    return true;
+  }
+  if (func->getName() == "atoll") {
+    return true;
+  }
+  if (func->getName() == "strtol") {
+    return true;
+  }
+  if (func->getName() == "strtoll") {
+    return true;
+  }
+  if (func->getName() == "strtoul") {
+    return true;
+  }
+  if (func->getName() == "strtoull") {
+    return true;
+  }
+  if (func->getName() == "strtof") {
+    return true;
+  }
+  if (func->getName() == "strtod") {
+    return true;
+  }
+  if (func->getName() == "strtold") {
+    return true;
+  }
+
+  return false;
 }
 
 bool is_call_to_std(llvm::CallBase *call) {
