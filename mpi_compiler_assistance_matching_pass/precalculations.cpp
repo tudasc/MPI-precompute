@@ -268,10 +268,12 @@ bool is_func_known_to_be_safe(llvm::Function *func) {
          // if barrier in precompute: all ranks can call them (if not all ranks
          // arrive at this point programm will deadlock anyway)
          func == mpi_func->mpi_barrier ||
+         func ==
+             mpi_func->mpi_finalize || // will not "except" but end the programm
          func->getName() ==
              "MPI_Abort" // calling would also abort main program, calling it
-                         // during precompute is "safe" in that regard
-
+                         // during precompute is "safe" in that regard it will
+                         // abort, not "except"
       ;
 }
 
@@ -701,9 +703,63 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
       }
       continue;
     }
+    if (auto *ret = dyn_cast<ReturnInst>(u)) {
+      visit_ptr_ret(ptr, ret);
+      continue;
+    }
+
     errs() << "Support for analyzing this Value is not implemented yet\n";
     u->dump();
     assert(false);
+  }
+}
+
+void Precalculations::visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
+                                    llvm::ReturnInst *ret) {
+  assert(ret->getOperand(0) == ptr->v);
+  // need to merge ptr info for the resulting ptr
+
+  // TODO some duplicate code with
+  // visit_arg and taint_all_indirect_call_args
+  auto *func = ret->getFunction();
+  auto fun_to_precalc = insert_functions_to_include(func);
+
+  for (auto u : func->users()) {
+    if (auto *call = dyn_cast<CallBase>(u)) {
+      assert(is_tainted(call));
+      assert(call->getType()->isPointerTy());
+
+      auto call_info = insert_tainted_value(call, ptr);
+      assert(call_info->ptr_info != nullptr);
+      ptr->ptr_info->merge_with(call_info->ptr_info);
+    }
+    if (functions_that_may_be_called_indirect.find(func) !=
+        functions_that_may_be_called_indirect.end()) {
+      // this func may be called indirect we need to visit all indirect call
+      // sites
+      // TODO this could be done more efficient...
+      // TODO duplicate code with taint_all_indirect_call_args
+      for (auto &f : M.functions()) {
+        if (is_func_from_std(&f)) {
+          // avoid messing with std::'s internals
+          continue;
+        }
+        for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+          if (auto *call = dyn_cast<CallBase>(&*I)) {
+            auto targets = get_possible_call_targets(call);
+            if (std::find(targets.begin(), targets.end(), func) !=
+                targets.end()) {
+              assert(is_tainted(call));
+              assert(call->getType()->isPointerTy());
+              auto call_info = insert_tainted_value(
+                  call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
+              assert(call_info->ptr_info != nullptr);
+              ptr->ptr_info->merge_with(call_info->ptr_info);
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -720,7 +776,8 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
 
       assert(false);
       // TODO treat std functions special?
-      //  sometimes the definition is also present (templated funcs from header)
+      //  sometimes the definition is also present (templated funcs from
+      //  header)
     }
 
     auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
@@ -874,8 +931,8 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           continue;
         }
         if (is_func_from_std(func)) {
-          // calling into std is safe, as no side effects will occur (other than
-          // for the given parameters)
+          // calling into std is safe, as no side effects will occur (other
+          // than for the given parameters)
           //  as std is designed to haf as fw side effects as possible
           // TODO implement check for exception std::rand and std::cout/cin
           // we just need to make shure all parameters are given
@@ -929,8 +986,8 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           continue;
         }
         if (is_func_from_std(func)) {
-          // calling into std is safe, as no side effects will occur (other than
-          // for the given parameters)
+          // calling into std is safe, as no side effects will occur (other
+          // than for the given parameters)
           //  as std is designed to haf as fw side effects as possible
           // TODO implement check for exception std::rand and std::cout/cin
           for (auto &arg : call->args()) {
@@ -995,8 +1052,8 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       assert(false && "Tracking Communication to get the envelope is currently "
                       "not supported");
     } else {
-      // we know that the other arguments are not important e.g. not written to
-      // like if the communicator is used
+      // we know that the other arguments are not important e.g. not written
+      // to like if the communicator is used
       return;
     }
   }
@@ -1095,6 +1152,8 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   }
 }
 
+// TODO refactoring, this should be thoe only place where a new ptr_info is
+// constructed
 std::shared_ptr<TaintedValue>
 Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
 
@@ -1607,8 +1666,8 @@ void Precalculations::taint_all_indirect_call_args(
   for (auto &f : M.functions()) {
     if (is_func_from_std(&f)) {
       // avoid messing with std::'s internals
-      // if std:: indirectely calls a user function, it needs to be given as an
-      // argument anyway
+      // if std:: indirectely calls a user function, it needs to be given as
+      // an argument anyway
       continue;
     }
     for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
