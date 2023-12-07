@@ -28,6 +28,14 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         precompute_funcs.h
 )
 
+set(Boost_USE_STATIC_LIBS OFF)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
+find_package(Boost 1.66.0 REQUIRED)
+
+include_directories(${Boost_INCLUDE_DIRS})
+target_link_libraries(mpi_compiler_assistance_matching_pass ${Boost_LIBRARIES})
+
 # if one wants to use mpi
 #find_package(MPI REQUIRED)
 #target_link_libraries(mpi_assertion_checker PRIVATE MPI::MPI_C)

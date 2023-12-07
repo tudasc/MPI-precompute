@@ -32,6 +32,9 @@
 
 #include "llvm/IR/Verifier.h"
 
+#include <boost/stacktrace.hpp>
+#include <iostream>
+
 #include "debug.h"
 using namespace llvm;
 
@@ -55,9 +58,18 @@ void PtrUsageInfo::setIsUsedDirectly(
 
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
   assert(other != nullptr);
+
+  if (not is_valid) {
+    errs() << "Invalid: " << shared_from_this().get() << "\n";
+  }
+
   assert(is_valid);
   if (other != shared_from_this()) {
+    if (not other->is_valid) {
+      errs() << "Invalid: " << other.get() << "\n";
+    }
     assert(other->is_valid);
+
     // if other == shared_from_this(): nothing to do already the same ptr info
 
     // merge users
@@ -116,14 +128,18 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
 
     // TODO no one should be able to retain a reference to other
     // assert(other.use_count()==1);
+    errs() << "use_count of other: " << other.use_count() << "\n";
 #ifndef NDEBUG
     other->is_valid = false;
-    // errs() << "Invalidate:\n";
-    // auto info = *other->ptrs_with_this_info.begin();
-    // info->v->dump();
-    // errs() << other.get() << "\n";
+    errs() << "Invalidate:\n";
+    auto info = *other->ptrs_with_this_info.begin();
+    info->v->dump();
+    errs() << other.get() << "\n";
+    std::stringstream stacktrace_stream;
+    stacktrace_stream << boost::stacktrace::stacktrace();
+    errs() << stacktrace_stream.str() << "\n";
 #endif
-    for (auto u : ptrs_with_this_info) {
+    for (const auto &u : ptrs_with_this_info) {
       assert(u->ptr_info != other);
     }
   }
