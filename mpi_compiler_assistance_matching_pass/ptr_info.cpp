@@ -70,6 +70,8 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     }
     assert(other->is_valid);
 
+    long previous_use_count_of_other = other.use_count();
+
     // if other == shared_from_this(): nothing to do already the same ptr info
 
     // merge users
@@ -80,17 +82,17 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
       ptrs_with_this_info.insert(ptr);
     }
     // merge parents
-    for (auto &parent : other->parents) {
+    for (auto &other_parent : other->parents) {
       int count_parents = 0;
-      for (const auto &pair : parent->important_members) {
+      for (const auto &pair : other_parent->important_members) {
         if (pair.second == other) {
           count_parents++;
           auto gep_idx = pair.first;
-          parent->important_members[gep_idx] = shared_from_this();
-          parents.insert(parent);
+          other_parent->important_members[gep_idx] = shared_from_this();
         }
       }
       assert(count_parents > 0);
+      parents.insert(other_parent);
     }
 
     if (other->is_used_directly) {
@@ -108,12 +110,12 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
-    std::move(other->parents.begin(), other->parents.end(),
-              std::inserter(parents, parents.end()));
+    //    std::move(other->parents.begin(),
+    //    other->parents.end(),std::inserter(parents, parents.end()));
 
     // merge important_members
     for (auto pos : other->important_members) {
-      // TODO wildcard usage!
+      // TODO merge wildcard usage!
       if (important_members.find(pos.first) != important_members.end()) {
         // merge the information
         important_members[pos.first]->merge_with(pos.second);
@@ -127,7 +129,9 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     }
 
     // TODO no one should be able to retain a reference to other
-    // assert(other.use_count()==1);
+    assert(
+        other.use_count() <
+        previous_use_count_of_other); // references need to be removed not added
     errs() << "use_count of other: " << other.use_count() << "\n";
 #ifndef NDEBUG
     other->is_valid = false;
