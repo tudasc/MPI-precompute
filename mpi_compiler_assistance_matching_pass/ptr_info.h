@@ -107,8 +107,13 @@ public:
 
   bool is_member_relevant(llvm::GetElementPtrInst *gep);
   void add_important_member(llvm::GetElementPtrInst *gep,
-                            std::shared_ptr<PtrUsageInfo> result_ptr);
+                            const std::shared_ptr<PtrUsageInfo> &result_ptr);
 
+private:
+  void add_important_member(std::vector<unsigned int> member_idx,
+                            const std::shared_ptr<PtrUsageInfo> &result_ptr);
+
+public:
   void merge_with(std::shared_ptr<PtrUsageInfo> other);
 
   // for debugging

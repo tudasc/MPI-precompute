@@ -62,17 +62,16 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
   if (not is_valid) {
     errs() << "Invalid: " << shared_from_this().get() << "\n";
   }
-
   assert(is_valid);
+
   if (other != shared_from_this()) {
+    // if other == shared_from_this(): nothing to do already the same ptr info
     if (not other->is_valid) {
       errs() << "Invalid: " << other.get() << "\n";
     }
     assert(other->is_valid);
 
     long previous_use_count_of_other = other.use_count();
-
-    // if other == shared_from_this(): nothing to do already the same ptr info
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
@@ -110,8 +109,6 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
-    //    std::move(other->parents.begin(),
-    //    other->parents.end(),std::inserter(parents, parents.end()));
 
     // merge important_members
     for (auto pos : other->important_members) {
@@ -189,11 +186,18 @@ bool is_member_matching(const std::vector<unsigned int> &member_idx,
 }
 
 void PtrUsageInfo::add_important_member(
-    llvm::GetElementPtrInst *gep, std::shared_ptr<PtrUsageInfo> result_ptr) {
+    llvm::GetElementPtrInst *gep,
+    const std::shared_ptr<PtrUsageInfo> &result_ptr) {
   assert(is_valid);
 
   auto member_idx = get_gep_idxs(gep);
+  add_important_member(member_idx, result_ptr);
+}
 
+void PtrUsageInfo::add_important_member(
+    std::vector<unsigned int> member_idx,
+    const std::shared_ptr<PtrUsageInfo> &result_ptr) {
+  assert(is_valid);
   auto existing_info = find_info_for_gep_idx(member_idx);
 
   if (existing_info.second == nullptr) {
