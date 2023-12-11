@@ -16,6 +16,7 @@
 
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <random>
+#include <regex>
 
 #include "CompilerPassConstants.h"
 #include "analysis_results.h"
@@ -183,27 +184,30 @@ bool is_func_from_std(llvm::Function *func) {
 
   auto demangled = llvm::demangle(func->getName().str());
 
-  errs() << demangled << "\n";
+  // errs() << "Test if in std:\n" <<demangled << "\n";
 
   // startswith std::
   if (demangled.rfind("std::", 0) == 0) {
     return true;
   }
-  // internals of gnu implementation
-  if (demangled.rfind("__gnu_cxx::", 0) == 0) {
+  // for some templates e.g.  unsigned long const& std::min<unsigned
+  // long>(unsigned long const&, unsigned long const&) the return type is part
+  // of the mangled name
+  std::regex regex_pattern_std(
+      "^((unsigned )?(((int)|(long)|(float)|(double)))?( const)?(&)? )?"
+      "std::(.+)");
+  if (std::regex_match(demangled, regex_pattern_std)) {
     return true;
   }
 
   // internals of gnu implementation
-  if (demangled.rfind("int __gnu_cxx::", 0) == 0) {
+  if (demangled.rfind("__gnu_cxx::", 0) == 0) {
     return true;
   }
-  // internals of gnu implementation
-  if (demangled.rfind("float __gnu_cxx::", 0) == 0) {
-    return true;
-  }
-  // internals of gnu implementation
-  if (demangled.rfind("double __gnu_cxx::", 0) == 0) {
+  std::regex regex_pattern_gnu(
+      "^((unsigned )?(((int)|(long)|(float)|(double)))?(const)?(&)? )?"
+      "__gnu_cxx::(.+)");
+  if (std::regex_match(demangled, regex_pattern_gnu)) {
     return true;
   }
 
