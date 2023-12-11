@@ -596,8 +596,6 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     // resume exception: nothing to do just keep it
     insert_tainted_value(resume->getOperand(0), v);
   } else if (auto *ret = dyn_cast<ReturnInst>(v->v)) {
-    errs() << v->getReason();
-    assert(v->getReason() == TaintReason::CONTROL_FLOW);
     insert_tainted_value(ret->getOperand(0), v);
   } else if (auto *lpad = dyn_cast<LandingPadInst>(v->v)) {
     // nothing to do, just keep around
