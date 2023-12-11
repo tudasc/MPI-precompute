@@ -109,17 +109,13 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
-
-    // merge important_members
-    for (auto pos : other->important_members) {
-      // TODO merge wildcard usage!
-      if (important_members.find(pos.first) != important_members.end()) {
-        // merge the information
-        important_members[pos.first]->merge_with(pos.second);
-      } else {
-        important_members.insert(pos);
-        changed = true;
-      }
+    // std::set<std::shared_ptr<PtrUsageInfo>> merged_ptrs;
+    // TODO can it happen that we try to merge the same ptr twice??
+    //  merging one ptr can modify the values in the important_members map is
+    //  this a problem?// merge important_members
+    for (const auto &pos : other->important_members) {
+      // this will propergate changes if applicable
+      add_important_member(pos.first, pos.second);
     }
     if (changed) {
       propergate_changes();
