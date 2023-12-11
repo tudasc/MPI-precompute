@@ -51,12 +51,14 @@ void PtrUsageInfo::setIsUsedDirectly(
     if (info_of_direct_usage) {
       info_of_direct_usage->merge_with(direct_usage_info);
       // merge will propergate changes if any
-    } else
+    } else {
       info_of_direct_usage = direct_usage_info;
+      direct_usage_info->direct_usage_parent = shared_from_this();
+    }
   }
 }
 
-void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
+void PtrUsageInfo::merge_with(const std::shared_ptr<PtrUsageInfo> &other) {
   assert(other != nullptr);
 
   if (not is_valid) {
@@ -94,6 +96,9 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
       parents.insert(other_parent);
     }
 
+    if (other->direct_usage_parent) {
+      other->direct_usage_parent->info_of_direct_usage = shared_from_this();
+    }
     if (other->is_used_directly) {
       this->setIsUsedDirectly(true, other->info_of_direct_usage);
       // will merge the info_of_direct_usage

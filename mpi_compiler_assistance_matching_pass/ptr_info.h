@@ -114,7 +114,7 @@ private:
                             const std::shared_ptr<PtrUsageInfo> &result_ptr);
 
 public:
-  void merge_with(std::shared_ptr<PtrUsageInfo> other);
+  void merge_with(const std::shared_ptr<PtrUsageInfo> &other);
 
   // for debugging
   void dump();
@@ -132,10 +132,12 @@ private:
   // false if the known usage has no wildcard
   std::pair<bool, std::shared_ptr<PtrUsageInfo>>
   find_info_for_gep_idx(const std::vector<unsigned int> &member_idx);
+
   // meaning gep idx 0,0,...(as many zeros as
   // deepest struct nesting level)
   std::shared_ptr<PtrUsageInfo> info_of_direct_usage = nullptr;
   // null if the direct load is a value
+  std::shared_ptr<PtrUsageInfo> direct_usage_parent = nullptr;
 
   std::map<std::vector<unsigned int>, std::shared_ptr<PtrUsageInfo>>
       important_members;
