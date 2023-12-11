@@ -404,10 +404,8 @@ void Precalculations::visit_store_from_ptr(
   assert(is_tainted(store->getPointerOperand()));
   // does only the find:
   auto ptr = insert_tainted_value(store->getPointerOperand(), store_info);
-  assert(
-      ptr->ptr_info
-          ->isUsedDirectly()); // must already be set, otherwise there is no
-                               // need in visiting this store in the first place
+  ptr->ptr_info->setIsUsedDirectly(
+      true, store_info->ptr_info); // null if stored value is no ptr
   ptr->ptr_info->setIsWrittenTo(true);
   // we only need the stored value if it is used later
   if (ptr->ptr_info->isReadFrom()) {
