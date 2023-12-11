@@ -1169,6 +1169,10 @@ std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
 
     // only if not already in set
     inserted_elem = std::make_shared<TaintedValue>(v);
+    if (v->getType()->isPointerTy()) {
+      // create empty info
+      inserted_elem->ptr_info = std::make_shared<PtrUsageInfo>(inserted_elem);
+    }
     if (from != nullptr) {
       // we dont care why the Control flow was tagged for te parent
       inserted_elem->addReason(from->getReason() &
