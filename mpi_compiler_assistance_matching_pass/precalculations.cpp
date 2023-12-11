@@ -14,6 +14,7 @@
  limitations under the License.
  */
 
+#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <random>
 
 #include "CompilerPassConstants.h"
@@ -182,6 +183,8 @@ bool is_func_from_std(llvm::Function *func) {
 
   auto demangled = llvm::demangle(func->getName().str());
 
+  errs() << demangled << "\n";
+
   // startswith std::
   if (demangled.rfind("std::", 0) == 0) {
     return true;
@@ -204,43 +207,10 @@ bool is_func_from_std(llvm::Function *func) {
     return true;
   }
 
-  // TODO more functions from the C api?
-  if (func->getName() == "atof") {
-    return true;
-  }
-  if (func->getName() == "atoi") {
-    return true;
-  }
-  if (func->getName() == "atol") {
-    return true;
-  }
-  if (func->getName() == "atoll") {
-    return true;
-  }
-  if (func->getName() == "strtol") {
-    return true;
-  }
-  if (func->getName() == "strtoll") {
-    return true;
-  }
-  if (func->getName() == "strtoul") {
-    return true;
-  }
-  if (func->getName() == "strtoull") {
-    return true;
-  }
-  if (func->getName() == "strtof") {
-    return true;
-  }
-  if (func->getName() == "strtod") {
-    return true;
-  }
-  if (func->getName() == "strtold") {
-    return true;
-  }
-
-  // readonly
-  if (func->getName() == "memcmp") {
+  // C API
+  LibFunc lib_func;
+  bool in_lib = analysis_results->getTLI()->getLibFunc(*func, lib_func);
+  if (in_lib) {
     return true;
   }
 
@@ -777,6 +747,11 @@ Precalculations::insert_functions_to_include(llvm::Function *func) {
       // TODO treat std functions special?
       //  sometimes the definition is also present (templated funcs from
       //  header)
+    }
+
+    if (func->getName() == "_ZSt3minImERKT_S2_S2_") {
+      errs() << "NOT IS from std:: assertion?????\n";
+      assert(false);
     }
 
     auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
