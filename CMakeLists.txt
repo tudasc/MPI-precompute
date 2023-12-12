@@ -31,12 +31,12 @@ set(PRECOMPUTE_LIB_PATH ${CMAKE_BINARY_DIR}/precompute_lib)
 
 add_custom_target(setup_env.sh ALL
         COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/setup_env.sh.in ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export PATH=\\$$PATH:${INSTALL_DIR}/bin" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export PATH=${INSTALL_DIR}/bin:\\$$PATH" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPICC=${INSTALL_DIR}/bin/mpicc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPICXX=${INSTALL_DIR}/bin/mpicxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export CPATH=\\$$CPATH:${INSTALL_DIR}/include" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export LIBRARY_PATH=\\$$LIBRARY_PATH:${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export LD_LIBRARY_PATH=\\$$LD_LIBRARY_PATH:${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export CPATH=${INSTALL_DIR}/include:\\$$CPATH" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export LIBRARY_PATH=${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}:\\$$LIBRARY_PATH" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export LD_LIBRARY_PATH=${INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}:\\$$LD_LIBRARY_PATH" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPI_COMPILER_ASSISTANCE_PASS=${PASS_LIB}" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export WHOLE_PROGRAM_DEVIRT_ANALYSIS_PASS=${CMAKE_BINARY_DIR}/WholeProgramDevirtAnalysisPass/libwholeProgramDevirtAnalysisPass.so" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
