@@ -40,7 +40,12 @@ target_link_libraries(mpi_compiler_assistance_matching_pass ${Boost_LIBRARIES})
 #find_package(MPI REQUIRED)
 #target_link_libraries(mpi_assertion_checker PRIVATE MPI::MPI_C)
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Og -DDEBUG_MACH_PASS=1")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer -g -Og -DDEBUG_MACH_PASS=1")
+#TODO the link step does not work correctly, we still need to preload the libasan
+#TODO check if compiler is clang
+if (CMAKE_BUILD_TYPE MATCHES DEBUG)
+    add_link_options(mpi_compiler_assistance_matching_pass  "-fsanitize=address -shared-libasan")
+endif (CMAKE_BUILD_TYPE MATCHES DEBUG)
 # switch off one Warning for release build: some variables are only used for assertions
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DDEBUG_MACH_PASS=0 -Wno-unused-but-set-variable")
 

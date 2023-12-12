@@ -7,5 +7,18 @@ export OMPI_MCA_pml=ucx
 export UCX_WARN_UNUSED_ENV_VARS=n
 export UCX_UNIFIED_MODE=y
 
+# ucx debugging logs:
+##export OMPI_MCA_pml_ucx_verbose=10
+# for my local non-cluster build:
+export OMPI_MCA_opal_common_ucx_tls=all
+export OMPI_MCA_opal_common_ucx_devices=all
+export OMPI_MCA_pml_ucx_tls=any
+export OMPI_MCA_pml_ucx_devices=any
+
+#to run in debug mode with address sanitizer
+#TODO only use it in clang wrapper script
+export LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan.so)
+
+
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/tj75qeje/mpi-comp-match/IMB-ASYNC/src_cpp/ASYNC/thirdparty/lib/
 # also set the paths for the mpi implementation
