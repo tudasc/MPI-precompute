@@ -81,7 +81,7 @@ void PtrUsageInfo::merge_with(const std::shared_ptr<PtrUsageInfo> &other) {
       assert(ptr->ptr_info == other);
       assert(ptr->ptr_info != shared_from_this());
       ptr->ptr_info = shared_from_this();
-      ptrs_with_this_info.insert(ptr);
+      this->ptrs_with_this_info.insert(ptr);
     }
     // merge parents
     for (auto &other_parent : other->parents) {
@@ -94,7 +94,7 @@ void PtrUsageInfo::merge_with(const std::shared_ptr<PtrUsageInfo> &other) {
         }
       }
       assert(count_parents > 0);
-      parents.insert(other_parent);
+      this->parents.insert(other_parent);
     }
 
     if (other->direct_usage_parent) {
