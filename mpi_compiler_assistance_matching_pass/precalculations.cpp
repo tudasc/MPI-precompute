@@ -812,12 +812,7 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
         new_val->visited =
             false; // may need to re visit if we discover it is important
         if (arg_info->is_pointer()) {
-          if (new_val->ptr_info == nullptr) {
-            new_val->ptr_info = arg_info->ptr_info;
-            new_val->ptr_info->add_ptr_info_user(new_val);
-          } else {
             arg_info->ptr_info->merge_with(new_val->ptr_info);
-          }
         }
         continue;
       }

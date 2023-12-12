@@ -77,6 +77,7 @@ void PtrUsageInfo::merge_with(const std::shared_ptr<PtrUsageInfo> &other) {
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
+      assert(ptr != nullptr);
       assert(ptr->ptr_info == other);
       assert(ptr->ptr_info != shared_from_this());
       ptr->ptr_info = shared_from_this();
