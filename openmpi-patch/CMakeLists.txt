@@ -8,12 +8,22 @@ cmake_policy(SET CMP0114 NEW)
 #find_package(UCX REQUIRED)  or anways use the openmpi internals ucx??
 # and pass the paths to ompi configure
 
+#TODO expose a cmake variable to specify the mpi build options
+# for the cluster openmpi build
+#set(OMPI_CONFIGURE_FLAGS
+#        --enable-heterogeneous --enable-static --with-hwloc=${HWLOC_ROOT}
+#        --with-slurm=/opt/slurm/current --with-pmi=/opt/slurm/current
+#        --with-ucx --enable-mca-no-build=btl-uct --without-verbs --enable-mpi-fortran=no
+#        LIBS=-lprecompute LDFLAGS=-L${CMAKE_BINARY_DIR}/precompute_lib
+#)
+
+# for my local openmpi build 
 set(OMPI_CONFIGURE_FLAGS
-        --enable-heterogeneous --enable-static --with-hwloc=${HWLOC_ROOT}
-        --with-slurm=/opt/slurm/current --with-pmi=/opt/slurm/current
+        --enable-heterogeneous --enable-static
         --with-ucx --enable-mca-no-build=btl-uct --without-verbs --enable-mpi-fortran=no
         LIBS=-lprecompute LDFLAGS=-L${CMAKE_BINARY_DIR}/precompute_lib
 )
+
 
 if (CMAKE_BUILD_TYPE MATCHES DEBUG)
     set(OMPI_CONFIGURE_FLAGS ${OMPI_CONFIGURE_FLAGS} --enable-debug)
