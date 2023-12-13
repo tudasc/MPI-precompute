@@ -16,9 +16,9 @@ export OMPI_MCA_pml_ucx_tls=any
 export OMPI_MCA_pml_ucx_devices=any
 
 #to run in debug mode with address sanitizer
-#TODO only use it in clang wrapper script
-export LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan.so)
-
+export DEBUG_CLANG_WRAPPER=true
+# currently there are some memory leak reports that seem to be the result of the pass manager?
+export ASAN_OPTIONS=detect_leaks=0
 
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/tj75qeje/mpi-comp-match/IMB-ASYNC/src_cpp/ASYNC/thirdparty/lib/
 # also set the paths for the mpi implementation

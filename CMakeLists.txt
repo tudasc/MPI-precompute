@@ -41,7 +41,9 @@ add_custom_target(setup_env.sh ALL
         echo "export WHOLE_PROGRAM_DEVIRT_ANALYSIS_PASS=${CMAKE_BINARY_DIR}/WholeProgramDevirtAnalysisPass/libwholeProgramDevirtAnalysisPass.so" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export OMPI_CC=${CMAKE_BINARY_DIR}/clang_wrap_cc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export OMPI_CXX=${CMAKE_BINARY_DIR}/clang_wrap_cxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
+        echo "export OMPI_CXX=${CMAKE_BINARY_DIR}/clang_wrap_cxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export CLANG_WRAP_CC=${CMAKE_BINARY_DIR}/clang_wrap_cc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export CLANG_WRAP_CXX=${CMAKE_BINARY_DIR}/clang_wrap_cxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
 
         DEPENDS setup_env.sh.in)
 

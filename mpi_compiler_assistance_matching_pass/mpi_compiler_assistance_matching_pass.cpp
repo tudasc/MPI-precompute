@@ -59,6 +59,8 @@
 #include "precompute_funcs.h"
 #include "replacement.h"
 
+#include <sanitizer/lsan_interface.h>
+
 using namespace llvm;
 
 int get_num_undefs(const Module &M) {
@@ -193,8 +195,8 @@ struct MPICompilerAssistanceMatchingPass
     // at most: every undef value can be duplicated
     assert(get_num_undefs(M) <= num_undef * 2);
     // but this is probably insecure (e.g. if undef is used to calculate the
-    // tag)// so we go with the stricter assertion that our pass should not use more
-    // undef values
+    // tag)// so we go with the stricter assertion that our pass should not use
+    // more undef values
     assert(get_num_undefs(M) <= num_undef);
 #endif
 

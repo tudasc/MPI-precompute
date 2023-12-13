@@ -3,9 +3,11 @@
 compiler=clang++
 #compiler= variable needs to be set on line 3 as it will be replaced with clang or clang++ depending if c or cpp wrapper is generated
 
+ LD_PRELOAD_PREV="$LD_PRELOAD"
 if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     echo "INVOKE CLANG_WRAPPER"
     echo "clang_wrapper $@"
+    export LD_PRELOAD="$(clang -print-file-name=libclang_rt.asan.so):$LD_PRELOAD_PREV"
 fi
 
 #TODO add check that at least -O1 is used as we require some optimizations done in O1
@@ -36,11 +38,13 @@ done
 if [ "$has_flto" == false ] ||
    [ "$has_fwhole_program_vtables" == false ]; then
     echo "Error, need -flto and -fwhole-program-vtables for pass to work correctly"
+    export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit 1
 fi
 
 if ! [[ -v MPI_COMPILER_ASSISTANCE_PASS ]]; then
     echo "The MPI_COMPILER_ASSISTANCE_PASS environment variable is not set"
+    export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit 1
 fi
 
@@ -66,6 +70,7 @@ if [ "$is_to_obj" == true ]; then
         echo "$COMPILER_INVOCATION"
     fi
     $COMPILER_INVOCATION
+    export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit
 fi
 
@@ -105,6 +110,7 @@ if [ "$has_o_files" == true ]; then
         echo "$LLVM_LINK_INVOCATION | $COMPILER_INVOCATION"
     fi
     $LLVM_LINK_INVOCATION | $COMPILER_INVOCATION
+    export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit
 fi
 
@@ -113,7 +119,7 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
 fi
 COMPILER_INVOCATION="$compiler"
 if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
-    COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS -l precompute"
+    COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS -lprecompute"
 fi
 for arg in "$@"; do
     COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
@@ -122,5 +128,6 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     echo "$COMPILER_INVOCATION"
 fi
 $COMPILER_INVOCATION
+export LD_PRELOAD="$LD_PRELOAD_PREV"
 exit
 
