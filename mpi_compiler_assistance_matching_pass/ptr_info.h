@@ -114,7 +114,7 @@ private:
                             const std::shared_ptr<PtrUsageInfo> &result_ptr);
 
 public:
-  void merge_with(const std::shared_ptr<PtrUsageInfo> &other);
+  void merge_with(std::shared_ptr<PtrUsageInfo> other);
 
   // for debugging
   void dump();

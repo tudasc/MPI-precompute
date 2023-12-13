@@ -58,7 +58,9 @@ void PtrUsageInfo::setIsUsedDirectly(
   }
 }
 
-void PtrUsageInfo::merge_with(const std::shared_ptr<PtrUsageInfo> &other) {
+// other MAY NOT be passed as const ref as we might recursively destruct it
+// before we are finish using it
+void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
   assert(other != nullptr);
 
   if (not is_valid) {
