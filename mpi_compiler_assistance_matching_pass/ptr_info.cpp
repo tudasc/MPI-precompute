@@ -71,6 +71,11 @@ void PtrUsageInfo::setIsUsedDirectly(
 // other MAY NOT be passed as const ref as we might recursively destruct it
 // before we are finish using it
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
+  if (merged_with) {
+    merged_with->merge_with(_other);
+    return;
+  }
+
   assert(_other != nullptr);
 
   auto other = _other;
