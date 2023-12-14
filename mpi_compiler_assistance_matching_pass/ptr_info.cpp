@@ -128,6 +128,11 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
     if (changed) {
       propergate_changes();
     }
+
+    // we can clean up other, as other is only used to forward to this by now
+    other->ptrs_with_this_info.clear();
+    other->important_members.clear();
+    other->info_of_direct_usage = nullptr;
   }
 }
 
