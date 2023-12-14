@@ -96,14 +96,14 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
-      assert(ptr != nullptr);
+      assert(not ptr.expired());
       // assert(ptr->ptr_info == other);
       // assert(ptr->ptr_info != shared_from_this());
 
       this->ptrs_with_this_info.insert(ptr);
       // directly replace references to other instead of dispatching calls to
       // this
-      ptr->ptr_info = shared_from_this();
+      ptr.lock()->ptr_info = shared_from_this();
     }
 
     bool changed =
@@ -233,9 +233,11 @@ void PtrUsageInfo::add_important_member(
 
 void PtrUsageInfo::propergate_changes() {
   assert(is_valid);
+  assert(merged_with == nullptr);
   // re-visit all users of ptr as something has changed
   for (const auto &tv : ptrs_with_this_info) {
-    tv->visited = false;
+    assert(not tv.expired());
+    tv.lock()->visited = false;
   }
 }
 
@@ -280,7 +282,7 @@ void PtrUsageInfo::dump() {
   errs() << "Users:\n";
   for (const auto &u : ptrs_with_this_info) {
     errs() << "\t";
-    u->v->dump();
+    u.lock()->v->dump();
   }
   errs() << "Is Read : " << is_read_from << "\n";
   errs() << "Is Written : " << is_written_to << "\n";

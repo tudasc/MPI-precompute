@@ -88,8 +88,8 @@ public:
     assert(is_valid);
     return is_used_directly;
   }
-  void setIsUsedDirectly(
-      bool isUsedDirectly,
+  void
+  setIsUsedDirectly(bool isUsedDirectly,
                     std::shared_ptr<PtrUsageInfo> direct_usage_info = nullptr);
 
   bool isReadFrom() const {
@@ -196,8 +196,11 @@ private:
   bool is_called = false;
 
   // std::set<std::shared_ptr<PtrUsageInfo>> parents;
-  std::set<std::shared_ptr<TaintedValue>>
+  std::set<std::weak_ptr<TaintedValue>,
+           std::owner_less<std::weak_ptr<TaintedValue>>>
       ptrs_with_this_info; // all possibly aliasing pointers
+  // the ptr info does not have ownership (these values have ownership over the
+  // ptr info)
 };
 
 #endif // MACH_PTR_INFO_H_
