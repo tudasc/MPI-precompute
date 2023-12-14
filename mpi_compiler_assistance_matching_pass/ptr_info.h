@@ -69,7 +69,7 @@ public:
   }
   void setIsUsedDirectly(
       bool isUsedDirectly,
-      const std::shared_ptr<PtrUsageInfo> &direct_usage_info = nullptr);
+                    std::shared_ptr<PtrUsageInfo> direct_usage_info = nullptr);
   bool isReadFrom() const {
     assert(is_valid);
     return is_read_from;
