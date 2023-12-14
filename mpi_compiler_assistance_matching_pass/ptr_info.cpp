@@ -40,6 +40,10 @@ using namespace llvm;
 
 void PtrUsageInfo::setIsUsedDirectly(
     bool isUsedDirectly, std::shared_ptr<PtrUsageInfo> direct_usage_info) {
+  if (merged_with) {
+    merged_with->setIsUsedDirectly(isUsedDirectly, direct_usage_info);
+    return;
+  }
   assert(is_valid);
   assert(isUsedDirectly == true);
   if (not is_used_directly) {
@@ -47,32 +51,38 @@ void PtrUsageInfo::setIsUsedDirectly(
     propergate_changes();
   }
 
+  // TODO do we need the direct_usage_parent for alias detection
   if (direct_usage_info) {
-    if (direct_usage_info->direct_usage_parent != nullptr &&
-        direct_usage_info->direct_usage_parent != shared_from_this()) {
-      this->merge_with(direct_usage_info->direct_usage_parent);
-    } else if (direct_usage_info->direct_usage_parent == nullptr) {
-      if (info_of_direct_usage) {
-        info_of_direct_usage->merge_with(direct_usage_info);
-        // merge will propergate changes if any
-      } else {
-        info_of_direct_usage = direct_usage_info;
-        direct_usage_info->direct_usage_parent = shared_from_this();
-      }
-    } // else: direct_usage_info->direct_usage_parent==shared_from_this()
-    // nothing to do
+    auto info_to_use = direct_usage_info;
+    while (info_to_use->merged_with != nullptr) {
+      info_to_use = info_to_use->merged_with;
+    }
+    assert(direct_usage_info->is_valid);
+
+    if (info_of_direct_usage) {
+      info_of_direct_usage->merge_with(info_to_use);
+      // merge will propergate changes if any
+    } else {
+      info_of_direct_usage = info_to_use;
+    }
   }
 }
 
 // other MAY NOT be passed as const ref as we might recursively destruct it
 // before we are finish using it
-void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
-  assert(other != nullptr);
+void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
+  assert(_other != nullptr);
+
+  auto other = _other;
+  while (other->merged_with != nullptr) {
+    other = other->merged_with;
+  }
 
   if (not is_valid) {
     errs() << "Invalid: " << shared_from_this().get() << "\n";
   }
   assert(is_valid);
+  assert(this->merged_with == nullptr);
 
   if (other != shared_from_this()) {
     // if other == shared_from_this(): nothing to do already the same ptr info
@@ -80,71 +90,21 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
       errs() << "Invalid: " << other.get() << "\n";
     }
     assert(other->is_valid);
-
-    long previous_use_count_of_other = other.use_count();
+    assert(other->merged_with == nullptr);
+    other->merged_with = shared_from_this();
+    other->is_valid = false;
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
       assert(ptr != nullptr);
-      // assert(ptr->ptr_info == other || ptr->ptr_info == shared_from_this());
-      assert(ptr->ptr_info == other);
-      assert(ptr->ptr_info != shared_from_this());
-      // sometimes during the merge process the pointer will already merge
-      // this is the case if some ptrs will end up with the same direct usage
-      // parent nonetheless the end result will be the same
-      ptr->ptr_info = shared_from_this();
+      // assert(ptr->ptr_info == other);
+      // assert(ptr->ptr_info != shared_from_this());
+
       this->ptrs_with_this_info.insert(ptr);
+      // directly replace references to other instead of dispatching calls to
+      // this
+      ptr->ptr_info = shared_from_this();
     }
-    // merge parents
-    for (auto &other_parent : other->parents) {
-      int count_parents = 0;
-      for (const auto &pair : other_parent->important_members) {
-        if (pair.second == other) {
-          count_parents++;
-          auto gep_idx = pair.first;
-          other_parent->important_members[gep_idx] = shared_from_this();
-        }
-      }
-      assert(count_parents >
-             0); // assertion only holds if ptrs are still different
-      // if other and this already merged, nothing to do
-      this->parents.insert(other_parent);
-    }
-
-    if (other->direct_usage_parent) {
-      other->direct_usage_parent->info_of_direct_usage = shared_from_this();
-    }
-    // change only the ptr to other for ptrs to this // the content will be
-    // merged later, as WE keep these ptrs
-    for (const auto &pair : other->important_members) {
-      auto child = pair.second;
-      child->parents.erase(other);
-      child->parents.insert(shared_from_this());
-    }
-    if (other->info_of_direct_usage) {
-      assert(other->is_used_directly);
-      assert(other->info_of_direct_usage->direct_usage_parent == other);
-      other->info_of_direct_usage->direct_usage_parent = shared_from_this();
-    }
-
-    // end swapping all the ptrs to other
-    // merge content
-
-    // TODO no one should be able to retain a reference to other
-    assert(
-        other.use_count() <
-        previous_use_count_of_other); // references need to be removed not added
-    // errs() << "use_count of other: " << other.use_count() << "\n";
-#ifndef NDEBUG
-    other->is_valid = false;
-    errs() << "Invalidate:\n";
-    auto info = *other->ptrs_with_this_info.begin();
-    info->v->dump();
-    errs() << other.get() << "\n";
-    std::stringstream stacktrace_stream;
-    stacktrace_stream << boost::stacktrace::stacktrace();
-    errs() << stacktrace_stream.str() << "\n";
-#endif
 
     bool changed =
         (this->is_read_from != other->is_read_from ||
@@ -156,13 +116,8 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
-    // std::set<std::shared_ptr<PtrUsageInfo>> merged_ptrs;
-    // TODO can it happen that we try to merge the same ptr twice??
-    //  merging one ptr can modify the values in the important_members map is
-    //  this a problem?// merge important_members
-
     for (const auto &pos : other->important_members) {
-      // this will propergate changes if applicable
+      // this will propagate changes if applicable
       add_important_member(pos.first, pos.second);
     }
     if (other->is_used_directly) {
@@ -172,10 +127,6 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
 
     if (changed) {
       propergate_changes();
-    }
-
-    for (const auto &u : ptrs_with_this_info) {
-      assert(u->ptr_info != other);
     }
   }
 }
@@ -222,6 +173,10 @@ bool is_member_matching(const std::vector<unsigned int> &member_idx,
 void PtrUsageInfo::add_important_member(
     llvm::GetElementPtrInst *gep,
     const std::shared_ptr<PtrUsageInfo> &result_ptr) {
+  if (merged_with) {
+    merged_with->add_important_member(gep, result_ptr);
+    return;
+  }
   assert(is_valid);
 
   auto member_idx = get_gep_idxs(gep);
@@ -232,11 +187,11 @@ void PtrUsageInfo::add_important_member(
     std::vector<unsigned int> member_idx,
     const std::shared_ptr<PtrUsageInfo> &result_ptr) {
   assert(is_valid);
+  assert(this->merged_with == nullptr);
   auto existing_info = find_info_for_gep_idx(member_idx);
 
   if (existing_info.second == nullptr) {
     important_members[member_idx] = result_ptr;
-    result_ptr->parents.insert(shared_from_this());
 
   } else { // info already present
     if (not existing_info.first && member_idx[member_idx.size() - 1]) {
@@ -266,8 +221,6 @@ void PtrUsageInfo::add_important_member(
         }
       }
       important_members[member_idx] = result_ptr;
-      result_ptr->parents.insert(shared_from_this());
-
     } else {
       // exact match regarding wildcards
       existing_info.second->merge_with(result_ptr);
@@ -284,10 +237,12 @@ void PtrUsageInfo::propergate_changes() {
   for (const auto &tv : ptrs_with_this_info) {
     tv->visited = false;
   }
-  // TODO do we need to re-visit all the parents or childrens as well?
 }
 
 bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
+  if (merged_with) {
+    return merged_with->is_member_relevant(gep);
+  }
   assert(is_valid);
   return find_info_for_gep_idx(get_gep_idxs(gep)).second != nullptr;
 }
@@ -310,8 +265,13 @@ PtrUsageInfo::find_info_for_gep_idx(
 }
 
 void PtrUsageInfo::dump() {
+  if (merged_with) {
+    merged_with->dump();
+    return;
+  }
 
   errs() << "PtrUsageInfo:\n";
+
 #ifndef NDEBUG
   if (not is_valid) {
     errs() << "INVALID\n";
