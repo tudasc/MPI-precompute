@@ -57,7 +57,7 @@ void PtrUsageInfo::setIsUsedDirectly(
     while (info_to_use->merged_with != nullptr) {
       info_to_use = info_to_use->merged_with;
     }
-    assert(direct_usage_info->is_valid);
+    assert(info_to_use->is_valid);
 
     if (info_of_direct_usage) {
       info_of_direct_usage->merge_with(info_to_use);
