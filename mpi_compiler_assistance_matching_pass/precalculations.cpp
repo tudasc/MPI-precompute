@@ -437,17 +437,6 @@ void Precalculations::visit_gep(const std::shared_ptr<TaintedValue> &gep_info) {
 
   auto gep_ptr_info = insert_tainted_value(gep->getPointerOperand(), gep_info);
 
-  if (gep_ptr_info->ptr_info == nullptr) {
-    gep_ptr_info->ptr_info = std::make_shared<PtrUsageInfo>(gep_ptr_info);
-  }
-  if (gep_info->ptr_info == nullptr) {
-    gep_info->ptr_info = std::make_shared<PtrUsageInfo>(gep_info);
-  }
-
-  if (isa<GetElementPtrInst>(gep_ptr_info->v)) {
-    errs() << "Use a pass that combines GEP instructions first\n";
-    assert(false);
-  }
   gep_ptr_info->ptr_info->add_important_member(gep, gep_info->ptr_info);
 
   // taint all values needed for calculating idx
@@ -651,6 +640,18 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
       }
       continue;
     }
+    if (auto *constant_exp = dyn_cast<ConstantExpr>(u)) {
+      auto *as_inst = constant_exp->getAsInstruction();
+      auto *gep = dyn_cast<GetElementPtrInst>(as_inst);
+      assert(gep &&
+             "Constexpr other than GEP for ptr currently not implemented");
+      // if gep is relevant
+      if (ptr->ptr_info->is_member_relevant(gep)) {
+        insert_tainted_value(gep, ptr);
+        // ptr info will be constructed when the gep is visited
+      }
+      continue;
+    }
     if (auto *compare = dyn_cast<ICmpInst>(u)) {
       // nothing to do
       // the compare will be tainted if it is necessary for control flow else
@@ -681,6 +682,7 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
     u->dump();
+
     assert(false);
   }
 }
@@ -812,7 +814,7 @@ void Precalculations::visit_arg(std::shared_ptr<TaintedValue> arg_info) {
         new_val->visited =
             false; // may need to re visit if we discover it is important
         if (arg_info->is_pointer()) {
-            arg_info->ptr_info->merge_with(new_val->ptr_info);
+          arg_info->ptr_info->merge_with(new_val->ptr_info);
         }
         continue;
       }
