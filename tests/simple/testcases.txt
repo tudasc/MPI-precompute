@@ -1,20 +1,22 @@
 explanation for the testcases:
 
 01-02: targeted at testing the static analysis wit everything in multiple functions
-other tests target the implementation
-03 non contigous datatype
-04 other communicator than wolrd
+tests 03 to 09 target the implementation of the communication
+03 non-contiguous datatype
+04 other communicator than world
 05 multiple requests
 06 very basic test
 07-09 different orderings of wait to check implementation for deadlock
-10 statically unkown tag number, but provably same
-11 statically unkown tag number, possibly same
+10 statically unknown tag number, but provably same
+11 statically unknown tag number, possibly same
 12 uses different functions via functionptr to set up communication 
 13 usage of a function ptr
 14 usage of a cpp object
-15 inharitance with virtual table
-16 inharitance with virtual table
-17 Waitall only on the sends anonly after that Waitall on the recvs
-18 same as 16 but with Foor Loop over object members
+15 inheritance with virtual table
+16 inheritance with virtual table
+17 Waitall only on the sends and only after that Waitall on the recvs (tests communication Implementation)
+18 same as 16 but with For Loop over object members
 19 Reinitialization of Requests I
-19 Reinitialization of Requests II
+20 Reinitialization of Requests II
+21 Reading from file but unrelated to message tags
+22 Reading tags from file

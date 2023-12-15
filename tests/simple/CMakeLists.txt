@@ -100,6 +100,15 @@ add_test(NAME test20
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+add_test(NAME test21
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/21
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+add_test(NAME test22
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/22
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
 set_tests_properties(test01 PROPERTIES PROCESSORS 2)
 set_tests_properties(test02 PROPERTIES PROCESSORS 2)
@@ -121,17 +130,19 @@ set_tests_properties(test17 PROPERTIES PROCESSORS 2)
 set_tests_properties(test18 PROPERTIES PROCESSORS 2)
 set_tests_properties(test19 PROPERTIES PROCESSORS 2)
 set_tests_properties(test20 PROPERTIES PROCESSORS 2)
+set_tests_properties(test21 PROPERTIES PROCESSORS 2)
+set_tests_properties(test22 PROPERTIES PROCESSORS 2)
 
 
 # currently not implemented feature: other comm than comm world
 set_tests_properties(test04 PROPERTIES DISABLED true)
-# currently not implemented feature: reading input data
+# currently not implemented feature: reading input data (C-Style)
 set_tests_properties(test10 PROPERTIES DISABLED true)
-# currently not implemented feature: reading input data
+# currently not implemented feature: reading input data (C-Style)
 set_tests_properties(test11 PROPERTIES DISABLED true)
 #set_tests_properties(test00 PROPERTIES DISABLED true)
 
-# These testcases Re-Use an envelope and are therefore Expeckted to fail
+# These testcases Re-Use an envelope and are therefore expected to fail
 #TODO better test infrastructure to also account for expected to fail tests
 set_tests_properties(test19 PROPERTIES DISABLED true)
 set_tests_properties(test20 PROPERTIES DISABLED true)
