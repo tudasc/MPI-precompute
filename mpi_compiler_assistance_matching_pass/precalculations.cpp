@@ -529,9 +529,12 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
   } else if (auto *phi = dyn_cast<PHINode>(v->v)) {
     visit_phi(v);
   } else if (auto *cast = dyn_cast<CastInst>(v->v)) {
-    // ptr casting is not supported
-    assert(not cast->getType()->isPointerTy());
-    assert(not cast->getOperand(0)->getType()->isPointerTy());
+    // cast TO ptr is not allowed
+    assert(not cast->getType()->isPointerTy() &&
+           "Casting an integer to a ptr is not supported");
+    // cast from ptr is allowed (e.g. to check if a ptr is aligned with a modulo
+    // operation) as long as it is not casted back into a ptr
+
     insert_tainted_value(cast->getOperand(0), v);
     v->visited = true;
 
