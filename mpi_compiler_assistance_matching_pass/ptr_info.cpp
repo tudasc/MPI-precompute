@@ -141,12 +141,12 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
   }
 }
 
-std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
-  std::vector<unsigned int> idxs;
+std::vector<long> get_gep_idxs(llvm::GetElementPtrInst *gep) {
+  std::vector<long> idxs;
   for (auto &idx : gep->indices()) {
     auto idx_constant = dyn_cast<ConstantInt>(&idx);
     if (idx_constant) {
-      unsigned int idx_v = idx_constant->getZExtValue();
+      long idx_v = idx_constant->getSExtValue();
       idxs.push_back(idx_v);
     } else {
       idxs.push_back(WILDCARD_IDX);
@@ -156,8 +156,8 @@ std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
   return idxs;
 }
 
-bool is_member_matching(const std::vector<unsigned int> &member_idx,
-                        const std::vector<unsigned int> &member_idx_reference) {
+bool is_member_matching(const std::vector<long> &member_idx,
+                        const std::vector<long> &member_idx_reference) {
   if (member_idx.size() > member_idx_reference.size()) {
     // swap args so that we can assume the right one is larger
     return is_member_matching(member_idx_reference, member_idx);
@@ -194,10 +194,13 @@ void PtrUsageInfo::add_important_member(
 }
 
 void PtrUsageInfo::add_important_member(
-    std::vector<unsigned int> member_idx,
+    std::vector<long> member_idx,
     const std::shared_ptr<PtrUsageInfo> &result_ptr) {
   assert(is_valid);
   assert(this->merged_with == nullptr);
+  // a ptr may not be its own GEP result
+
+  assert(result_ptr != shared_from_this());
   auto existing_info = find_info_for_gep_idx(member_idx);
 
   if (existing_info.second == nullptr) {
@@ -220,6 +223,10 @@ void PtrUsageInfo::add_important_member(
         assert(m != shared_from_this());
         result_ptr->merge_with(m);
       }
+      if (not is_valid) {
+        assert(this->merged_with != nullptr);
+        this->dump();
+      }
 
       // std::erase_if in c++20
       for (auto iter = important_members.begin();
@@ -236,6 +243,7 @@ void PtrUsageInfo::add_important_member(
       existing_info.second->merge_with(result_ptr);
     }
   }
+
   // TODO if merge does not change anything: nothing to do
   // but propergate "changes" is not wrong in either case
   propergate_changes();
@@ -260,8 +268,7 @@ bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
 }
 
 std::pair<bool, std::shared_ptr<PtrUsageInfo>>
-PtrUsageInfo::find_info_for_gep_idx(
-    const std::vector<unsigned int> &member_idx) {
+PtrUsageInfo::find_info_for_gep_idx(const std::vector<long> &member_idx) {
   assert(is_valid);
   auto pos = std::find_if(important_members.begin(), important_members.end(),
                           [&member_idx](auto pair) {

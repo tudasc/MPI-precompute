@@ -154,7 +154,7 @@ public:
                             const std::shared_ptr<PtrUsageInfo> &result_ptr);
 
 private:
-  void add_important_member(std::vector<unsigned int> member_idx,
+  void add_important_member(std::vector<long> member_idx,
                             const std::shared_ptr<PtrUsageInfo> &result_ptr);
 
 public:
@@ -179,7 +179,7 @@ private:
   // returns bool true, if wildcard usage was found
   // false if the known usage has no wildcard
   std::pair<bool, std::shared_ptr<PtrUsageInfo>>
-  find_info_for_gep_idx(const std::vector<unsigned int> &member_idx);
+  find_info_for_gep_idx(const std::vector<long> &member_idx);
 
   // meaning gep idx 0,0,...(as many zeros as
   // deepest struct nesting level)
@@ -187,8 +187,7 @@ private:
   // null if the direct load is a value
   // std::shared_ptr<PtrUsageInfo> direct_usage_parent = nullptr;
 
-  std::map<std::vector<unsigned int>, std::shared_ptr<PtrUsageInfo>>
-      important_members;
+  std::map<std::vector<long>, std::shared_ptr<PtrUsageInfo>> important_members;
 
   bool is_read_from = false;
   bool is_written_to = false;
