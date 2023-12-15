@@ -56,6 +56,7 @@ def annotate(module, remarks):
         annotation = get_annotation_string(reason)
         # the next line
         to_annotate = remarks[idx + 2]
+        # only the part before the debug symbols
         if "!" in to_annotate:
             pos = to_annotate.find("!")
             to_annotate = to_annotate[0:pos]
@@ -67,8 +68,8 @@ def annotate(module, remarks):
             to_anno_idx = [i for i in to_anno_idx if
                            function_defines[match_func_idx[0]][0] < i < function_defines[match_func_idx[0] + 1][0]]
 
-        for idx in to_anno_idx:
-            module[idx] = annotation + " " + module[idx]
+        for ii in to_anno_idx:
+            module[ii] = annotation + " " + module[ii]
 
     return module
 
