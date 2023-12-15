@@ -151,12 +151,6 @@ bool is_allocation(llvm::CallBase *call) {
   if (call->isIndirectCall()) {
     return false;
   }
-  // operator new
-  if (call->getCalledFunction()->getName() == "_Znwm") {
-    assert(isa<Constant>(call->getArgOperand(0)) &&
-           "Non constant allocation in new??");
-    return true;
-  }
   return is_allocation(call->getCalledFunction());
 }
 
