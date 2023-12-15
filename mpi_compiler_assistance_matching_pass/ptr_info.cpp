@@ -189,6 +189,11 @@ void PtrUsageInfo::add_important_member(
   }
   assert(is_valid);
 
+  if (result_ptr == shared_from_this()) {
+    return; // nothing to do
+    // e.g. an iterator where it++ is realized as a GEP instruction
+  }
+
   auto member_idx = get_gep_idxs(gep);
   add_important_member(member_idx, result_ptr);
 }
@@ -198,9 +203,13 @@ void PtrUsageInfo::add_important_member(
     const std::shared_ptr<PtrUsageInfo> &result_ptr) {
   assert(is_valid);
   assert(this->merged_with == nullptr);
-  // a ptr may not be its own GEP result
 
-  assert(result_ptr != shared_from_this());
+  // we dont keep track of if the GEP results in ptr again
+  if (result_ptr == shared_from_this()) {
+    return; // nothing to do
+    // e.g. an iterator where it++ is realized as a GEP instruction
+  }
+
   auto existing_info = find_info_for_gep_idx(member_idx);
 
   if (existing_info.second == nullptr) {
@@ -219,13 +228,7 @@ void PtrUsageInfo::add_important_member(
         }
       }
       for (auto &m : to_merge) {
-        // a ptr may not be its own GEP result
-        assert(m != shared_from_this());
         result_ptr->merge_with(m);
-      }
-      if (not is_valid) {
-        assert(this->merged_with != nullptr);
-        this->dump();
       }
 
       // std::erase_if in c++20
@@ -244,9 +247,16 @@ void PtrUsageInfo::add_important_member(
     }
   }
 
+  // this may be invalid if it needs to be merged due to an iterator++ being
+  // realized as GEP
+  auto to_propergate = shared_from_this();
+  while (to_propergate->merged_with) {
+    to_propergate = to_propergate->merged_with;
+  }
+
   // TODO if merge does not change anything: nothing to do
   // but propergate "changes" is not wrong in either case
-  propergate_changes();
+  to_propergate->propergate_changes();
 }
 
 void PtrUsageInfo::propergate_changes() {
