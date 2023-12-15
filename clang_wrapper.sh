@@ -35,14 +35,15 @@ for arg in "$@"; do
 done
 
 # check if necessary flags are given
-if [ "$has_flto" == false ] ||
-   [ "$has_fwhole_program_vtables" == false ]; then
+if [ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ] &&
+    ( [ "$has_flto" == false ] ||
+   [ "$has_fwhole_program_vtables" == false ] ); then
     echo "Error, need -flto and -fwhole-program-vtables for pass to work correctly"
     export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit 1
 fi
 
-if ! [[ -v MPI_COMPILER_ASSISTANCE_PASS ]]; then
+if [ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ] && ( ! [[ -v MPI_COMPILER_ASSISTANCE_PASS ]] ); then
     echo "The MPI_COMPILER_ASSISTANCE_PASS environment variable is not set"
     export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit 1
