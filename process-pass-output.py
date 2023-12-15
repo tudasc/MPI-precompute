@@ -14,24 +14,46 @@ marker_begin_module_modified = "After Modification:"
 marker_begin_module_orig = "Before Modification:"
 marker_end_pass_execution = "Successfully executed the pass"
 
-marker_need_control = "need for control flow:"
-marker_need_dest = "need for dest compute:"
-marker_need_tag = "need for tag compute:"
-marker_need_other = "need for other reason:"
+marker_text = "need for reason:"
+
+taint_reasons = {
+    # 'OTHER': 0,
+    'COMPUTE_TAG': 1 << 0,
+    'COMPUTE_DEST': 1 << 1,
+    'CONTROL_FLOW': 1 << 2,
+    'CONTROL_FLOW_RETURN_VALUE_NEEDED': 1 << 3,
+    'CONTROL_FLOW_CALLEE_NEEDED': 1 << 4,
+    'CONTROL_FLOW_EXCEPTION_NEEDED': 1 << 5,
+    'CONTROL_FLOW_ONLY_PRESENCE_NEEDED': 1 << 6,
+}
 
 
 def get_idices_of_elem(list, elem):
     return [i for i, x in enumerate(list) if x == elem]
 
 
-def annotate(module, remarks, marker, annotation):
-    idx_annotations = get_idices_of_elem(remarks, marker)
+def get_annotation_string(reason):
+    anno = ""
+    if reason == 0:
+        return "OTHER "
+
+    for key, val in taint_reasons.items():
+        if reason & val:
+            anno = anno + key + " "
+    return anno
+
+
+def annotate(module, remarks):
+    idx_annotations = [i for i, x in enumerate(remarks) if x.startswith(marker_text)]
 
     function_defines = [(i, v) for i, v in enumerate(module) if v.startswith("define ")]
     function_defines.append((len(module) - 1, "END OF MODULE"))
     # is sorted by i already
 
     for idx in idx_annotations:
+        integer_part = remarks[idx].split(':')[-1].strip()
+        reason = int(integer_part)
+        annotation = get_annotation_string(reason)
         # the next line
         to_annotate = remarks[idx + 2]
         if "!" in to_annotate:
@@ -54,10 +76,7 @@ def annotate(module, remarks, marker, annotation):
 def print_orig(module, remarks):
     without_debug_info = [l for l in module if not l.startswith("!")]
 
-    with_anno = annotate(without_debug_info, remarks, marker_need_control, "CONTROL")
-    with_anno = annotate(with_anno, remarks, marker_need_tag, "TAG")
-    with_anno = annotate(with_anno, remarks, marker_need_dest, "DEST")
-    with_anno = annotate(with_anno, remarks, marker_need_other, "OTHER")
+    with_anno = annotate(without_debug_info, remarks)
 
     with open(output_orig, 'w') as the_file:
         the_file.write("\n".join(with_anno))

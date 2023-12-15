@@ -1699,29 +1699,11 @@ void Precalculations::print_analysis_result_remarks() {
 
   for (auto v : tainted_values) {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
-      if (v->getReason() & TaintReason::CONTROL_FLOW) {
-        errs() << "need for control flow:\n";
-        errs() << inst->getFunction()->getName() << "\n";
+      errs() << "need for reason: " << v->getReason() << "\n";
+      errs() << inst->getFunction()->getName() << "\n";
         inst->dump();
-      }
-      if (v->getReason() & TaintReason::COMPUTE_TAG) {
-        errs() << "need for tag compute:\n";
-        errs() << inst->getFunction()->getName() << "\n";
-        inst->dump();
-      }
-      if (v->getReason() & TaintReason::COMPUTE_DEST) {
-        errs() << "need for dest compute:\n";
-        errs() << inst->getFunction()->getName() << "\n";
-        inst->dump();
-      }
-      if (v->getReason() == TaintReason::OTHER) {
-        errs() << "need for other reason:\n";
-        errs() << inst->getFunction()->getName() << "\n";
-        inst->dump();
-      }
     }
   }
-
   debug_printings();
 }
 
