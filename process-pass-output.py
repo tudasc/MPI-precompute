@@ -43,6 +43,9 @@ def get_annotation_string(reason):
     return anno
 
 
+# TODO a call with no return value is not unique as it can occur multiple times
+# but this is visible in multiple annotations in the result output
+
 def annotate(module, remarks):
     idx_annotations = [i for i, x in enumerate(remarks) if x.startswith(marker_text)]
 
