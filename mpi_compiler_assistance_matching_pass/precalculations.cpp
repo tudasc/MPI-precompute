@@ -553,12 +553,14 @@ void Precalculations::visit_val(std::shared_ptr<TaintedValue> v) {
     assert(v->getReason() == TaintReason::CONTROL_FLOW);
     // resume exception: nothing to do just keep it
     insert_tainted_value(resume->getOperand(0), v);
+    v->visited = true;
   } else if (auto *ret = dyn_cast<ReturnInst>(v->v)) {
     insert_tainted_value(ret->getOperand(0), v);
+    v->visited = true;
   } else if (auto *lpad = dyn_cast<LandingPadInst>(v->v)) {
     // nothing to do, just keep around
     assert(v->getReason() == TaintReason::CONTROL_FLOW);
-
+    v->visited = true;
   } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -1158,6 +1160,10 @@ std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
   if (not is_tainted(v)) {
     if (auto *inst = dyn_cast<Instruction>(v)) {
       // dont analyze std::s internals
+      if (is_func_from_std(inst->getFunction())) {
+        inst->getFunction()->dump();
+        inst->dump();
+      }
       assert(not is_func_from_std(inst->getFunction()));
     }
 
