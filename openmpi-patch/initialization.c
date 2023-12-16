@@ -85,6 +85,7 @@ int check_if_envelope_was_registered(int dest, int tag, bool is_send) {
     if (i != num_elements_created) {
       int other_dest = get_precomputed_value(dest_category, i);
       int other_tag = get_precomputed_value(tag_category, i);
+
       if (other_dest == current_dest && other_tag == current_tag) {
         printf(
             "Rank %d: envelope (%d,%d) USED more than one time: CONFLICTING\n",

@@ -1502,9 +1502,12 @@ void Precalculations::prune_function_copy(
       // an invoke can be tainted only because it may return an exception
       // but it actually is exception free for our purpose
       // meaning if it throws no MPI is used
-      if (not is_invoke_necessary_for_control_flow(
-              dyn_cast<InvokeInst>(old_v)) &&
-          not is_retval_of_call_needed(dyn_cast<InvokeInst>(old_v))) {
+
+      assert(is_tainted(old_v));
+      auto info = insert_tainted_value(old_v);
+
+      if (info->getReason() == TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
+        // can be replaced with unconditional br to normal dest
         to_prune.push_back(inst);
       }
     }
