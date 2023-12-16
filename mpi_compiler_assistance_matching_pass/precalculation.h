@@ -168,6 +168,7 @@ public:
   void prune_function_copy(const std::shared_ptr<FunctionToPrecalculate> &func);
 
   bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke);
+  bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke);
 
   void add_call_to_precalculation_to_main();
 

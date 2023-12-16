@@ -73,29 +73,10 @@ void print_parents(std::shared_ptr<TaintedValue> child,
   }
 }
 
-// True if callee needs to be called as it contains tainted instructions
-// or True if callee can raise an exception and the exception handling code is
-// actually tainted if exception handling is not tainted, we dont need to handle
-// the exception anyway and abortion is fine in this case
-bool Precalculations::is_invoke_necessary_for_control_flow(
+bool Precalculations::is_invoke_exception_case_needed(
     llvm::InvokeInst *invoke) {
-
   assert(invoke);
 
-  if (invoke->isIndirectCall()) {
-    // TODO if we know by devirt analysis that call is not neded we can exclude
-    // it
-    return true;
-  }
-  // calling into something we need
-  if (std::find_if(functions_to_include.begin(), functions_to_include.end(),
-                   [&invoke](auto f) {
-                     return f->F_orig == invoke->getCalledFunction();
-                   }) != functions_to_include.end()) {
-    return true;
-  }
-
-  // check if the exception part is needed
   auto *unwindBB = invoke->getUnwindDest();
 
   std::set<Instruction *> in_unwind;
@@ -122,6 +103,32 @@ bool Precalculations::is_invoke_necessary_for_control_flow(
   }
   // may yield an exception
   return true;
+}
+
+// True if callee needs to be called as it contains tainted instructions
+// or True if callee can raise an exception and the exception handling code is
+// actually tainted if exception handling is not tainted, we dont need to handle
+// the exception anyway and abortion is fine in this case
+bool Precalculations::is_invoke_necessary_for_control_flow(
+    llvm::InvokeInst *invoke) {
+
+  assert(invoke);
+
+  if (invoke->isIndirectCall()) {
+    // TODO if we know by devirt analysis that call is not neded we can exclude
+    // it
+    return true;
+  }
+  // calling into something we need
+  if (std::find_if(functions_to_include.begin(), functions_to_include.end(),
+                   [&invoke](auto f) {
+                     return f->F_orig == invoke->getCalledFunction();
+                   }) != functions_to_include.end()) {
+    return true;
+  }
+
+  // check if the exception part is needed
+  return is_invoke_exception_case_needed(invoke);
 }
 
 bool should_exclude_function_for_debugging(llvm::Function *func) {
@@ -937,8 +944,11 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   // if there are no resumes in called function: no need to do anything as an
   // exception cannot be raised
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-    if (is_invoke_necessary_for_control_flow(invoke)) {
-      // if it will not cause an exception, there is no need to have an invoke
+    if (is_invoke_exception_case_needed(invoke)) {
+      if (is_invoke_exception_case_needed(debug oinvoke)) {
+
+        // TODO
+        // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this
       // function, as we know that it does not make the flow go away due to an
       // exception
@@ -953,6 +963,17 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
              func->getIntrinsicID() == Intrinsic::type_checked_load)) {
           // ignore intrinsics
           continue;
+        }
+
+        if (func == mpi_func->mpi_send_init ||
+            func == mpi_func->mpi_recv_init) {
+          // ma need to visit it again if we find that exception control flow is
+          // needed
+
+          assert(call_info->getReason() |
+                     TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED &&
+                 call_info->has_specific_reason());
+          continue; // ignore otherwise
         }
         if (is_func_known_to_be_safe(func)) {
           continue;
@@ -970,6 +991,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
         if (func->isDeclaration()) {
           call->dump();
           func->dump();
+          errs() << "Reason: " << call_info->getReason() << "\n";
           errs() << "In: " << call->getFunction()->getName() << "\n";
         }
         assert(not func->isDeclaration() &&
@@ -1174,6 +1196,7 @@ std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
   if (not is_tainted(v)) {
+
     if (auto *inst = dyn_cast<Instruction>(v)) {
       // dont analyze std::s internals
       if (is_func_from_std(inst->getFunction())) {
