@@ -1504,11 +1504,28 @@ void Precalculations::prune_function_copy(
       // meaning if it throws no MPI is used
 
       assert(is_tainted(old_v));
-      auto info = insert_tainted_value(old_v);
+      auto old_ivoke = dyn_cast<InvokeInst>(old_v);
+      assert(old_ivoke);
 
-      if (info->getReason() == TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
-        // can be replaced with unconditional br to normal dest
-        to_prune.push_back(inst);
+      if (not is_invoke_necessary_for_control_flow(old_ivoke)) {
+        // cal to std or MPI will be kept if all params are tainted
+
+        if (not(is_func_from_std(old_ivoke->getCalledFunction()) ||
+                is_mpi_call(old_ivoke))) {
+          to_prune.push_back(inst);
+        } else {
+
+          bool all_tainted = true;
+          for (auto &vv : old_ivoke->args()) {
+            if (not is_tainted(cast<Value>(&vv))) {
+              all_tainted = false;
+            }
+          }
+          // can be replaced with unconditional br to normal dest
+          if (not all_tainted) {
+            to_prune.push_back(inst);
+          }
+        }
       }
     }
   }
