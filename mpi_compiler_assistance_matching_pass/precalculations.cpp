@@ -945,10 +945,8 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   // exception cannot be raised
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     if (is_invoke_exception_case_needed(invoke)) {
-      if (is_invoke_exception_case_needed(debug oinvoke)) {
 
-        // TODO
-        // if it will not cause an exception, there is no need to have an invoke
+      // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this
       // function, as we know that it does not make the flow go away due to an
       // exception
@@ -967,8 +965,8 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
 
         if (func == mpi_func->mpi_send_init ||
             func == mpi_func->mpi_recv_init) {
-          // ma need to visit it again if we find that exception control flow is
-          // needed
+          // ma need to visit it again if we find that exception control flow
+          // is needed
 
           assert(call_info->getReason() |
                      TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED &&
@@ -1368,17 +1366,15 @@ void Precalculations::replace_calls_in_copy(
 
       builder.CreateCall(precompute_func->register_precomputed_value,
                          {builder.getInt32(SEND_ENVELOPE_DEST), src});
-      CallBase *new_call = nullptr;
-      if (auto *invoke = dyn_cast<InvokeInst>(call)) {
 
-        new_call = builder.CreateInvoke(
-            precompute_func->register_precomputed_value,
-            invoke->getNormalDest(), invoke->getUnwindDest(),
-            {builder.getInt32(SEND_ENVELOPE_TAG), tag});
-      } else {
-        new_call =
-            builder.CreateCall(precompute_func->register_precomputed_value,
-                               {builder.getInt32(SEND_ENVELOPE_TAG), tag});
+      auto *new_call =
+          builder.CreateCall(precompute_func->register_precomputed_value,
+                             {builder.getInt32(SEND_ENVELOPE_TAG), tag});
+
+      if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+        // the register precompute call does not throw exceptions so we dont
+        // need an invoke
+        builder.CreateBr(invoke->getNormalDest());
       }
       call->replaceAllUsesWith(
           ImplementationSpecifics::get_instance()->SUCCESS);
