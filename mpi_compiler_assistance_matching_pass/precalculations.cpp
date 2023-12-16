@@ -596,6 +596,11 @@ void Precalculations::visit_ptr_usages(std::shared_ptr<TaintedValue> ptr) {
     }
   }
 
+  if (auto *constant = dyn_cast<ConstantPointerNull>(ptr->v)) {
+    return;
+    // we dont need to trace usages of null to find out if if is written or read
+  }
+
   if (ptr->ptr_info == nullptr) {
     // this pointer is not needed
     // if this pointer is indeed needed it will later be visited again if the
