@@ -1371,42 +1371,51 @@ void Precalculations::replace_calls_in_copy(
           builder.CreateCall(precompute_func->register_precomputed_value,
                              {builder.getInt32(SEND_ENVELOPE_TAG), tag});
 
+      Instruction *invoke_br = nullptr;
       if (auto *invoke = dyn_cast<InvokeInst>(call)) {
         // the register precompute call does not throw exceptions so we dont
         // need an invoke
-        builder.CreateBr(invoke->getNormalDest());
+        invoke_br = builder.CreateBr(invoke->getNormalDest());
       }
       call->replaceAllUsesWith(
           ImplementationSpecifics::get_instance()->SUCCESS);
-      call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
+      call->eraseFromParent();
+
       func->new_to_old_map[new_call] = old_call_v;
+      if (invoke_br) {
+        func->new_to_old_map[invoke_br] = old_call_v;
+      }
 
       continue;
     }
     if (callee == mpi_func->mpi_recv_init) {
+      // TODO bad smell duplicate code
       auto tag = get_tag_value(call, false);
       auto src = get_src_value(call, false);
       IRBuilder<> builder = IRBuilder<>(call);
       builder.CreateCall(precompute_func->register_precomputed_value,
                          {builder.getInt32(RECV_ENVELOPE_DEST), src});
-      CallBase *new_call = nullptr;
-      if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+      CallBase *new_call =
+          builder.CreateCall(precompute_func->register_precomputed_value,
+                             {builder.getInt32(RECV_ENVELOPE_TAG), tag});
 
-        new_call = builder.CreateInvoke(
-            precompute_func->register_precomputed_value,
-            invoke->getNormalDest(), invoke->getUnwindDest(),
-            {builder.getInt32(RECV_ENVELOPE_TAG), tag});
-      } else {
-        new_call =
-            builder.CreateCall(precompute_func->register_precomputed_value,
-                               {builder.getInt32(RECV_ENVELOPE_TAG), tag});
+      Instruction *invoke_br = nullptr;
+      if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+        // the register precompute call does not throw exceptions so we dont
+        // need an invoke
+        invoke_br = builder.CreateBr(invoke->getNormalDest());
       }
+
       call->replaceAllUsesWith(
           ImplementationSpecifics::get_instance()->SUCCESS);
-      call->eraseFromParent();
       auto old_call_v = func->new_to_old_map[call];
+      call->eraseFromParent();
+
       func->new_to_old_map[new_call] = old_call_v;
+      if (invoke_br) {
+        func->new_to_old_map[invoke_br] = old_call_v;
+      }
 
       continue;
     }
