@@ -1034,6 +1034,22 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
     return;
   }
 
+  if (not call->isIndirectCall() && call->getCalledFunction()->isIntrinsic()) {
+    // ignore lifetime, type test, debug intrinsics
+    auto intrinsic_id = call->getCalledFunction()->getIntrinsicID();
+    if (intrinsic_id == Intrinsic::lifetime_start ||
+        intrinsic_id == Intrinsic::lifetime_end ||
+        intrinsic_id == Intrinsic::public_type_test ||
+        intrinsic_id == Intrinsic::type_test ||
+        intrinsic_id == Intrinsic::dbg_declare ||
+        intrinsic_id == Intrinsic::dbg_addr ||
+        intrinsic_id == Intrinsic::dbg_assign ||
+        intrinsic_id == Intrinsic::dbg_label ||
+        intrinsic_id == Intrinsic::dbg_value) {
+      return;
+    }
+  }
+
   assert(not ptr_given_as_arg.empty());
 
   assert(ptr->ptr_info); // otherwise no need to trace this ptr usage
@@ -1701,7 +1717,7 @@ void Precalculations::print_analysis_result_remarks() {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
       errs() << "need for reason: " << v->getReason() << "\n";
       errs() << inst->getFunction()->getName() << "\n";
-        inst->dump();
+      inst->dump();
     }
   }
   debug_printings();
