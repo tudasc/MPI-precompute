@@ -1850,7 +1850,18 @@ llvm::Function *Precalculations::get_global_re_init_function() {
       auto global_info = insert_tainted_value(&global); // does find only
       assert(global_info->ptr_info);
       if (global_info->ptr_info->isWrittenTo()) {
-        builder.CreateStore(global.getInitializer(), &global);
+        if (global.hasInitializer()) {
+          builder.CreateStore(global.getInitializer(), &global);
+        } else {
+          // TODO @_ZSt4cout = external global %"class.std::basic_ostream",
+          // align 8
+          //  can we modify this global to point towards /dev/null?
+          //  this would "resolve" the issue that writing to stdout can have an
+          //  exception
+          errs() << "Global without initializer:\n";
+          global.dump();
+          assert(global.getName() == "_ZSt4cout");
+        }
       } // else no need to do anything as it is not changed (readonly)
       // at least not by tainted instructions
     }
