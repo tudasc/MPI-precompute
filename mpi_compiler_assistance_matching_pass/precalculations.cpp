@@ -894,6 +894,33 @@ bool should_ignore_intrinsic(Intrinsic::ID id) {
       id == Intrinsic::lrint || id == Intrinsic::llrint;
 }
 
+void analyze_ptr_usage_in_std(
+    CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
+
+  assert(ptr_arg_info->v->getType()->isPointerTy());
+  assert(ptr_arg_info->ptr_info);
+  assert(is_call_to_std(call));
+
+  int arg_no = -1;
+
+  for (int i = 0; i < call->getNumOperands(); ++i) {
+    if (call->getArgOperand(i) == ptr_arg_info->v) {
+      arg_no = i;
+      break;
+    }
+  }
+  assert(arg_no != -1);
+
+  auto arg = call->getCalledFunction()->getArg(arg_no);
+  if (not arg->hasAttribute(llvm::Attribute::ReadNone)) {
+    ptr_arg_info->ptr_info->setIsReadFrom(true);
+  }
+
+  if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
+    ptr_arg_info->ptr_info->setIsWrittenTo(true);
+  }
+}
+
 void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   auto *call = cast<CallBase>(call_info->v);
   assert(!call_info->visited);
@@ -917,11 +944,17 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
         if (is_func_from_std(func)) {
           // calling into std is safe, as no side effects will occur (other
           // than for the given parameters)
-          //  as std is designed to haf as fw side effects as possible
+          //  as std is designed to have as fw side effects as possible
           // TODO implement check for exception std::rand and std::cout/cin
           // we just need to make shure all parameters are given
           for (auto &arg : call->args()) {
-            insert_tainted_value(arg, call_info);
+            auto arg_info = insert_tainted_value(arg, call_info);
+
+            // for ptr parameters: we need to respect if thes func reads/writes
+            // them
+            if (arg->getType()->isPointerTy()) {
+              analyze_ptr_usage_in_std(call, arg_info);
+            }
           }
           continue;
         }
@@ -987,7 +1020,13 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           //  as std is designed to haf as fw side effects as possible
           // TODO implement check for exception std::rand and std::cout/cin
           for (auto &arg : call->args()) {
-            insert_tainted_value(arg, call_info);
+            auto arg_info = insert_tainted_value(arg, call_info);
+
+            // for ptr parameters: we need to respect if thes func reads/writes
+            // them
+            if (arg->getType()->isPointerTy()) {
+              analyze_ptr_usage_in_std(call, arg_info);
+            }
           }
           continue;
         }
@@ -1136,6 +1175,8 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
       // for the given parameters)
       //  as std is designed to haf as fw side effects as possible
       // TODO implement check for exception std::rand and std::cout/cin
+
+      analyze_ptr_usage_in_std(call, ptr);
       continue;
     }
 
@@ -1203,8 +1244,10 @@ std::shared_ptr<TaintedValue> Precalculations::insert_tainted_value(
     if (auto *inst = dyn_cast<Instruction>(v)) {
       // dont analyze std::s internals
       if (is_func_from_std(inst->getFunction())) {
-        inst->getFunction()->dump();
+        // inst->getFunction()->dump();
+
         inst->dump();
+        errs() << "In: " << inst->getFunction()->getName() << "\n";
       }
       assert(not is_func_from_std(inst->getFunction()));
     }
