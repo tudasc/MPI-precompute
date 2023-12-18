@@ -851,8 +851,7 @@ bool Precalculations::is_retval_of_call_needed(llvm::CallBase *call) {
   for (auto *v : users_of_retval) {
     if (is_tainted(v)) {
       auto taint_info = insert_tainted_value(v);
-      if (taint_info->has_specific_reason() &&
-          taint_info->getReason() !=
+      if (taint_info->getReason() !=
               TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
         need_return_val = true;
 
@@ -894,8 +893,8 @@ bool should_ignore_intrinsic(Intrinsic::ID id) {
       id == Intrinsic::lrint || id == Intrinsic::llrint;
 }
 
-void analyze_ptr_usage_in_std(
-    CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
+void Precalculations::analyze_ptr_usage_in_std(
+    llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
 
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
@@ -932,7 +931,9 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   if (need_return_val) {
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
-      // TODO do we need to taint the arguments?
+      for (auto &arg : call->args()) {
+        auto arg_info = insert_tainted_value(arg, call_info);
+      }
 
     } else {
       for (auto func : possible_targets) {
@@ -950,7 +951,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
           for (auto &arg : call->args()) {
             auto arg_info = insert_tainted_value(arg, call_info);
 
-            // for ptr parameters: we need to respect if thes func reads/writes
+            // for ptr parameters: we need to respect if the func reads/writes
             // them
             if (arg->getType()->isPointerTy()) {
               analyze_ptr_usage_in_std(call, arg_info);
@@ -1060,8 +1061,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   }
 }
 
-void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
-                                          std::shared_ptr<TaintedValue> ptr) {
+void Precalculations::visit_call_from_ptr(llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
 
   std::set<unsigned int> ptr_given_as_arg;
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
@@ -1096,22 +1096,6 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
   if (not call->isIndirectCall() && is_free(call)) {
     // the precompute library will take care of free, so no need to taint it
     return;
-  }
-
-  if (not call->isIndirectCall() && call->getCalledFunction()->isIntrinsic()) {
-    // ignore lifetime, type test, debug intrinsics
-    auto intrinsic_id = call->getCalledFunction()->getIntrinsicID();
-    if (intrinsic_id == Intrinsic::lifetime_start ||
-        intrinsic_id == Intrinsic::lifetime_end ||
-        intrinsic_id == Intrinsic::public_type_test ||
-        intrinsic_id == Intrinsic::type_test ||
-        intrinsic_id == Intrinsic::dbg_declare ||
-        intrinsic_id == Intrinsic::dbg_addr ||
-        intrinsic_id == Intrinsic::dbg_assign ||
-        intrinsic_id == Intrinsic::dbg_label ||
-        intrinsic_id == Intrinsic::dbg_value) {
-      return;
-    }
   }
 
   assert(not ptr_given_as_arg.empty());
@@ -1166,6 +1150,7 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call,
 
     if (func->isIntrinsic() &&
         should_ignore_intrinsic(func->getIntrinsicID())) {
+      // TODO for intrinsic such as max, we need to taint args!
       // ignore intrinsics
       continue;
     }

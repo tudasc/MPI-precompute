@@ -127,7 +127,7 @@ public:
 
   void visit_call(std::shared_ptr<TaintedValue> call_info);
   void visit_call_from_ptr(llvm::CallBase *call,
-                           std::shared_ptr<TaintedValue> ptr);
+                           const std::shared_ptr<TaintedValue> &ptr);
   void visit_ptr_usages(std::shared_ptr<TaintedValue> ptr);
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
@@ -169,6 +169,9 @@ public:
 
   bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke);
   bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke);
+  void
+  analyze_ptr_usage_in_std(llvm::CallBase *call,
+                           const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
   void add_call_to_precalculation_to_main();
 
