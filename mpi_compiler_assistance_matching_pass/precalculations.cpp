@@ -115,7 +115,7 @@ bool Precalculations::is_invoke_necessary_for_control_flow(
   assert(invoke);
 
   if (invoke->isIndirectCall()) {
-    // TODO if we know by devirt analysis that call is not neded we can exclude
+    // TODO if we know by devirt analysis that call is not needed we can exclude
     // it
     return true;
   }
@@ -238,18 +238,33 @@ bool is_call_to_std(llvm::CallBase *call) {
 // is function known to not throw an exception during precompute
 // if one of those throws: the whole precompute has to abort anyway
 bool is_func_known_to_be_safe(llvm::Function *func) {
-  return is_allocation(func) || func == mpi_func->mpi_comm_size ||
-         func == mpi_func->mpi_comm_rank ||
-         // if barrier in precompute: all ranks can call them (if not all ranks
-         // arrive at this point programm will deadlock anyway)
-         func == mpi_func->mpi_barrier ||
-         func ==
-             mpi_func->mpi_finalize || // will not "except" but end the programm
-         func->getName() ==
-             "MPI_Abort" // calling would also abort main program, calling it
-                         // during precompute is "safe" in that regard it will
-                         // abort, not "except"
-      ;
+  if (is_allocation(func) || func == mpi_func->mpi_comm_size ||
+      func == mpi_func->mpi_comm_rank ||
+      // if barrier in precompute: all ranks can call them (if not all ranks
+      // arrive at this point programm will deadlock anyway)
+      func == mpi_func->mpi_barrier ||
+      func ==
+          mpi_func->mpi_finalize || // will not "except" but end the programm
+      func->getName() ==
+          "MPI_Abort" // calling would also abort main program, calling it
+                      // during precompute is "safe" in that regard it will
+                      // abort, not "except"
+  ) {
+    return true;
+  }
+
+  if (func->hasFnAttribute(llvm::Attribute::NoUnwind)) {
+    // no exception possible
+    return true;
+  }
+
+  if (func->isDeclaration()) {
+    // dont know, need to assume it can throw
+    return false;
+  }
+
+  // TODO one needs to go through every callee and check if it is safe as well
+  return false;
 }
 
 void Precalculations::add_precalculations(
@@ -852,7 +867,7 @@ bool Precalculations::is_retval_of_call_needed(llvm::CallBase *call) {
     if (is_tainted(v)) {
       auto taint_info = insert_tainted_value(v);
       if (taint_info->getReason() !=
-              TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
+          TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
         need_return_val = true;
 
         errs() << "NEEDED IN:\n";
@@ -900,6 +915,9 @@ void Precalculations::analyze_ptr_usage_in_std(
   assert(ptr_arg_info->ptr_info);
   assert(is_call_to_std(call));
 
+  // errs() << "in : " << call->getCalledFunction()->getName() << " \n";
+  // ptr_arg_info->v->dump();
+
   int arg_no = -1;
 
   for (int i = 0; i < call->getNumOperands(); ++i) {
@@ -912,10 +930,12 @@ void Precalculations::analyze_ptr_usage_in_std(
 
   auto arg = call->getCalledFunction()->getArg(arg_no);
   if (not arg->hasAttribute(llvm::Attribute::ReadNone)) {
+    // errs() << "Is READ\n";
     ptr_arg_info->ptr_info->setIsReadFrom(true);
   }
 
   if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
+    // errs() << "Is WRITTEN\n";
     ptr_arg_info->ptr_info->setIsWrittenTo(true);
   }
 }
@@ -1041,7 +1061,7 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
                "cannot analyze if external function may throw an exception");
         for (auto &bb : *func) {
           if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
-            insert_tainted_value(res, call_info);
+            insert_tainted_value(res, TaintReason::CONTROL_FLOW);
           }
         }
       }
@@ -1061,7 +1081,8 @@ void Precalculations::visit_call(std::shared_ptr<TaintedValue> call_info) {
   }
 }
 
-void Precalculations::visit_call_from_ptr(llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
+void Precalculations::visit_call_from_ptr(
+    llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
 
   std::set<unsigned int> ptr_given_as_arg;
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
@@ -1191,8 +1212,6 @@ void Precalculations::visit_call_from_ptr(llvm::CallBase *call, const std::share
   }
 }
 
-// TODO refactoring, this should be thoe only place where a new ptr_info is
-// constructed
 std::shared_ptr<TaintedValue>
 Precalculations::insert_tainted_value(llvm::Value *v, TaintReason reason) {
 
@@ -1541,7 +1560,7 @@ void Precalculations::prune_function_copy(
       assert(old_ivoke);
 
       if (not is_invoke_necessary_for_control_flow(old_ivoke)) {
-        // cal to std or MPI will be kept if all params are tainted
+        // call to std or MPI will be kept if all params are tainted
 
         if (not(is_func_from_std(old_ivoke->getCalledFunction()) ||
                 is_mpi_call(old_ivoke))) {
