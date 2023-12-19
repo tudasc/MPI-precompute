@@ -9,57 +9,57 @@ add_test(NAME test01
 add_test(NAME test02
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/02-multi_func
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test03
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/03
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test04
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/04
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test05
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/05
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test06
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/06
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test07
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/07
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test08
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/08
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test09
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/09
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test10
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/10
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test11
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/11
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test12
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/12
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
+)
 
 add_test(NAME test13
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/13
@@ -117,11 +117,13 @@ add_test(NAME test23
 
 add_test(NAME cmake-c
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/cmake-c
+
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_test(NAME cmake-cpp
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/cmake-cpp
+        ENVIRONMENT EXPECT_NO_MPIOPT=1
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
@@ -158,9 +160,10 @@ set_tests_properties(test10 PROPERTIES DISABLED true)
 set_tests_properties(test11 PROPERTIES DISABLED true)
 #set_tests_properties(test00 PROPERTIES DISABLED true)
 
-# These testcases Re-Use an envelope and are therefore expected to "fail" dont use MPIOPT
-#TODO better test infrastructure to also account for expected to fail tests
-set_tests_properties(test19 PROPERTIES DISABLED true)
-set_tests_properties(test20 PROPERTIES DISABLED true)
-set_tests_properties(cmake-c PROPERTIES DISABLED true)
-set_tests_properties(cmake-cpp PROPERTIES DISABLED true)
+# These testcases Re-Use an envelope and are therefore expected to NOT use MPIOPT
+# the pas should still produce a running executable though, where precompute finds out that MPIOPT is not applicable
+set_tests_properties(test19 PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
+set_tests_properties(test20 PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
+set_tests_properties(cmake-c PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
+set_tests_properties(cmake-cpp PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
+
