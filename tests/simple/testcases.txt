@@ -20,3 +20,4 @@ tests 03 to 09 target the implementation of the communication
 20 Reinitialization of Requests II
 21 Reading from file but unrelated to message tags
 22 Reading tags from file
+22 Catch exception and use different tag in this case

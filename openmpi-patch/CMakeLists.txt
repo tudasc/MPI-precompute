@@ -21,7 +21,7 @@ cmake_policy(SET CMP0114 NEW)
 set(OMPI_CONFIGURE_FLAGS
         --enable-heterogeneous --enable-static
         --with-ucx --enable-mca-no-build=btl-uct --without-verbs --enable-mpi-fortran=no
-        LIBS=-lprecompute LDFLAGS=-L${CMAKE_BINARY_DIR}/precompute_lib
+        LIBS=-lprecompute LDFLAGS=-L${CMAKE_BINARY_DIR}/precompute_lib CFLAGS=-gdwarf-4 CXXFLAGS=-gdwarf-4
 )
 
 
