@@ -125,7 +125,7 @@ bool PrecalculationAnalysis::is_invoke_necessary_for_control_flow(
   // calling into something we need
   if (std::find_if(functions_to_include.begin(), functions_to_include.end(),
                    [&invoke](auto f) {
-                     return f->F_orig == invoke->getCalledFunction();
+                     return f->func == invoke->getCalledFunction();
                    }) != functions_to_include.end()) {
     return true;
   }
@@ -675,11 +675,11 @@ void PrecalculationAnalysis::visit_ptr_ret(
   }
 }
 
-std::shared_ptr<FunctionToPrecalculate>
+std::shared_ptr<PrecalculationFunctionAnalysis>
 PrecalculationAnalysis::insert_functions_to_include(llvm::Function *func) {
   auto pos =
       std::find_if(functions_to_include.begin(), functions_to_include.end(),
-                   [&func](const auto p) { return p->F_orig == func; });
+                   [&func](const auto p) { return p->func == func; });
 
   if (pos == functions_to_include.end()) {
     errs() << "include function: " << func->getName() << "\n";
@@ -697,7 +697,8 @@ PrecalculationAnalysis::insert_functions_to_include(llvm::Function *func) {
       assert(false);
     }
 
-    auto fun_to_precalc = std::make_shared<FunctionToPrecalculate>(func);
+    auto fun_to_precalc =
+        std::make_shared<PrecalculationFunctionAnalysis>(func);
     functions_to_include.insert(fun_to_precalc);
 
     // used outside of a call
@@ -1232,19 +1233,6 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
   }
 }
 
-void FunctionToPrecalculate::initialize_copy() {
-  assert(F_copy == nullptr);
-  assert(not F_orig->isDeclaration() && "Cannot copy external function");
-  F_copy = CloneFunction(F_orig, old_new_map, cloned_code_info);
-
-  for (auto v : old_new_map) {
-    Value *old_v = const_cast<Value *>(v.first);
-    Value *new_v = v.second;
-    new_to_old_map.insert(std::make_pair(new_v, old_v));
-  }
-}
-
-
 void PrecalculationAnalysis::find_functions_called_indirect() {
   for (auto &f : M.functions()) {
     for (auto u : f.users()) {
@@ -1361,5 +1349,12 @@ void PrecalculationAnalysis::debug_printings() {
     }
   }
 }
-
-
+const std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> &
+PrecalculationAnalysis::getFunctionsToInclude() const {
+  return functions_to_include;
+}
+Function *PrecalculationAnalysis::getEntryPoint() const { return entry_point; }
+const std::vector<llvm::CallBase *> &
+PrecalculationAnalysis::getToReplaceWithEnvelopeRegister() const {
+  return to_replace_with_envelope_register;
+}

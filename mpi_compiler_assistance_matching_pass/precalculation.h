@@ -31,24 +31,18 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "VtableManager.h"
 
-class FunctionToPrecalculate {
+class PrecalculationFunctionAnalysis {
 public:
-  FunctionToPrecalculate(llvm::Function *F) : F_orig(F) {
+  // analysis Part
+  explicit PrecalculationFunctionAnalysis(llvm::Function *F) : func(F) {
     assert(not F->isDeclaration() && "Cannot analyze external function");
   };
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
               std::inserter(args_to_use, args_to_use.begin()));
   }
-
   std::set<unsigned int> args_to_use = {};
-  llvm::Function *F_orig;
-  llvm::Function *F_copy = nullptr;
-  llvm::ValueToValueMapTy old_new_map;
-  std::map<llvm::Value *, llvm::Value *> new_to_old_map;
-  llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we dont need it
-
-  void initialize_copy();
+  llvm::Function *func;
 };
 
 class PrecalculationAnalysis {
@@ -60,14 +54,24 @@ public:
 
   void add_precalculations(const std::vector<llvm::CallBase *> &to_precompute);
 
+private:
+  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
+      functions_to_include;
+
 public:
+  const std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> &
+  getFunctionsToInclude() const;
+  llvm::Function *getEntryPoint() const;
+  const std::vector<llvm::CallBase *> &getToReplaceWithEnvelopeRegister() const;
+
+public:
+private:
   llvm::Module &M;
   llvm::Function *entry_point;
 
   DevirtAnalysis virtual_call_sites;
 
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
-  std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
   std::set<std::shared_ptr<TaintedValue>> tainted_values;
 
   std::shared_ptr<TaintedValue>
@@ -77,13 +81,29 @@ public:
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
 
+public:
   std::shared_ptr<TaintedValue> get_taint_info(llvm::Value *v) const {
     assert(is_tainted(v));
     return *std::find_if(tainted_values.begin(), tainted_values.end(),
                          [&v](const auto &vv) { return vv->v == v; });
   }
 
-  std::shared_ptr<FunctionToPrecalculate>
+  bool is_func_included_in_precompute(llvm::Function *F) const {
+    return std::find_if(functions_to_include.begin(),
+                        functions_to_include.end(), [F](const auto p) {
+                          return F == p->func;
+                        }) != functions_to_include.end();
+  }
+
+  // collect all call sites that can call F respecting indirect calls
+  std::vector<llvm::CallBase *> get_callsites(llvm::Function *F) {
+    // TODO IMPLEMENT
+    assert(false);
+    return {};
+  }
+
+private:
+  std::shared_ptr<PrecalculationFunctionAnalysis>
   insert_functions_to_include(llvm::Function *func);
 
   // TODO we need some kind of heuristic to check if precalculation of all msg
@@ -95,7 +115,6 @@ public:
   void find_all_tainted_vals();
   void find_functions_called_indirect();
   // we need a function to re-initialize all globals that may be overwritten
-  llvm::Function *get_global_re_init_function();
 
   void print_analysis_result_remarks();
   void debug_printings();
@@ -117,6 +136,7 @@ public:
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
+public:
   bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) { return vv->v == v; }) !=
@@ -148,6 +168,8 @@ public:
 
   bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
   bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke) const;
+
+private:
   void
   analyze_ptr_usage_in_std(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
