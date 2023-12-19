@@ -24,7 +24,10 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include <utility>
 
 #include "llvm/IR/Module.h"
+
 #include "llvm/Transforms/Utils/Cloning.h"
+
+#include "llvm/Analysis/TargetLibraryInfo.h"
 
 #include "analysis_results.h"
 #include "llvm/Demangle/Demangle.h"
@@ -163,7 +166,7 @@ public:
   bool is_retval_of_call_needed(llvm::CallBase *call) const;
 
   void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
-                                    std::shared_ptr<TaintedValue> arg_info);
+                               const std::shared_ptr<TaintedValue> &arg_info);
   void taint_all_indirect_calls(llvm::Function *func);
 
   bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;

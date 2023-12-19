@@ -1,35 +1,17 @@
-//
-// Created by tim on 19.12.23.
-//
-
 // TODO clean includes
-#include <boost/stacktrace.hpp>
-#include <llvm/Analysis/TargetLibraryInfo.h>
-#include <random>
-#include <regex>
-
 #include "CompilerPassConstants.h"
 #include "analysis_results.h"
 #include "conflict_detection.h"
-#include "devirt_analysis.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
 #include "precompute_funcs.h"
 
-#include "implementation_specific.h"
-#include "mpi_functions.h"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-
-#include "llvm/Demangle/Demangle.h"
-#include "llvm/IR/Verifier.h"
 
 #include "Precompute_insertion.h"
-#include "precalculation.h"
 
 #include "debug.h"
 
