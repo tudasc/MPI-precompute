@@ -7,7 +7,7 @@ CXXFLAGS="-std=c++17 -O1 -g ${INCLUDE}"
 #
 
 #PASS_FLAGS="-flto -fwhole-program-vtables"
-PASS_FLAGS="-fuse-ld=lld -flto -fwhole-program-vtables"
+PASS_FLAGS="-fuse-ld=lld -flto -fwhole-program-vtables -fno-inline"
 
 
 export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="plugin_data.json"
