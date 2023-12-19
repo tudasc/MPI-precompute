@@ -13,7 +13,7 @@
 #include <map>
 #include <set>
 
-class Precalculations;
+class PrecalculationAnalysis;
 
 class VtableManager {
   // manages the vtables to use in function copies

@@ -159,7 +159,7 @@ struct MPICompilerAssistanceMatchingPass
     auto *main_func = M.getFunction("main");
     assert(main_func);
 
-    auto precalcuation = Precalculations(M, main_func);
+    auto precalcuation = PrecalculationAnalysis(M, main_func);
     precalcuation.add_precalculations(combined_init_list);
 
     bool replacement = !combined_init_list.empty();

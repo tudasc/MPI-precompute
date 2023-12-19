@@ -47,9 +47,9 @@ public:
   void initialize_copy();
 };
 
-class Precalculations {
+class PrecalculationAnalysis {
 public:
-  Precalculations(llvm::Module &M, llvm::Function *entry_point)
+  PrecalculationAnalysis(llvm::Module &M, llvm::Function *entry_point)
       : M(M), entry_point(entry_point), virtual_call_sites(DevirtAnalysis(M)) {
     find_functions_called_indirect();
   };
