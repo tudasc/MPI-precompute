@@ -924,7 +924,7 @@ void PrecalculationAnalysis::analyze_ptr_usage_in_std(
 
   int arg_no = -1;
 
-  for (int i = 0; i < call->getNumOperands(); ++i) {
+  for (unsigned i = 0; i < call->getNumOperands(); ++i) {
     if (call->getArgOperand(i) == ptr_arg_info->v) {
       arg_no = i;
       break;
