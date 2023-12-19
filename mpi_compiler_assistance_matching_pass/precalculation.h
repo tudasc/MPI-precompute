@@ -20,10 +20,14 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "ptr_info.h"
 #include "taintedValue.h"
 #include <numeric>
+#include <regex>
 #include <utility>
 
 #include "llvm/IR/Module.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+
+#include "analysis_results.h"
+#include "llvm/Demangle/Demangle.h"
 
 #include "VtableManager.h"
 
@@ -73,6 +77,12 @@ public:
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
 
+  std::shared_ptr<TaintedValue> get_taint_info(llvm::Value *v) const {
+    assert(is_tainted(v));
+    return *std::find_if(tainted_values.begin(), tainted_values.end(),
+                         [&v](const auto &vv) { return vv->v == v; });
+  }
+
   std::shared_ptr<FunctionToPrecalculate>
   insert_functions_to_include(llvm::Function *func);
 
@@ -107,51 +117,120 @@ public:
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
-  void replace_allocation_call(llvm::CallBase *call);
-
-  bool is_tainted(llvm::Value *v) {
+  bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) { return vv->v == v; }) !=
            tainted_values.end();
   }
 
-  template <class container> unsigned int get_num_tainted(container vals) {
+  template <class container>
+  unsigned int get_num_tainted(container vals) const {
     return std::accumulate(
         vals.begin(), vals.end(), (unsigned int)0,
         [this](auto accu, auto v) { return accu + is_tainted(v); });
   };
 
-  template <class container> bool are_all_tainted(container vals) {
+  template <class container> bool are_all_tainted(container vals) const {
     return get_num_tainted(vals) == vals.size();
   }
 
-  template <class container> bool is_none_tainted(container vals) {
+  template <class container> bool is_none_tainted(container vals) const {
     return !std::accumulate(
         vals.begin(), vals.end(), false,
         [this](auto accu, auto v) { return accu || is_tainted(v); });
   };
 
-  bool is_retval_of_call_needed(llvm::CallBase *call);
+  bool is_retval_of_call_needed(llvm::CallBase *call) const;
 
   void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
                                     std::shared_ptr<TaintedValue> arg_info);
   void taint_all_indirect_calls(llvm::Function *func);
 
-  void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
-  void
-  replace_usages_of_func_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
-  void prune_function_copy(const std::shared_ptr<FunctionToPrecalculate> &func);
-
-  bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke);
-  bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke);
+  bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
+  bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke) const;
   void
   analyze_ptr_usage_in_std(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
-  void add_call_to_precalculation_to_main();
-
   std::vector<llvm::Function *> get_possible_call_targets(llvm::CallBase *call);
   void insert_necessary_control_flow(llvm::Value *v);
 };
+
+inline bool is_allocation(llvm::Function *func) {
+  assert(func);
+  // operator new
+  if (func->getName() == "_Znwm") {
+    return true;
+  }
+  if (func->getName() == "malloc") {
+    return true;
+  }
+  if (func->getName() == "calloc") {
+    return true;
+  }
+  return false;
+}
+
+inline bool is_allocation(llvm::CallBase *call) {
+
+  if (call->isIndirectCall()) {
+    return false;
+  }
+  return is_allocation(call->getCalledFunction());
+}
+
+inline bool is_func_from_std(llvm::Function *func) {
+
+  auto demangled = llvm::demangle(func->getName().str());
+
+  // errs() << "Test if in std:\n" <<demangled << "\n";
+
+  // startswith std::
+  if (demangled.rfind("std::", 0) == 0) {
+    return true;
+  }
+  // for some templates e.g.  unsigned long const& std::min<unsigned
+  // long>(unsigned long const&, unsigned long const&) the return type is part
+  // of the mangled name
+  std::regex regex_pattern_std(
+      "^((unsigned )?(((int)|(long)|(float)|(double)))?( const)?(&)? )?"
+      "std::(.+)");
+  if (std::regex_match(demangled, regex_pattern_std)) {
+    return true;
+  }
+
+  // internals of gnu implementation
+  if (demangled.rfind("__gnu_cxx::", 0) == 0) {
+    return true;
+  }
+  std::regex regex_pattern_gnu(
+      "^((unsigned )?(((int)|(long)|(float)|(double)))?(const)?(&)? )?"
+      "__gnu_cxx::(.+)");
+  if (std::regex_match(demangled, regex_pattern_gnu)) {
+    return true;
+  }
+
+  // C API
+  llvm::LibFunc lib_func;
+  bool in_lib = analysis_results->getTLI()->getLibFunc(*func, lib_func);
+  if (in_lib) {
+    return true;
+  }
+
+  // more like a stack ptr than a function call
+  if (func->getName() == "__errno_location") {
+    return true;
+  }
+
+  return false;
+}
+
+inline bool is_call_to_std(llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    return false;
+  }
+
+  return is_func_from_std(call->getCalledFunction());
+}
 
 #endif // MACH_PRECALCULATIONS_H_
