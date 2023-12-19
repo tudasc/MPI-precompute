@@ -122,8 +122,8 @@ private:
   void print_analysis_result_remarks();
   void debug_printings();
 
-  void visit_val(std::shared_ptr<TaintedValue> v);
-  void visit_arg(std::shared_ptr<TaintedValue> arg_info);
+  void visit_val(const std::shared_ptr<TaintedValue> &v);
+  void visit_arg(const std::shared_ptr<TaintedValue> &arg_info);
 
   void visit_load(const std::shared_ptr<TaintedValue> &load_info);
   void visit_store(const std::shared_ptr<TaintedValue> &store_info);
@@ -132,10 +132,10 @@ private:
   void visit_gep(const std::shared_ptr<TaintedValue> &gep_info);
   void visit_phi(const std::shared_ptr<TaintedValue> &phi_info);
 
-  void visit_call(std::shared_ptr<TaintedValue> call_info);
+  void visit_call(const std::shared_ptr<TaintedValue> &call_info);
   void visit_call_from_ptr(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr);
-  void visit_ptr_usages(std::shared_ptr<TaintedValue> ptr);
+  void visit_ptr_usages(const std::shared_ptr<TaintedValue> &ptr);
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
