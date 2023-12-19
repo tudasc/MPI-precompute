@@ -1876,7 +1876,3 @@ llvm::Function *Precalculations::get_global_re_init_function() {
 
   return func;
 }
-void Precalculations::remove_tainted_value(
-    const std::shared_ptr<TaintedValue> &value_info) {
-  tainted_values.erase(value_info);
-}
