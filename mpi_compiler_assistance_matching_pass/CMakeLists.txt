@@ -26,6 +26,10 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         CompilerPassConstants.h
         precompute_funcs.cpp
         precompute_funcs.h
+        Precompute_insertion.cpp
+        Precompute_insertion.h
+        VtableManager.cpp
+        VtableManager.h
 )
 
 set(Boost_USE_STATIC_LIBS OFF)
