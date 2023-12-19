@@ -115,6 +115,16 @@ add_test(NAME test23
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+add_test(NAME cmake-c
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/cmake-c
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+add_test(NAME cmake-cpp
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/cmake-cpp
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 set_tests_properties(test01 PROPERTIES PROCESSORS 2)
 set_tests_properties(test02 PROPERTIES PROCESSORS 2)
 set_tests_properties(test03 PROPERTIES PROCESSORS 2)
@@ -148,7 +158,9 @@ set_tests_properties(test10 PROPERTIES DISABLED true)
 set_tests_properties(test11 PROPERTIES DISABLED true)
 #set_tests_properties(test00 PROPERTIES DISABLED true)
 
-# These testcases Re-Use an envelope and are therefore expected to fail
+# These testcases Re-Use an envelope and are therefore expected to "fail" dont use MPIOPT
 #TODO better test infrastructure to also account for expected to fail tests
 set_tests_properties(test19 PROPERTIES DISABLED true)
 set_tests_properties(test20 PROPERTIES DISABLED true)
+set_tests_properties(cmake-c PROPERTIES DISABLED true)
+set_tests_properties(cmake-cpp PROPERTIES DISABLED true)
