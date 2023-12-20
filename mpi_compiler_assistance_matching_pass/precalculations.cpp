@@ -100,27 +100,25 @@ bool PrecalculationAnalysis::is_invoke_exception_case_needed(
   assert(invoke);
 
   auto *unwindBB = invoke->getUnwindDest();
-
   std::set<Instruction *> in_unwind;
-
   for (auto &i : *unwindBB) {
     in_unwind.insert(&i);
     // need to put it into set for sorting
   }
-
   if (is_none_tainted(in_unwind)) {
     return false;
     // exception handling is not needed;
   }
 
-  unwindBB->dump();
-  for (auto &i : *unwindBB) {
-    i.dump();
-    errs() << "Tainted? " << is_tainted(&i) << "\n";
+  bool all_exception_free = true;
+  for (auto *tgt : get_possible_call_targets(invoke)) {
+    if (get_function_analysis(tgt)->can_except_in_precompute) {
+      all_exception_free = false;
+      break;
+    }
   }
-
-  auto *func = invoke->getCalledFunction();
-  if (func->hasFnAttribute(Attribute::AttrKind::NoUnwind)) {
+  if (all_exception_free) {
+    // cannot yield exception
     return false;
   }
   // may yield an exception
@@ -212,6 +210,9 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute() {
     return;
   }
 
+  // TODO better analysis needed??
+  //  if they invoke the function that may except they need to resume exception
+  //  handling
   analysis_except_in_precompute = true; // this one is currently analyzed
   for (const auto &c : callees) {
     if (not c.expired()) {
@@ -868,8 +869,6 @@ void PrecalculationAnalysis::visit_call(
   }
 
   // we need to check the control flow if a exception is raised
-  // if there are no resumes in called function: no need to do anything as an
-  // exception cannot be raised
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     if (is_invoke_exception_case_needed(invoke)) {
 
