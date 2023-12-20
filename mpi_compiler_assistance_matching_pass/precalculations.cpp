@@ -184,21 +184,16 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute() {
     return;
   }
 
+  // TODO
+  // std::basic_ostream<char, std::char_traits<char> >& std::operator<<(...) can
+  // also not "except" for our purpose at least if ostream is std::cout
+  // (_ZSt4cout as parameter 1)
+
   // this kind of exception would be fatal during precompute anyway
   // this means not executing the function to test if the exception is raised is
   // OK as exception would lead to abort anyway
-  if (is_allocation(func) // out of mem is fatal
-
-      || func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank ||
-      // if barrier in precompute: all ranks can call them (if not all ranks
-      // arrive at this point programm will deadlock anyway)
-      func == mpi_func->mpi_barrier ||
-      func ==
-          mpi_func->mpi_finalize || // will not "except" but end the programm
-      func->getName() ==
-          "MPI_Abort" // calling would also abort main program, calling it
-                      // during precompute is "safe" in that regard it will
-                      // abort, not "except"
+  if (is_allocation(func)      // out of mem is fatal
+      || is_mpi_function(func) // mpi cannot throw recoverable exceptions
   ) {
     can_except_in_precompute = false;
     return;

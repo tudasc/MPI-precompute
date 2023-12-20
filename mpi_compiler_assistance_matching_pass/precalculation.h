@@ -124,6 +124,10 @@ public:
   bool is_func_included_in_precompute(llvm::Function *F) const {
     return function_analysis.at(F)->include_in_precompute;
   }
+  std::shared_ptr<PrecalculationFunctionAnalysis>
+  get_function_analysis(llvm::Function *F) const {
+    return function_analysis.at(F);
+  }
 
 private:
   void insert_functions_to_include(llvm::Function *func);
@@ -183,11 +187,6 @@ public:
 
   bool is_retval_of_call_needed(llvm::CallBase *call) const;
 
-  void
-  taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
-                               const std::shared_ptr<TaintedValue> &arg_info);
-  void taint_all_indirect_calls(llvm::Function *func);
-
   bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
   bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke) const;
 
@@ -196,8 +195,11 @@ private:
   analyze_ptr_usage_in_std(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
+public:
   std::vector<llvm::Function *>
   get_possible_call_targets(llvm::CallBase *call) const;
+
+private:
   void insert_necessary_control_flow(llvm::Value *v);
 };
 
@@ -227,7 +229,6 @@ inline bool is_allocation(llvm::CallBase *call) {
 inline bool is_func_from_std(llvm::Function *func) {
 
   assert(func);
-  func->dump();
 
   auto demangled = llvm::demangle(func->getName().str());
 

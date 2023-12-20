@@ -233,19 +233,62 @@ void replace_calls_in_copy(
           continue;
         }
 
+        if (isa<InvokeInst>(call)) {
+          to_replace.push_back(call);
+          continue;
+        }
+
         if (precompute_analyis_result.is_func_included_in_precompute(
                 call->getCalledFunction())) {
           to_replace.push_back(call);
           continue;
         } else {
           assert(not precompute_analyis_result.is_tainted(callee));
-          // it is not used: nothing to do
+          // it is not used: nothing to do, later pruning step will remove it
         }
       }
     }
   }
 
   for (auto *call : to_replace) {
+    Value *orig_call_v = func->new_to_old_map[call];
+    auto *orig_call = dyn_cast<CallBase>(orig_call_v);
+    assert(orig_call);
+
+    if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+      // special case: it is an invoke that we don't need to call because no
+      // meaningful exception can be raised
+
+      errs() << "Test Removal:\n";
+      call->dump();
+
+      bool can_omit = true;
+      for (auto *target :
+           precompute_analyis_result.get_possible_call_targets(orig_call)) {
+
+        errs() << target->getName() << "\n";
+
+        auto func_info =
+            precompute_analyis_result.get_function_analysis(target);
+        if (func_info->can_except_in_precompute ||
+            func_info->include_in_precompute) {
+          errs() << "Can NOT omit: except?"
+                 << func_info->can_except_in_precompute << " needed?"
+                 << func_info->include_in_precompute << "\n";
+          can_omit = false;
+        }
+      }
+
+      if (can_omit) {
+        errs() << "REMOVE:  ";
+        invoke->dump();
+        IRBuilder<> builder = IRBuilder<>(invoke);
+        builder.CreateBr(invoke->getNormalDest());
+        invoke->eraseFromParent();
+        continue;
+      }
+    }
+
     auto *callee = call->getCalledFunction();
     if (callee == mpi_func->mpi_send_init) {
       call = replace_MPI_with_precompute(func, call);
@@ -272,10 +315,6 @@ void replace_calls_in_copy(
       }
       // null all not used args
 
-      Value *orig_call_v = func->new_to_old_map[call];
-      auto *orig_call = dyn_cast<CallBase>(orig_call_v);
-      assert(orig_call);
-
       for (unsigned int i = 0; i < call->arg_size(); ++i) {
         if (not precompute_analyis_result.is_tainted(
                 orig_call->getArgOperand(i))) {
@@ -285,18 +324,11 @@ void replace_calls_in_copy(
         } // else pass arg normally
       }
     } catch (std::out_of_range &e) {
-      // callee is the original function
-      if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-
-        // special case: it is a invoke inst and we later find out that it
-        // actually has no resume -> meaning no exception and retval is not used
-
-        assert(invoke);
-        IRBuilder<> builder = IRBuilder<>(invoke);
-        builder.CreateBr(invoke->getNormalDest());
-        invoke->eraseFromParent();
-        // if there were an exception, or the result value is used, the callee
-        // would have been tainted
+      if (not call->isIndirectCall()) {
+        // callee is the original function
+        // which should not be a user function
+        assert(is_func_from_std(callee) || is_mpi_function(callee) ||
+               callee->isIntrinsic());
       }
     }
   }
