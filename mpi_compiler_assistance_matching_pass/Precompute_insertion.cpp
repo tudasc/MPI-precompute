@@ -209,35 +209,34 @@ void replace_calls_in_copy(
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
     if (auto *call = dyn_cast<CallBase>(&*I)) {
-      auto *callee = call->getCalledFunction();
-
-      if (callee == mpi_func->mpi_comm_rank ||
-          callee == mpi_func->mpi_comm_size) {
-        continue; // noting to do, keep original call
-      }
-      if (callee == mpi_func->mpi_send_init) {
+      if (call->isIndirectCall()) {
         to_replace.push_back(call);
-        continue;
-      }
-      if (callee == mpi_func->mpi_recv_init) {
-        to_replace.push_back(call);
-        continue;
-      }
-      // end handling calls to MPI
-
-      if (is_allocation(call)) {
-        to_replace.push_back(call);
-        continue;
-      }
-
-      if (precompute_analyis_result.is_func_included_in_precompute(
-              call->getCalledFunction())) {
-        to_replace.push_back(call);
-        continue;
       } else {
-        // indirect call
-        if (call->isIndirectCall()) {
+        auto *callee = call->getCalledFunction();
+
+        if (callee == mpi_func->mpi_comm_rank ||
+            callee == mpi_func->mpi_comm_size) {
+          continue; // noting to do, keep original call
+        }
+        if (callee == mpi_func->mpi_send_init) {
           to_replace.push_back(call);
+          continue;
+        }
+        if (callee == mpi_func->mpi_recv_init) {
+          to_replace.push_back(call);
+          continue;
+        }
+        // end handling calls to MPI
+
+        if (is_allocation(call)) {
+          to_replace.push_back(call);
+          continue;
+        }
+
+        if (precompute_analyis_result.is_func_included_in_precompute(
+                call->getCalledFunction())) {
+          to_replace.push_back(call);
+          continue;
         } else {
           assert(not precompute_analyis_result.is_tainted(callee));
           // it is not used: nothing to do

@@ -28,6 +28,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/Support/Casting.h"
 
 #include "llvm/Demangle/Demangle.h"
 
@@ -65,6 +66,28 @@ void print_parents(const std::shared_ptr<TaintedValue> &child,
   child->v->dump();
   for (const auto &p : child->parents) {
     print_parents(p, indent + 1);
+  }
+}
+
+void PrecalculationAnalysis::analyze_functions() {
+  // create
+  for (auto &f : M) {
+    function_analysis[&f] =
+        std::make_shared<PrecalculationFunctionAnalysis>(&f);
+  }
+
+  // populate callees and callsites
+  for (auto &f : M.functions()) {
+    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+      if (auto *call = dyn_cast<CallBase>(&*I)) {
+        auto targets = get_possible_call_targets(call);
+        for (auto *target : targets) {
+          function_analysis[target]->callsites.insert(call);
+          function_analysis[call->getFunction()]->callees.insert(
+              function_analysis[target]);
+        }
+      }
+    }
   }
 }
 
@@ -109,17 +132,11 @@ bool PrecalculationAnalysis::is_invoke_necessary_for_control_flow(
 
   assert(invoke);
 
-  if (invoke->isIndirectCall()) {
-    // TODO if we know by devirt analysis that call is not needed we can exclude
-    // it
-    return true;
-  }
   // calling into something we need
-  if (std::find_if(functions_to_include.begin(), functions_to_include.end(),
-                   [&invoke](auto f) {
-                     return f->func == invoke->getCalledFunction();
-                   }) != functions_to_include.end()) {
-    return true;
+  for (auto *tgt : get_possible_call_targets(invoke)) {
+    if (function_analysis.at(tgt)->include_in_precompute) {
+      return true;
+    }
   }
 
   // check if the exception part is needed
@@ -625,97 +642,27 @@ void PrecalculationAnalysis::visit_ptr_ret(
   // TODO some duplicate code with
   // visit_arg and taint_all_indirect_call_args
   auto *func = ret->getFunction();
-  auto fun_to_precalc = insert_functions_to_include(func);
+  auto fun_to_precalc = function_analysis.at(func);
 
-  for (auto *u : func->users()) {
-    if (auto *call = dyn_cast<CallBase>(u)) {
-      assert(is_tainted(call));
-      assert(call->getType()->isPointerTy());
+  for (auto *call : fun_to_precalc->callsites) {
 
-      auto call_info = insert_tainted_value(call, ptr);
-      assert(call_info->ptr_info != nullptr);
-      ptr->ptr_info->merge_with(call_info->ptr_info);
-    }
-    if (functions_that_may_be_called_indirect.find(func) !=
-        functions_that_may_be_called_indirect.end()) {
-      // this func may be called indirect we need to visit all indirect call
-      // sites
-      // TODO this could be done more efficient...
-      // TODO duplicate code with taint_all_indirect_call_args
-      for (auto &f : M.functions()) {
-        if (is_func_from_std(&f)) {
-          // avoid messing with std::'s internals
-          continue;
-        }
-        for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-          if (auto *call = dyn_cast<CallBase>(&*I)) {
-            auto targets = get_possible_call_targets(call);
-            if (std::find(targets.begin(), targets.end(), func) !=
-                targets.end()) {
-              assert(is_tainted(call));
-              assert(call->getType()->isPointerTy());
-              auto call_info = insert_tainted_value(
-                  call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
-              assert(call_info->ptr_info != nullptr);
-              ptr->ptr_info->merge_with(call_info->ptr_info);
-            }
-          }
-        }
-      }
-    }
+    auto call_info = get_taint_info(call);
+    assert(call_info->ptr_info != nullptr);
+    ptr->ptr_info->merge_with(call_info->ptr_info);
   }
 }
 
-std::shared_ptr<PrecalculationFunctionAnalysis>
-PrecalculationAnalysis::insert_functions_to_include(llvm::Function *func) {
-  auto pos =
-      std::find_if(functions_to_include.begin(), functions_to_include.end(),
-                   [&func](const auto p) { return p->func == func; });
+void PrecalculationAnalysis::insert_functions_to_include(llvm::Function *func) {
 
-  if (pos == functions_to_include.end()) {
-    errs() << "include function: " << func->getName() << "\n";
-    if (is_func_from_std(func)) {
-      errs() << "this function is from std::\n";
-
-      assert(false);
-      // TODO treat std functions special?
-      //  sometimes the definition is also present (templated funcs from
-      //  header)
+  auto fun_to_precalc = function_analysis.at(func);
+  if (not fun_to_precalc->include_in_precompute) {
+    fun_to_precalc->include_in_precompute = true;
+    for (auto *call : fun_to_precalc->callsites) {
+      auto call_info =
+          insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
+      call_info->visited = false; // may need to re visit if it was later
+                                  // discovered that it is important
     }
-
-    if (func->getName() == "_ZSt3minImERKT_S2_S2_") {
-      errs() << "NOT IS from std:: assertion?????\n";
-      assert(false);
-    }
-
-    auto fun_to_precalc =
-        std::make_shared<PrecalculationFunctionAnalysis>(func);
-    functions_to_include.insert(fun_to_precalc);
-
-    // used outside of a call
-    bool is_func_ptr_captured = false;
-
-    for (auto *u : func->users()) {
-      if (auto *call = dyn_cast<CallBase>(u)) {
-        errs() << "Visit\n";
-        call->dump();
-        auto new_val =
-            insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
-        new_val->visited =
-            false; // may need to be re-visited if we discover it is important
-        continue;
-      } else {
-        is_func_ptr_captured = true;
-      }
-    }
-    // indirect calls
-    if (is_func_ptr_captured) {
-      taint_all_indirect_calls(func);
-    } // otherwise no indirect calls to this possible
-
-    return fun_to_precalc;
-  } else {
-    return *pos;
   }
 }
 
@@ -724,37 +671,22 @@ void PrecalculationAnalysis::visit_arg(
   auto *arg = cast<Argument>(arg_info->v);
   arg_info->visited = true;
 
-  if (arg_info->v->getType()->isPointerTy()) {
-    if (arg_info->ptr_info == nullptr) {
-      arg_info->ptr_info = std::make_shared<PtrUsageInfo>(arg_info);
-    }
-  }
-
   auto *func = arg->getParent();
-
-  auto fun_to_precalc = insert_functions_to_include(func);
+  auto fun_to_precalc = function_analysis.at(func);
 
   if (fun_to_precalc->args_to_use.find(arg->getArgNo()) ==
       fun_to_precalc->args_to_use.end()) {
 
-    fun_to_precalc->args_to_use.insert(arg->getArgNo());
     // else: nothing to do, this was already visited
-    for (auto *u : func->users()) {
-      if (auto *call = dyn_cast<CallBase>(u)) {
-        auto *operand = call->getArgOperand(arg->getArgNo());
-        auto new_val = insert_tainted_value(operand, arg_info);
-        new_val->visited =
-            false; // may need to re visit if we discover it is important
-        if (arg_info->is_pointer()) {
-          arg_info->ptr_info->merge_with(new_val->ptr_info);
-        }
-        continue;
-      }
-      if (functions_that_may_be_called_indirect.find(func) !=
-          functions_that_may_be_called_indirect.end()) {
-        // this func may be called indirect we need to visit all indirect call
-        // sites
-        taint_all_indirect_call_args(func, arg->getArgNo(), arg_info);
+    fun_to_precalc->args_to_use.insert(arg->getArgNo());
+
+    for (auto *call : fun_to_precalc->callsites) {
+      auto *operand = call->getArgOperand(arg->getArgNo());
+      auto new_val = insert_tainted_value(operand, arg_info);
+      new_val->visited =
+          false; // may need to re visit if we discover it is important
+      if (arg_info->is_pointer()) {
+        arg_info->ptr_info->merge_with(new_val->ptr_info);
       }
     }
   }
@@ -949,8 +881,8 @@ void PrecalculationAnalysis::visit_call(
           for (auto &arg : call->args()) {
             auto arg_info = insert_tainted_value(arg, call_info);
 
-            // for ptr parameters: we need to respect if thes func reads/writes
-            // them
+            // for ptr parameters: we need to respect if thes func
+            // reads/writes them
             if (arg->getType()->isPointerTy()) {
               analyze_ptr_usage_in_std(call, arg_info);
             }
@@ -1223,29 +1155,29 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
   }
 }
 
-void PrecalculationAnalysis::find_functions_called_indirect() {
-  for (auto &f : M.functions()) {
-    for (auto *u : f.users()) {
-      if (not isa<CallBase>(u)) {
-        functions_that_may_be_called_indirect.insert(&f);
-      }
-    }
-  }
-}
-
 std::vector<llvm::Function *>
-PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) {
+PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
   std::vector<llvm::Function *> possible_targets;
   if (call->isIndirectCall()) {
     possible_targets = virtual_call_sites.get_possible_call_targets(call);
   } else {
     possible_targets.push_back(call->getCalledFunction());
   }
+
+  if (is_func_from_std(call->getFunction())) {
+    // we dont need to analyze the sts::'s internals
+    // if std:: calls a user function indirecttly it will get a ptr to it anyway
+    return possible_targets;
+  }
+
   if (possible_targets.empty()) {
     // can call any function with same type that we get a ptr of somewhere
-    for (auto *func : functions_that_may_be_called_indirect) {
-      if (func->getFunctionType() == call->getFunctionType())
-        possible_targets.push_back(func);
+    for (const auto &pair : function_analysis) {
+      auto func = pair.second;
+      if (func->is_func_ptr_captured) {
+        if (func->func->getFunctionType() == call->getFunctionType())
+          possible_targets.push_back(func->func);
+      }
     }
     // TODO can we check that we will not be able to get a ptr to a function
     // outside of the module?
@@ -1260,62 +1192,6 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) {
   return possible_targets;
 }
 
-void PrecalculationAnalysis::taint_all_indirect_call_args(
-    llvm::Function *func, unsigned int ArgNo,
-    const std::shared_ptr<TaintedValue> &arg_info) {
-  // TODO this could be done more efficient...
-  for (auto &f : M.functions()) {
-    if (is_func_from_std(&f)) {
-      // avoid messing with std::'s internals
-      // if std:: indirectely calls a user function, it needs to be given as
-      // an argument anyway
-      continue;
-    }
-    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-      if (auto *call = dyn_cast<CallBase>(&*I)) {
-        auto targets = get_possible_call_targets(call);
-        if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
-          auto new_info =
-              insert_tainted_value(call->getArgOperand(ArgNo), arg_info);
-          new_info->visited =
-              false; // may need to re-visit if we discover it is important
-          if (arg_info->is_pointer()) {
-            assert(arg_info->ptr_info);
-            if (new_info->ptr_info == nullptr) {
-              new_info->ptr_info = arg_info->ptr_info;
-              new_info->ptr_info->add_ptr_info_user(new_info);
-            } else {
-              arg_info->ptr_info->merge_with(new_info->ptr_info);
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-void PrecalculationAnalysis::taint_all_indirect_calls(llvm::Function *func) {
-  errs() << "INDIRECT CALLS TO: " << func->getName() << "\n";
-
-  // TODO this could be done more efficient...
-  // TODO duplicate code with taint_all_indirect_call_args
-  for (auto &f : M.functions()) {
-    if (is_func_from_std(&f)) {
-      // avoid messing with std::'s internals
-      // if std:: indireclty calls a user function, it needs to be given as an
-      // argument anyway
-      continue;
-    }
-    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-      if (auto *call = dyn_cast<CallBase>(&*I)) {
-        auto targets = get_possible_call_targets(call);
-        if (std::find(targets.begin(), targets.end(), func) != targets.end()) {
-          insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
-        }
-      }
-    }
-  }
-}
 void PrecalculationAnalysis::print_analysis_result_remarks() {
 
   for (const auto &v : tainted_values) {
@@ -1338,9 +1214,15 @@ void PrecalculationAnalysis::debug_printings() {
     }
   }
 }
-const std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> &
+std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
 PrecalculationAnalysis::getFunctionsToInclude() const {
-  return functions_to_include;
+  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> result;
+  for (const auto &pair : function_analysis) {
+    if (pair.second->include_in_precompute) {
+      result.insert(pair.second);
+    }
+  }
+  return result;
 }
 Function *PrecalculationAnalysis::getEntryPoint() const { return entry_point; }
 const std::vector<llvm::CallBase *> &

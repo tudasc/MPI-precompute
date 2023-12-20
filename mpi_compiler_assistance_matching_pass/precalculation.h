@@ -16,29 +16,35 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MACH_PRECALCULATIONS_H_
 #define MACH_PRECALCULATIONS_H_
 
-#include "devirt_analysis.h"
-#include "ptr_info.h"
-#include "taintedValue.h"
 #include <numeric>
 #include <regex>
 #include <utility>
 
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Module.h"
-
+#include "llvm/Support/Casting.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llvm/Analysis/TargetLibraryInfo.h"
-
-#include "analysis_results.h"
-#include "llvm/Demangle/Demangle.h"
-
 #include "VtableManager.h"
+#include "analysis_results.h"
+#include "devirt_analysis.h"
+#include "ptr_info.h"
+#include "taintedValue.h"
 
 class PrecalculationFunctionAnalysis {
 public:
   // analysis Part
   explicit PrecalculationFunctionAnalysis(llvm::Function *F) : func(F) {
-    assert(not F->isDeclaration() && "Cannot analyze external function");
+    // assert(not F->isDeclaration() && "Cannot analyze external function");
+
+    is_func_ptr_captured = false;
+
+    for (auto *u : func->users()) {
+      if (not isa<llvm::CallBase>(u)) {
+        is_func_ptr_captured = true;
+      }
+    }
   };
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
@@ -46,23 +52,43 @@ public:
   }
   std::set<unsigned int> args_to_use = {};
   llvm::Function *func;
+
+  bool include_in_precompute = false;
+
+  // can this function throw an exception where the except case needs to be
+  // handled in precompute? some funcs like malloc or writing to stdout can
+  // except causing the control flow to divert from the precomputation but these
+  // exceptions are so harmful that precompute need to abort anyway so we dont
+  // actually need to handle it during precompute (and check if the precompute
+  // handle it)
+  bool can_except_in_precompute = true;
+
+  // used outside of a call
+  bool is_func_ptr_captured;
+
+  // all call sites that can call F respecting indirect calls
+  std::set<llvm::CallBase *> callsites;
+  // all possible callees called by F respecting indirect calls
+  std::set<std::weak_ptr<PrecalculationFunctionAnalysis>, std::owner_less<>>
+      callees;
 };
 
 class PrecalculationAnalysis {
 public:
   PrecalculationAnalysis(llvm::Module &M, llvm::Function *entry_point)
       : M(M), entry_point(entry_point), virtual_call_sites(DevirtAnalysis(M)) {
-    find_functions_called_indirect();
+    analyze_functions();
   };
 
   void add_precalculations(const std::vector<llvm::CallBase *> &to_precompute);
 
 private:
-  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
-      functions_to_include;
+  std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>
+      function_analysis;
+  void analyze_functions();
 
 public:
-  const std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> &
+  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
   getFunctionsToInclude() const;
   llvm::Function *getEntryPoint() const;
   const std::vector<llvm::CallBase *> &getToReplaceWithEnvelopeRegister() const;
@@ -92,31 +118,19 @@ public:
   }
 
   bool is_func_included_in_precompute(llvm::Function *F) const {
-    return std::find_if(functions_to_include.begin(),
-                        functions_to_include.end(), [F](const auto p) {
-                          return F == p->func;
-                        }) != functions_to_include.end();
-  }
-
-  // collect all call sites that can call F respecting indirect calls
-  std::vector<llvm::CallBase *> get_callsites(llvm::Function *F) {
-    // TODO IMPLEMENT
-    assert(false);
-    return {};
+    return function_analysis.at(F)->include_in_precompute;
   }
 
 private:
-  std::shared_ptr<PrecalculationFunctionAnalysis>
-  insert_functions_to_include(llvm::Function *func);
+  void insert_functions_to_include(llvm::Function *func);
 
   // TODO we need some kind of heuristic to check if precalculation of all msg
   // tags seems to be worth it
   //  or if e.g. for some reason a compute heavy loop was included as well
 
-  std::set<llvm::Function *> functions_that_may_be_called_indirect;
+  // std::set<llvm::Function *> functions_that_may_be_called_indirect;
 
   void find_all_tainted_vals();
-  void find_functions_called_indirect();
   // we need a function to re-initialize all globals that may be overwritten
 
   void print_analysis_result_remarks();
@@ -165,7 +179,8 @@ public:
 
   bool is_retval_of_call_needed(llvm::CallBase *call) const;
 
-  void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
+  void
+  taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
                                const std::shared_ptr<TaintedValue> &arg_info);
   void taint_all_indirect_calls(llvm::Function *func);
 
@@ -177,7 +192,8 @@ private:
   analyze_ptr_usage_in_std(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
-  std::vector<llvm::Function *> get_possible_call_targets(llvm::CallBase *call);
+  std::vector<llvm::Function *>
+  get_possible_call_targets(llvm::CallBase *call) const;
   void insert_necessary_control_flow(llvm::Value *v);
 };
 
@@ -205,6 +221,9 @@ inline bool is_allocation(llvm::CallBase *call) {
 }
 
 inline bool is_func_from_std(llvm::Function *func) {
+
+  assert(func);
+  func->dump();
 
   auto demangled = llvm::demangle(func->getName().str());
 
