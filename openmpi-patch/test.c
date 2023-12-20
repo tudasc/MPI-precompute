@@ -262,7 +262,13 @@ LINKAGE_TYPE void progress_all_requests() {
 
 LINKAGE_TYPE int test_fallback(MPIOPT_Request *request, int *flag,
                                MPI_Status *status) {
-  return MPI_Test(&request->backup_request, flag, status);
+  int ret_val = MPI_Test(&request->backup_request, flag, status);
+#ifdef DISTINGUISH_ACTIVE_REQUESTS
+  if (*flag) {
+    request->active = 0;
+  }
+#endif
+  return ret_val;
 }
 
 // does nothing (for non-active requests)
