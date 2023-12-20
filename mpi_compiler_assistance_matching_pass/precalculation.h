@@ -62,8 +62,10 @@ public:
   // actually need to handle it during precompute (and check if the precompute
   // handle it)
   bool can_except_in_precompute = true;
+  bool analysis_except_in_precompute =
+      false; // used avoid endless recursion on recursive call chains
 
-  // used outside of a call
+  // used outside of call instructions
   bool is_func_ptr_captured;
 
   // all call sites that can call F respecting indirect calls
@@ -71,6 +73,8 @@ public:
   // all possible callees called by F respecting indirect calls
   std::set<std::weak_ptr<PrecalculationFunctionAnalysis>, std::owner_less<>>
       callees;
+
+  void analyze_can_except_in_precompute();
 };
 
 class PrecalculationAnalysis {

@@ -89,6 +89,10 @@ void PrecalculationAnalysis::analyze_functions() {
       }
     }
   }
+
+  for (auto pair : function_analysis) {
+    pair.second->analyze_can_except_in_precompute();
+  }
 }
 
 bool PrecalculationAnalysis::is_invoke_exception_case_needed(
@@ -170,11 +174,22 @@ bool is_free(llvm::CallBase *call) {
   return is_free(call->getCalledFunction());
 }
 
-// is function known to not throw an exception during precompute
-// if one of those throws: the whole precompute has to abort anyway
-bool is_func_known_to_be_safe(llvm::Function *func) {
-  if (is_allocation(func) || func == mpi_func->mpi_comm_size ||
-      func == mpi_func->mpi_comm_rank ||
+void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute() {
+
+  assert(not analysis_except_in_precompute);
+
+  if (func->hasFnAttribute(llvm::Attribute::NoUnwind)) {
+    // no exception possible
+    can_except_in_precompute = false;
+    return;
+  }
+
+  // this kind of exception would be fatal during precompute anyway
+  // this means not executing the function to test if the exception is raised is
+  // OK as exception would lead to abort anyway
+  if (is_allocation(func) // out of mem is fatal
+
+      || func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank ||
       // if barrier in precompute: all ranks can call them (if not all ranks
       // arrive at this point programm will deadlock anyway)
       func == mpi_func->mpi_barrier ||
@@ -185,21 +200,41 @@ bool is_func_known_to_be_safe(llvm::Function *func) {
                       // during precompute is "safe" in that regard it will
                       // abort, not "except"
   ) {
-    return true;
+    can_except_in_precompute = false;
+    return;
   }
 
-  if (func->hasFnAttribute(llvm::Attribute::NoUnwind)) {
-    // no exception possible
-    return true;
+  if (func->isIntrinsic()) {
+    // intrinsics cannot fail
+    can_except_in_precompute = false;
+    return;
   }
 
   if (func->isDeclaration()) {
-    // dont know, need to assume it can throw
-    return false;
+    // don't know: need to assume it can throw
+    func->dump();
+    assert(can_except_in_precompute);
+    return;
   }
 
-  // TODO one needs to go through every callee and check if it is safe as well
-  return false;
+  analysis_except_in_precompute = true; // this one is currently analyzed
+  for (const auto &c : callees) {
+    if (not c.expired()) {
+      auto callee = c.lock();
+      if (not callee->analysis_except_in_precompute) {
+        callee->analyze_can_except_in_precompute();
+        if (callee->can_except_in_precompute) {
+          analysis_except_in_precompute = false;
+          assert(can_except_in_precompute);
+          return;
+        }
+      }
+    }
+  }
+
+  // no callee can except (this implies that no call to trow was detected)
+  analysis_except_in_precompute = false;
+  can_except_in_precompute = false;
 }
 
 void PrecalculationAnalysis::add_precalculations(
@@ -870,7 +905,7 @@ void PrecalculationAnalysis::visit_call(
                  call_info->has_specific_reason());
           continue; // ignore otherwise
         }
-        if (is_func_known_to_be_safe(func)) {
+        if (not function_analysis.at(func)->can_except_in_precompute) {
           continue;
         }
         if (is_func_from_std(func)) {
