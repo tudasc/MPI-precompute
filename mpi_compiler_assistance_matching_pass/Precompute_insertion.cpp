@@ -294,6 +294,23 @@ void replace_calls_in_copy(
     auto *orig_call = dyn_cast<CallBase>(orig_call_v);
     assert(orig_call);
 
+    auto *callee = call->getCalledFunction();
+    if (callee == mpi_func->mpi_send_init) {
+      call = replace_MPI_with_precompute(func, call);
+      continue;
+    }
+    if (callee == mpi_func->mpi_recv_init) {
+      call = replace_MPI_with_precompute(func, call);
+
+      continue;
+    }
+    // end handling calls to MPI
+
+    if (is_allocation(call)) {
+      replace_allocation_call(call);
+      continue;
+    }
+
     if (auto *invoke = dyn_cast<InvokeInst>(call)) {
       // special case: it is an invoke that we don't need to call because no
       // meaningful exception can be raised
@@ -330,23 +347,6 @@ void replace_calls_in_copy(
         invoke->eraseFromParent();
         continue;
       }
-    }
-
-    auto *callee = call->getCalledFunction();
-    if (callee == mpi_func->mpi_send_init) {
-      call = replace_MPI_with_precompute(func, call);
-      continue;
-    }
-    if (callee == mpi_func->mpi_recv_init) {
-      call = replace_MPI_with_precompute(func, call);
-
-      continue;
-    }
-    // end handling calls to MPI
-
-    if (is_allocation(call)) {
-      replace_allocation_call(call);
-      continue;
     }
 
     try {
