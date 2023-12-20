@@ -309,11 +309,14 @@ void replace_calls_in_copy(
 
         auto func_info =
             precompute_analyis_result.get_function_analysis(target);
-        if (func_info->can_except_in_precompute ||
-            func_info->include_in_precompute) {
-          errs() << "Can NOT omit: except?"
-                 << func_info->can_except_in_precompute << " needed?"
-                 << func_info->include_in_precompute << "\n";
+        if (func_info->include_in_precompute ||
+            precompute_analyis_result.is_invoke_exception_case_needed(
+                cast<InvokeInst>(func->new_to_old_map[call]))) {
+          errs() << "Can NOT omit: needed for except case?"
+                 << precompute_analyis_result.is_invoke_exception_case_needed(
+                        cast<InvokeInst>(func->new_to_old_map[call]))
+                 << " needed for callee?" << func_info->include_in_precompute
+                 << "\n";
           can_omit = false;
         }
       }
