@@ -195,6 +195,45 @@ CallBase *replace_MPI_with_precompute(
   }
   return call;
 }
+
+// sometimes different member funcs of objects are relevant
+//  example: Base: foo, bar
+//  for inherited1: foo is relevant, for inherited2 bar is relevant
+//  in this case vtable for inherited1 foo will be null as it is not needed
+//  therefore we need to check against null and skip the call if it is not
+//  necessary for the given instance
+void surround_indirect_call_with_nullptr_check(
+    const std::shared_ptr<PrecalculationFunctionCopy> &func, CallBase *call) {
+  assert(call->isIndirectCall());
+
+  auto *BB = call->getParent();
+  BasicBlock *continueBB;
+  if (auto *invoke = dyn_cast<InvokeInst>(call)) {
+    continueBB = invoke->getNormalDest();
+  } else {
+    continueBB = BB->splitBasicBlock(call->getNextNode());
+    // map all new instructions created to the old call
+    func->new_to_old_map[BB->getTerminator()] = func->new_to_old_map[call];
+  }
+
+  auto *callBB = BB->splitBasicBlock(call);
+
+  auto *unconditionalBR = BB->getTerminator();
+  // the unconditional br created by splitBasicBlock
+  IRBuilder<> builder(unconditionalBR);
+  auto *null_p = ConstantPointerNull::get(
+      cast<PointerType>(call->getCalledOperand()->getType()));
+  auto *cmp = builder.CreateCmp(CmpInst::Predicate::ICMP_NE,
+                                call->getCalledOperand(), null_p);
+  auto *condbr = builder.CreateCondBr(cmp, callBB, continueBB);
+
+  // map all new instructions created to the old call
+  func->new_to_old_map[cmp] = func->new_to_old_map[call];
+  func->new_to_old_map[condbr] = func->new_to_old_map[call];
+
+  unconditionalBR->eraseFromParent();
+}
+
 void replace_calls_in_copy(
     const std::shared_ptr<PrecalculationFunctionCopy> &func,
     const PrecalculationAnalysis &precompute_analyis_result,
@@ -283,7 +322,8 @@ void replace_calls_in_copy(
         errs() << "REMOVE:  ";
         invoke->dump();
         IRBuilder<> builder = IRBuilder<>(invoke);
-        builder.CreateBr(invoke->getNormalDest());
+        auto br = builder.CreateBr(invoke->getNormalDest());
+        func->new_to_old_map[br] = func->new_to_old_map[invoke];
         invoke->eraseFromParent();
         continue;
       }
@@ -312,8 +352,8 @@ void replace_calls_in_copy(
 
       if (not call->isIndirectCall()) {
         call->setCalledFunction(function_information->F_copy);
+        // null all not used args
       }
-      // null all not used args
 
       for (unsigned int i = 0; i < call->arg_size(); ++i) {
         if (not precompute_analyis_result.is_tainted(
@@ -330,6 +370,10 @@ void replace_calls_in_copy(
         assert(is_func_from_std(callee) || is_mpi_function(callee) ||
                callee->isIntrinsic());
       }
+    }
+
+    if (call->isIndirectCall()) {
+      surround_indirect_call_with_nullptr_check(func, call);
     }
   }
 
@@ -519,7 +563,7 @@ void insert_precomputation(
   assert(entry_point);
   auto entry_point_copy = functions_copied[entry_point];
   if (entry_point_copy) {
-    // otherwise: nothng to do nothing to precalculate was found
+    // otherwise: nothing to do nothing to precalculate was found
     add_call_to_precalculation_to_main(M, entry_point_copy,
                                        precompute_analyis_result);
   }
