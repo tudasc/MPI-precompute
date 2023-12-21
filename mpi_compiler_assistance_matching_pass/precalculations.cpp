@@ -534,6 +534,9 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // nothing to do, just keep around
     assert(v->getReason() == TaintReason::CONTROL_FLOW);
     v->visited = true;
+  } else if (auto *ext = dyn_cast<ExtractValueInst>(v->v)) {
+    insert_tainted_value(ext->getAggregateOperand(), v);
+    v->visited = true;
   } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -747,6 +750,7 @@ bool PrecalculationAnalysis::is_retval_of_call_needed(
   return false;
 }
 
+// we consider this intrinsics as safe to call during precompute
 bool should_ignore_intrinsic(Intrinsic::ID id) {
 
   return
@@ -754,7 +758,6 @@ bool should_ignore_intrinsic(Intrinsic::ID id) {
       id == Intrinsic::lifetime_start || id == Intrinsic::lifetime_end ||
       id == Intrinsic::type_test || id == Intrinsic::public_type_test ||
       id == Intrinsic::assume || id == Intrinsic::type_checked_load ||
-
       // std:: functions
       // (https://llvm.org/docs/LangRef.html#standard-c-c-library-intrinsics):
       id == Intrinsic::abs || id == Intrinsic::smax || id == Intrinsic::smin ||
@@ -773,7 +776,9 @@ bool should_ignore_intrinsic(Intrinsic::ID id) {
       id == Intrinsic::rint || id == Intrinsic::nearbyint ||
       id == Intrinsic::round || id == Intrinsic::roundeven ||
       id == Intrinsic::lround || id == Intrinsic::llround ||
-      id == Intrinsic::lrint || id == Intrinsic::llrint; // NOLINT
+      id == Intrinsic::lrint || id == Intrinsic::llrint ||
+      // exception handling:
+      id == Intrinsic::eh_typeid_for; // NOLINT
 }
 
 void PrecalculationAnalysis::analyze_ptr_usage_in_std(
