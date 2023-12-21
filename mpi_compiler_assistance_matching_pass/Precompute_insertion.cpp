@@ -327,6 +327,7 @@ void replace_calls_in_copy(
         auto func_info =
             precompute_analyis_result.get_function_analysis(target);
         if (func_info->include_in_precompute ||
+            precompute_analyis_result.is_retval_of_call_needed(orig_call) ||
             precompute_analyis_result.is_invoke_exception_case_needed(
                 cast<InvokeInst>(func->new_to_old_map[call]))) {
           errs() << "Can NOT omit: needed for except case?"
@@ -344,6 +345,8 @@ void replace_calls_in_copy(
         IRBuilder<> builder = IRBuilder<>(invoke);
         auto br = builder.CreateBr(invoke->getNormalDest());
         func->new_to_old_map[br] = func->new_to_old_map[invoke];
+        invoke->replaceAllUsesWith(UndefValue::get(invoke->getType()));
+        // all users of retval will be removed in prune_function_copy
         invoke->eraseFromParent();
         continue;
       }
