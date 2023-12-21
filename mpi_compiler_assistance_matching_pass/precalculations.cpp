@@ -561,6 +561,11 @@ void PrecalculationAnalysis::visit_ptr_usages(
     const std::shared_ptr<TaintedValue> &ptr) {
   assert(ptr->is_pointer());
 
+  if (isa<ConstantPointerNull>(ptr->v)) {
+    return;
+    // we don't need to trace usages of null to find out if is written or read
+  }
+
   if (auto *global = dyn_cast<GlobalVariable>(ptr->v)) {
     auto *implementation_specifics = ImplementationSpecifics::get_instance();
     if (global == implementation_specifics->COMM_WORLD) {
@@ -574,17 +579,17 @@ void PrecalculationAnalysis::visit_ptr_usages(
       return;
     }
   }
-
-  if (isa<ConstantPointerNull>(ptr->v)) {
-    return;
-    // we dont need to trace usages of null to find out if if is written or read
-  }
-
-  if (ptr->ptr_info == nullptr) {
-    // this pointer is not needed
-    // if this pointer is indeed needed it will later be visited again if the
-    // ptr info was initialized
-    return;
+  if (auto *c = dyn_cast<ConstantExpr>(ptr->v)) {
+    if (auto *gep = dyn_cast<GetElementPtrInst>(c->getAsInstruction())) {
+      if (is_global_from_std(cast<GlobalValue>(gep->getPointerOperand()))) {
+        // constant gep derived from std
+        // e.g. a vtable entry
+        delete gep;
+        return;
+      }
+      delete gep;
+      // dont keep the temporary instruction around
+    }
   }
 
   if (not ptr->ptr_info->isReadFrom()) {
@@ -1217,7 +1222,8 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
 
   if (is_func_from_std(call->getFunction())) {
     // we dont need to analyze the sts::'s internals
-    // if std:: calls a user function indirecttly it will get a ptr to it anyway
+    // if std:: calls a user function indirecttly it will get a ptr to it
+    // anyway
     return possible_targets;
   }
 
