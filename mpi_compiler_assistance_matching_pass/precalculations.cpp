@@ -568,6 +568,11 @@ void PrecalculationAnalysis::visit_ptr_usages(
       // object
       return;
     }
+    if (is_global_from_std(global)) {
+      // don't analyze the usage of std::'s globals in std
+      // TODO we could replace for example std::cout
+      return;
+    }
   }
 
   if (isa<ConstantPointerNull>(ptr->v)) {
@@ -1134,6 +1139,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
         // inst->getFunction()->dump();
 
         inst->dump();
+        errs() << "from:";
+        from->v->dump();
         errs() << "In: " << inst->getFunction()->getName() << "\n";
       }
       assert(not is_func_from_std(inst->getFunction()));

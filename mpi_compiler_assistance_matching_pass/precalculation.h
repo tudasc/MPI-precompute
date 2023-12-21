@@ -282,4 +282,23 @@ inline bool is_call_to_std(llvm::CallBase *call) {
   return is_func_from_std(call->getCalledFunction());
 }
 
+inline bool is_global_from_std(llvm::GlobalValue *global) {
+  assert(global);
+  if (auto *f = dyn_cast<llvm::Function>(global)) {
+    return is_func_from_std(f);
+  }
+  auto demangled = llvm::demangle(global->getName().str());
+
+  // startswith std::
+  if (demangled.rfind("std::", 0) == 0) {
+    return true;
+  }
+
+  std::regex regex_pattern_std("^(VTT for )?std::(.+)");
+  if (std::regex_match(demangled, regex_pattern_std)) {
+    return true;
+  }
+  return false;
+}
+
 #endif // MACH_PRECALCULATIONS_H_
