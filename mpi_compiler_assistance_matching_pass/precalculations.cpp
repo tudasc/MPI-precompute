@@ -580,16 +580,17 @@ void PrecalculationAnalysis::visit_ptr_usages(
     }
   }
   if (auto *c = dyn_cast<ConstantExpr>(ptr->v)) {
-    if (auto *gep = dyn_cast<GetElementPtrInst>(c->getAsInstruction())) {
+    auto *as_inst = c->getAsInstruction();
+    if (auto *gep = dyn_cast<GetElementPtrInst>(as_inst)) {
       if (is_global_from_std(cast<GlobalValue>(gep->getPointerOperand()))) {
         // constant gep derived from std
         // e.g. a vtable entry
-        delete gep;
+        as_inst->deleteValue();
         return;
       }
-      delete gep;
-      // dont keep the temporary instruction around
     }
+    as_inst->deleteValue();
+    // don't keep the temporary instruction around
   }
 
   if (not ptr->ptr_info->isReadFrom()) {
