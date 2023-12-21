@@ -537,6 +537,11 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
   } else if (auto *ext = dyn_cast<ExtractValueInst>(v->v)) {
     insert_tainted_value(ext->getAggregateOperand(), v);
     v->visited = true;
+  } else if (auto *ptoi = dyn_cast<PtrToIntInst>(v->v)) {
+    // conversion of ptr TO int e.g. for comparison or alignment check is
+    // allowed
+    insert_tainted_value(ptoi->getPointerOperand(), v);
+    v->visited = true;
   } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -658,6 +663,10 @@ void PrecalculationAnalysis::visit_ptr_usages(
     }
     if (auto *ret = dyn_cast<ReturnInst>(u)) {
       visit_ptr_ret(ptr, ret);
+      continue;
+    }
+    if (isa<PtrToIntInst>(u)) {
+      // nothing to do cast to int e.g. for comparison is allowed
       continue;
     }
 
