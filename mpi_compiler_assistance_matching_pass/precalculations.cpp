@@ -543,7 +543,6 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     insert_tainted_value(ptoi->getPointerOperand(), v);
     v->visited = true;
   } else {
-
     errs() << "Support for analyzing this Value is not implemented yet\n";
     v->v->dump();
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
@@ -786,6 +785,8 @@ bool should_ignore_intrinsic(Intrinsic::ID id) {
       id == Intrinsic::round || id == Intrinsic::roundeven ||
       id == Intrinsic::lround || id == Intrinsic::llround ||
       id == Intrinsic::lrint || id == Intrinsic::llrint ||
+      // specialized arithmetic
+      id == Intrinsic::fmuladd || id == Intrinsic::fma ||
       // exception handling:
       id == Intrinsic::eh_typeid_for; // NOLINT
 }
