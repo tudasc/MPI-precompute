@@ -17,7 +17,7 @@ std::vector<std::string> read_input_file(const std::string &fname) {
 
   while (std::getline(file_in, line))
     lines.push_back(line);
-  assert(lines.size() > 0);
+  // assert(lines.size() > 0);
   return lines;
 }
 
@@ -99,9 +99,10 @@ int main(int argc, char *argv[]) {
   int tag1, tag2;
   try {
     auto file_content = read_input_file("config.cfg");
-    tag1 = std::stoi(file_content[0]);
-    tag2 = std::stoi(file_content[1]);
-  } catch (std::ifstream::failure e) {
+    tag1 = std::stoi(file_content.at(0));
+    tag2 = std::stoi(file_content.at(1));
+  } catch (const std::exception &e) {
+    // either std::ifstream::failure or std::out_of_range
     tag1 = 0;
     tag2 = 0;
   }
