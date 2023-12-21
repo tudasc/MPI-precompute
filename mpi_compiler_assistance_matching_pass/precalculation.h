@@ -22,6 +22,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Demangle/Demangle.h"
+#include "llvm/IR/GlobalAlias.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -39,19 +40,38 @@ public:
     // assert(not F->isDeclaration() && "Cannot analyze external function");
 
     is_func_ptr_captured = false;
+    aliases.insert(func);
 
     for (auto *u : func->users()) {
-      if (not isa<llvm::CallBase>(u)) {
+      if (auto *alias = llvm::dyn_cast<llvm::GlobalAlias>(u)) {
+        assert(alias->getAliasee() == func);
+        aliases.insert(alias);
+
+        if (not alias->user_empty()) {
+          llvm::errs() << "Alias is used\n";
+          for (auto *auu : alias->users()) {
+            auu->dump();
+          }
+          llvm::errs() << "currently not supported\n";
+          assert(false);
+        }
+
+        continue;
+      }
+      if (not llvm::isa<llvm::CallBase>(u)) {
         is_func_ptr_captured = true;
       }
     }
   };
+
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
               std::inserter(args_to_use, args_to_use.begin()));
   }
   std::set<unsigned int> args_to_use = {};
   llvm::Function *func;
+  std::set<llvm::GlobalValue *> aliases;
+  const std::set<llvm::GlobalValue *> &getAliases() const { return aliases; }
 
   bool include_in_precompute = false;
 
@@ -284,7 +304,7 @@ inline bool is_call_to_std(llvm::CallBase *call) {
 
 inline bool is_global_from_std(llvm::GlobalValue *global) {
   assert(global);
-  if (auto *f = dyn_cast<llvm::Function>(global)) {
+  if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
     return is_func_from_std(f);
   }
   auto demangled = llvm::demangle(global->getName().str());

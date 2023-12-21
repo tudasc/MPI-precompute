@@ -142,6 +142,14 @@ void replace_usages_of_func_in_copy(
       // nothing to do, the vtable manager will take care of this
       continue;
     }
+    if (isa<GlobalAlias>(u)) {
+      // alias -- can be ignored as analysis will make sure that no-one uses the
+      // alias
+      assert(func->analysis_result->getAliases().find(cast<GlobalAlias>(u)) !=
+             func->analysis_result->getAliases().end());
+      continue;
+    }
+
     errs() << "This usage is currently not supported:\n";
     errs() << func->F_orig->getName() << "\n";
     u->dump();

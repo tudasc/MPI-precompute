@@ -90,7 +90,7 @@ void PrecalculationAnalysis::analyze_functions() {
     }
   }
 
-  for (auto pair : function_analysis) {
+  for (const auto &pair : function_analysis) {
     pair.second->analyze_can_except_in_precompute();
   }
 }
@@ -1258,7 +1258,7 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
       inst->dump();
     }
   }
-  debug_printings();
+  // debug_printings();
 }
 
 void PrecalculationAnalysis::debug_printings() {
