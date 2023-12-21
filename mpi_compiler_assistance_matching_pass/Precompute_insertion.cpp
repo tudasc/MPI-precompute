@@ -77,8 +77,6 @@ llvm::Function *get_global_re_init_function(
 void replace_allocation_call(llvm::CallBase *call) {
   assert(call);
   assert(is_allocation(call));
-  assert(isa<CallInst>(call));
-  // no invoke for malloc
 
   Value *size;
   IRBuilder<> builder = IRBuilder<>(call);
@@ -93,10 +91,20 @@ void replace_allocation_call(llvm::CallBase *call) {
     size = builder.CreateMul(call->getArgOperand(0), call->getArgOperand(1));
   }
   assert(size);
+  CallBase *new_call;
 
-  auto *new_call =
-      builder.CreateCall(PrecomputeFunctions::get_instance()->allocate_memory,
-                         {size}, call->getName());
+  if (isa<CallInst>(call)) {
+    new_call =
+        builder.CreateCall(PrecomputeFunctions::get_instance()->allocate_memory,
+                           {size}, call->getName());
+  } else {
+    assert(isa<InvokeInst>(call));
+    auto *ivoke = cast<InvokeInst>(call);
+    new_call = builder.CreateInvoke(
+        PrecomputeFunctions::get_instance()->allocate_memory,
+        ivoke->getNormalDest(), ivoke->getUnwindDest(), {size},
+        call->getName());
+  }
 
   call->replaceAllUsesWith(new_call);
   call->eraseFromParent();

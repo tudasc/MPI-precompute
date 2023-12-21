@@ -70,7 +70,7 @@ void PtrUsageInfo::setIsUsedDirectly(
 
 // other MAY NOT be passed as const ref as we might recursively destruct it
 // before we are finish using it
-void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
+void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
   if (merged_with) {
     merged_with->merge_with(_other);
     return;
@@ -121,10 +121,6 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
-    for (const auto &pos : other->important_members) {
-      // this will propagate changes if applicable
-      add_important_member(pos.first, pos.second);
-    }
     if (other->is_used_directly) {
       this->setIsUsedDirectly(true, other->info_of_direct_usage);
       // will merge the info_of_direct_usage
@@ -132,6 +128,16 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) {
 
     if (changed) {
       propergate_changes();
+    }
+
+    auto obj_to_merge_to = shared_from_this();
+    // this may be invalidated (if gep is result of self)
+    for (const auto &pos : other->important_members) {
+      // this will propagate changes if applicable
+      obj_to_merge_to->add_important_member(pos.first, pos.second);
+      while (obj_to_merge_to->merged_with != nullptr) {
+        obj_to_merge_to = obj_to_merge_to->merged_with;
+      }
     }
 
     // we can clean up other, as other is only used to forward to this by now
