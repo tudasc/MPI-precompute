@@ -16,6 +16,7 @@
 
 #include <boost/stacktrace.hpp>
 
+#include <llvm/IR/Verifier.h>
 #include <random>
 #include <regex>
 
@@ -250,6 +251,11 @@ void PrecalculationAnalysis::add_precalculations(
   }
 
   find_all_tainted_vals();
+
+#ifndef NDEBUG
+  auto has_error = verifyModule(M, &errs(), nullptr);
+  assert(!has_error && "Module Error introduced during analysis part???");
+#endif
 
   insert_precomputation(M, *this);
 }
@@ -646,6 +652,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
         insert_tainted_value(gep, ptr);
         // ptr info will be constructed when the gep is visited
       }
+      as_inst->deleteValue(); // dont keep temporary instruction
       continue;
     }
     if (isa<ICmpInst>(u)) {
