@@ -1296,56 +1296,75 @@ PrecalculationAnalysis::getToReplaceWithEnvelopeRegister() const {
   return to_replace_with_envelope_register;
 }
 
-// only gets the name of a dunction if a demangled name contains areturn param
-// or template args
-std::string get_function_name(const std::string &demangled_name) {
+// removes all template args from the given name
+std::string get_name_without_templates(const std::string &demangled_name) {
 
   auto pos = demangled_name.begin();
-  auto start_pos = pos;
   auto end_pos = pos;
+  auto start_pos = pos;
 
+  std::string result = "";
   int template_nesting_level = 0;
 
-  errs() << demangled_name << "\n";
-
   while (pos != demangled_name.end()) {
-    if (*pos == '(') {
-      if (end_pos <= start_pos) {
-        end_pos = pos;
-        // otherwise end_pos is the start of the template arguments
-      }
 
-      while (template_nesting_level != 0) {
-        // overloading of operator<< or operator<
-        // in this case the << is part of the function name
-        end_pos++;
-        template_nesting_level--;
-        assert(*end_pos == '<');
-      }
-
-      break;
-    }
-    // function name will be seperated from return type by a space
-    // possible multiple space seperated "return types" e.g. unsigned int foo()
-    if (*pos == ' ' && template_nesting_level == 0) {
-      start_pos = pos + 1; // space itself is not part of the name
-    }
     if (*pos == '<') {
       if (template_nesting_level == 0) {
-        end_pos = pos;
+        start_pos = pos;
+        // directly use std::copy?
+        result += std::string(end_pos, pos);
       }
       template_nesting_level++;
     }
     if (*pos == '>') {
       template_nesting_level--;
+      if (template_nesting_level == 0) {
+        end_pos = pos + 1;
+      }
     }
 
     ++pos;
+    // special case for operators << or <
+    if (pos == demangled_name.end() && template_nesting_level != 0) {
+      // ignore the first < and re-start processing from there
+      template_nesting_level = 0;
+      pos = start_pos + 1;
+    }
   }
 
   assert(template_nesting_level == 0);
+  result = result + std::string(end_pos, pos);
 
-  return std::string(start_pos, end_pos);
+  return result;
+}
+
+// only gets the name of a function if a demangled name contains a return param
+// or template args
+std::string get_function_name(const std::string &demangled_name) {
+
+  auto no_template = get_name_without_templates(demangled_name);
+
+  std::istringstream iss(no_template);
+  std::string item;
+  std::vector<std::string> elems;
+  while (std::getline(iss, item, ' ')) {
+    elems.push_back(item);
+  }
+
+  if (elems.size() > 1) {
+    // find the element with the '('
+    for (size_t i = 0; i < elems.size(); ++i) {
+      if (elems[i].rfind('(') != std::string ::npos) {
+        if (i != 0 && elems[i - 1].rfind("operator") != std::string ::npos) {
+          return elems[i - 1] + " " + elems[i];
+        } else {
+          return elems[i];
+        }
+      }
+    }
+  }
+
+  return no_template;
 }
 
 bool is_func_from_std(llvm::Function *func) {
@@ -1362,13 +1381,7 @@ bool is_func_from_std(llvm::Function *func) {
   auto demangled_fname =
       get_function_name(llvm::demangle(func->getName().str()));
 
-  if (func->getName() == "_ZNKSt9basic_iosIcSt11char_traitsIcEEcvbEv") {
-    errs() << llvm::demangle(func->getName().str()) << "\n";
-    errs() << demangled_fname << "\n";
-    assert(false);
-  }
-
-  // errs() << "Test if in std:\n" <<demangled << "\n";
+  // errs() << "Test if in std:\n" << func->getName() <<demangled_fname << "\n";
 
   // startswith std::
   if (demangled_fname.rfind("std::", 0) == 0) {
