@@ -246,53 +246,7 @@ inline bool is_allocation(llvm::CallBase *call) {
   return is_allocation(call->getCalledFunction());
 }
 
-inline bool is_func_from_std(llvm::Function *func) {
-
-  assert(func);
-
-  auto demangled = llvm::demangle(func->getName().str());
-
-  // errs() << "Test if in std:\n" <<demangled << "\n";
-
-  // startswith std::
-  if (demangled.rfind("std::", 0) == 0) {
-    return true;
-  }
-  // for some templates e.g.  unsigned long const& std::min<unsigned
-  // long>(unsigned long const&, unsigned long const&) the return type is part
-  // of the mangled name
-  std::regex regex_pattern_std(
-      "^((unsigned )?(((int)|(long)|(float)|(double)))?( const)?(&)? )?"
-      "std::(.+)");
-  if (std::regex_match(demangled, regex_pattern_std)) {
-    return true;
-  }
-
-  // internals of gnu implementation
-  if (demangled.rfind("__gnu_cxx::", 0) == 0) {
-    return true;
-  }
-  std::regex regex_pattern_gnu(
-      "^((unsigned )?(((int)|(long)|(float)|(double)))?(const)?(&)? )?"
-      "__gnu_cxx::(.+)");
-  if (std::regex_match(demangled, regex_pattern_gnu)) {
-    return true;
-  }
-
-  // C API
-  llvm::LibFunc lib_func;
-  bool in_lib = analysis_results->getTLI()->getLibFunc(*func, lib_func);
-  if (in_lib) {
-    return true;
-  }
-
-  // more like a stack ptr than a function call
-  if (func->getName() == "__errno_location") {
-    return true;
-  }
-
-  return false;
-}
+bool is_func_from_std(llvm::Function *func);
 
 inline bool is_call_to_std(llvm::CallBase *call) {
   if (call->isIndirectCall()) {
