@@ -776,14 +776,23 @@ bool PrecalculationAnalysis::is_retval_of_call_needed(
   return false;
 }
 
-// we consider this intrinsics as safe to call during precompute
+// we ignore those intrinsics for precompute we dont need to call them
 bool should_ignore_intrinsic(Intrinsic::ID id) {
 
   return
       // intrinsics serving as additional annotations to the IR:
       id == Intrinsic::lifetime_start || id == Intrinsic::lifetime_end ||
       id == Intrinsic::type_test || id == Intrinsic::public_type_test ||
-      id == Intrinsic::assume || id == Intrinsic::type_checked_load ||
+      id == Intrinsic::assume || id == Intrinsic::type_checked_load; // NOLINT
+}
+
+// we consider this intrinsics as safe to call during precompute
+bool should_call_intrinsic(Intrinsic::ID id) {
+
+  return
+      // it is also safe to call ignored intrinsics
+      // they only serve as IR annotations anyway
+      should_ignore_intrinsic(id) ||
       // std:: functions
       // (https://llvm.org/docs/LangRef.html#standard-c-c-library-intrinsics):
       id == Intrinsic::abs || id == Intrinsic::smax || id == Intrinsic::smin ||
@@ -814,7 +823,8 @@ void PrecalculationAnalysis::analyze_ptr_usage_in_std(
 
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
-  assert(is_call_to_std(call));
+  assert(not call->isIndirectCall());
+  assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
 
   // errs() << "in : " << call->getCalledFunction()->getName() << " \n";
   // ptr_arg_info->v->dump();
@@ -860,7 +870,21 @@ void PrecalculationAnalysis::visit_call(
     } else {
       for (auto *func : possible_targets) {
         if (func->isIntrinsic() &&
-            should_ignore_intrinsic(func->getIntrinsicID())) {
+            should_call_intrinsic(func->getIntrinsicID())) {
+          if (not should_ignore_intrinsic(func->getIntrinsicID())) {
+            // consider it same as call to std
+            // TODO bad smell: duplicate code
+            for (auto &arg : call->args()) {
+              auto arg_info = insert_tainted_value(arg, call_info);
+
+              // for ptr parameters: we need to respect if the func reads/writes
+              // them
+              if (arg->getType()->isPointerTy()) {
+                analyze_ptr_usage_in_std(call, arg_info);
+              }
+            }
+          }
+
           // ignore intrinsics
           continue;
         }
@@ -1069,10 +1093,20 @@ void PrecalculationAnalysis::visit_call_from_ptr(
       continue;
     }
 
-    if (func->isIntrinsic() &&
-        should_ignore_intrinsic(func->getIntrinsicID())) {
-      // TODO for intrinsic such as max, we need to taint args!
-      // ignore intrinsics
+    if (func->isIntrinsic() && should_call_intrinsic(func->getIntrinsicID())) {
+      if (not should_ignore_intrinsic(func->getIntrinsicID())) {
+        // consider it same as call to std
+        // TODO bad smell: duplicate code
+        for (auto &arg : call->args()) {
+          auto arg_info = insert_tainted_value(arg, call_info);
+
+          // for ptr parameters: we need to respect if the func reads/writes
+          // them
+          if (arg->getType()->isPointerTy()) {
+            analyze_ptr_usage_in_std(call, arg_info);
+          }
+        }
+      }
       continue;
     }
 
