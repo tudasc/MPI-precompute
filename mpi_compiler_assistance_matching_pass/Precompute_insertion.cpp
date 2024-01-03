@@ -399,8 +399,8 @@ void replace_calls_in_copy(
     if (call->isIndirectCall()) {
       if (not precompute_analyis_result.is_retval_of_call_needed(orig_call)) {
         surround_indirect_call_with_nullptr_check(func, call);
-        // if retval is used: the precompute vtable cann not contain null
-        // TODO performance: only insert nulll check if we know the precompute
+        // if retval is used: the precompute vtable can not contain null
+        // TODO performance: only insert null check if we know the precompute
         // vtable can contain null
       }
     }
