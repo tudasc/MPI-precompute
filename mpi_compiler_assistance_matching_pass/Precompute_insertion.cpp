@@ -60,9 +60,11 @@ llvm::Function *get_global_re_init_function(
           //  can we modify this global to point towards /dev/null?
           //  this would "resolve" the issue that writing to stdout can have an
           //  exception
+          // and the user would see the output just to check if an exception is
+          // raised
           errs() << "Global without initializer:\n";
           global.dump();
-          assert(global.getName() == "_ZSt4cout");
+          assert(is_global_from_std(&global));
         }
       } // else no need to do anything as it is not changed (readonly)
       // at least not by tainted instructions

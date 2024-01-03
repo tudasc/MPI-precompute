@@ -687,7 +687,24 @@ void PrecalculationAnalysis::visit_ptr_usages(
       continue;
     }
 
+    if (auto *lpad = dyn_cast<LandingPadInst>(u)) {
+      bool used_in_catch = false;
+      for (unsigned int i = 0; i < lpad->getNumClauses(); ++i) {
+        if (lpad->getClause(i) == ptr->v) {
+          used_in_catch = true;
+          break;
+        }
+      }
+      assert(used_in_catch);
+      // nothing to do:
+      // we don't care if the typeinfo is used in a catch clause,
+      // as the catch itself does not do anything harmful to the ptr
+      continue;
+    }
+
+    ptr->ptr_info->dump();
     errs() << "Support for analyzing this Value is not implemented yet\n";
+
     u->dump();
 
     assert(false);

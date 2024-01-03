@@ -261,8 +261,8 @@ inline bool is_global_from_std(llvm::GlobalValue *global) {
   if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
     return is_func_from_std(f);
   }
-  auto demangled = llvm::demangle(global->getName().str());
 
+  auto demangled = llvm::demangle(global->getName().str());
   // startswith std::
   if (demangled.rfind("std::", 0) == 0) {
     return true;
@@ -270,6 +270,10 @@ inline bool is_global_from_std(llvm::GlobalValue *global) {
 
   std::regex regex_pattern_std("^(VTT for )?std::(.+)");
   if (std::regex_match(demangled, regex_pattern_std)) {
+    return true;
+  }
+
+  if (std::regex_match(demangled, std::regex("^(typeinfo for )?std::(.+)"))) {
     return true;
   }
   return false;
