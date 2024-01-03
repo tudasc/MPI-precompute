@@ -846,7 +846,10 @@ bool should_call_intrinsic(Intrinsic::ID id) {
       // specialized arithmetic
       id == Intrinsic::fmuladd || id == Intrinsic::fma ||
       // exception handling:
-      id == Intrinsic::eh_typeid_for; // NOLINT
+      id == Intrinsic::eh_typeid_for ||
+
+      // vector instructions
+      Intrinsic::getName(id).starts_with("llvm.x86.sse"); // NOLINT
 }
 
 void PrecalculationAnalysis::analyze_ptr_usage_in_std(
@@ -1397,7 +1400,8 @@ std::string get_name_without_templates(const std::string &demangled_name) {
       }
       template_nesting_level++;
     }
-    if (*pos == '>') {
+    // if template_nesting_level==0 whe are looking at operator> or >>
+    if (*pos == '>' && template_nesting_level > 0) {
       template_nesting_level--;
       if (template_nesting_level == 0) {
         end_pos = pos + 1;
