@@ -66,7 +66,7 @@ def annotate(module, remarks):
         to_anno_idx = [i for i, v in enumerate(module) if to_annotate in v]
         if not len(to_anno_idx) == 1:
             func = remarks[idx + 1]
-            match_func_idx = [i for i, v in enumerate(function_defines) if func in v[1]]
+            match_func_idx = [i for i, v in enumerate(function_defines) if "@" + func + "(" in v[1]]
             assert len(match_func_idx) == 1
             to_anno_idx = [i for i in to_anno_idx if
                            function_defines[match_func_idx[0]][0] < i < function_defines[match_func_idx[0] + 1][0]]
