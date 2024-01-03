@@ -1155,7 +1155,15 @@ void PrecalculationAnalysis::visit_call_from_ptr(
       //  as std is designed to haf as fw side effects as possible
       // TODO implement check for exception std::rand and std::cout/cin
 
-      analyze_ptr_usage_in_std(call, ptr);
+      for (auto &arg : call->args()) {
+        auto arg_info = insert_tainted_value(arg, call_info);
+
+        // for ptr parameters: we need to respect if the func reads/writes
+        // them
+        if (arg->getType()->isPointerTy()) {
+          analyze_ptr_usage_in_std(call, arg_info);
+        }
+      }
       continue;
     }
 
