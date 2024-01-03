@@ -98,6 +98,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     assert(other->merged_with == nullptr);
     other->merged_with = shared_from_this();
     other->is_valid = false;
+    assert(this->is_valid);
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
@@ -121,23 +122,23 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
+    if (changed) {
+      propergate_changes();
+    }
+
     if (other->is_used_directly) {
       this->setIsUsedDirectly(true, other->info_of_direct_usage);
       // will merge the info_of_direct_usage
     }
 
-    if (changed) {
-      propergate_changes();
-    }
-
     auto obj_to_merge_to = shared_from_this();
     // this may be invalidated (if gep is result of self)
     for (const auto &pos : other->important_members) {
-      // this will propagate changes if applicable
-      obj_to_merge_to->add_important_member(pos.first, pos.second);
       while (obj_to_merge_to->merged_with != nullptr) {
         obj_to_merge_to = obj_to_merge_to->merged_with;
       }
+      // this will propagate changes if applicable
+      obj_to_merge_to->add_important_member(pos.first, pos.second);
     }
 
     // we can clean up other, as other is only used to forward to this by now
