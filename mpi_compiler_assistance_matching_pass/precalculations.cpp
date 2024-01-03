@@ -1478,5 +1478,13 @@ bool is_func_from_std(llvm::Function *func) {
     return true;
   }
 
+  // TODO why it is not in TLI info??
+  if (func->getName() == "rand") {
+    // calling rand in precompute is actually "safe",
+    // as one should usa a random seed anyway it doesn't matter if we call it in
+    // precompute
+    return true;
+  }
+
   return false;
 }
