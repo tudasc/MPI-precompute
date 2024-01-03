@@ -475,6 +475,14 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
     v->visited = true;
+  } else if (auto *uop = dyn_cast<UnaryOperator>(v->v)) {
+    // arithmetic
+    // TODO do we need to exclude some opcodes?
+    assert(uop->getNumOperands() == 1);
+    assert(not uop->getType()->isPointerTy());
+    insert_tainted_value(uop->getOperand(0), v);
+    insert_tainted_value(uop->getOperand(0), v);
+    v->visited = true;
   } else if (auto *cmp = dyn_cast<CmpInst>(v->v)) {
     // cmp
     assert(cmp->getNumOperands() == 2);
