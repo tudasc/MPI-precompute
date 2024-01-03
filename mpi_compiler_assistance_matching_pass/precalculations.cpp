@@ -584,6 +584,12 @@ void PrecalculationAnalysis::visit_ptr_usages(
       // TODO we could replace for example std::cout
       return;
     }
+
+    if (global->isConstant()) {
+      // we don't need to trace the usages of constant ptrs e.g. constant
+      // string values, one can just use them in precompute as well
+      return;
+    }
   }
   if (auto *c = dyn_cast<ConstantExpr>(ptr->v)) {
     auto *as_inst = c->getAsInstruction();
