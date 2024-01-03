@@ -128,8 +128,8 @@ bool PrecalculationAnalysis::is_invoke_exception_case_needed(
 
 // True if callee needs to be called as it contains tainted instructions
 // or True if callee can raise an exception and the exception handling code is
-// actually tainted if exception handling is not tainted, we dont need to handle
-// the exception anyway and abortion is fine in this case
+// actually tainted if exception handling is not tainted, we don't need to
+// handle the exception anyway and abortion is fine in this case
 bool PrecalculationAnalysis::is_invoke_necessary_for_control_flow(
     llvm::InvokeInst *invoke) const {
 
@@ -213,7 +213,7 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute() {
 
   // TODO better analysis needed??
   //  if they invoke the function that may except they need to resume exception
-  //  handling
+  //  handling aka if they catch they dont throw
   analysis_except_in_precompute = true; // this one is currently analyzed
   for (const auto &c : callees) {
     if (not c.expired()) {
@@ -1010,6 +1010,14 @@ void PrecalculationAnalysis::visit_call(
           if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
             insert_tainted_value(res, TaintReason::CONTROL_FLOW);
           }
+          for (auto &inst : bb)
+            if (auto *cc = dyn_cast<CallBase>(&inst)) {
+              for (auto *tgt : get_possible_call_targets(call)) {
+                if (function_analysis.at(tgt)->can_except_in_precompute) {
+                  insert_tainted_value(cc, TaintReason::CONTROL_FLOW);
+                }
+              }
+            }
         }
       }
     }

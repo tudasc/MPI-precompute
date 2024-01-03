@@ -78,7 +78,7 @@ public:
   // can this function throw an exception where the except case needs to be
   // handled in precompute? some funcs like malloc or writing to stdout can
   // except causing the control flow to divert from the precomputation but these
-  // exceptions are so harmful that precompute need to abort anyway so we dont
+  // exceptions are so harmful that precompute need to abort anyway, so we don't
   // actually need to handle it during precompute (and check if the precompute
   // handle it)
   bool can_except_in_precompute = true;
