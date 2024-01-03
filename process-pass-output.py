@@ -118,7 +118,7 @@ def main():
 
     success_marker_idx = get_idices_of_elem(full_input, marker_end_pass_execution)
 
-    if success_marker_idx:
+    if len(end_idx) > 1:
         begin_mod_idx = get_idices_of_elem(full_input, marker_begin_module_modified)
         assert len(begin_mod_idx) == 1
         altered_mod = full_input[begin_mod_idx[0]:end_idx[1]]
