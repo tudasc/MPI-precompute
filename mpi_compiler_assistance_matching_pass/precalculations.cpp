@@ -1184,13 +1184,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         assert(false);
       } else {
         auto new_val = insert_tainted_value(arg, ptr);
-        if (new_val->ptr_info == nullptr) {
-          new_val->ptr_info = ptr->ptr_info;
-          new_val->ptr_info->add_ptr_info_user(new_val);
-        } else {
-          ptr->ptr_info->merge_with(new_val->ptr_info);
-        }
-        visit_ptr_usages(new_val);
+        ptr->ptr_info->merge_with(new_val->ptr_info);
+        assert(new_val->ptr_info == ptr->ptr_info);
       }
     }
   }
