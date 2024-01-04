@@ -300,7 +300,12 @@ void replace_calls_in_copy(
           to_replace.push_back(call);
           continue;
         } else {
-          assert(not precompute_analyis_result.is_tainted(callee));
+          call->dump();
+          assert(not precompute_analyis_result.is_tainted(callee) ||
+                 // callee is the original function
+                 // which should not be a user function
+                 is_func_from_std(callee) || is_mpi_function(callee) ||
+                 callee->isIntrinsic());
           // it is not used: nothing to do, later pruning step will remove it
         }
       }
