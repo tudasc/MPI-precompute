@@ -48,7 +48,7 @@ using namespace llvm;
 bool is_interaction_with_cout(llvm::CallBase *call) {
 
   if (call->isIndirectCall()) {
-    return false;
+    return false; // may except
   }
 
   if (call->getCalledFunction()->getName() == "printf") {
@@ -57,7 +57,9 @@ bool is_interaction_with_cout(llvm::CallBase *call) {
 
   auto *cout = call->getModule()->getGlobalVariable("_ZSt4cout");
   if (cout) {
-    if (call->getNumOperands() > 1 && call->getArgOperand(0) == cout) {
+    call->dump();
+
+    if (call->arg_size() >= 1 && call->getArgOperand(0) == cout) {
       assert(is_func_from_std(call->getCalledFunction()));
       return true;
     }
