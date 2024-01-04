@@ -1040,11 +1040,9 @@ void PrecalculationAnalysis::visit_call(
           }
           for (auto &inst : bb)
             if (auto *cc = dyn_cast<CallBase>(&inst)) {
-              for (auto *tgt : get_possible_call_targets(call)) {
-                if (function_analysis.at(tgt)->can_except_in_precompute) {
-                  insert_tainted_value(cc, TaintReason::CONTROL_FLOW);
+              if (can_except_in_precompute(cc)) {
+                insert_tainted_value(cc, TaintReason::CONTROL_FLOW);
                 }
-              }
             }
         }
       }
