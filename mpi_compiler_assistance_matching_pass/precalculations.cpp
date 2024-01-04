@@ -990,7 +990,7 @@ void PrecalculationAnalysis::visit_call(
     }
   }
 
-  // we need to check the control flow if a exception is raised
+  // we need to check the control flow if an exception is raised
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     if (is_invoke_exception_case_needed(invoke) &&
         can_except_in_precompute(invoke)) {
@@ -1308,17 +1308,26 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
       // here
       for (auto *pred_bb : predecessors(bb)) {
         auto *term = pred_bb->getTerminator();
-        auto new_val = insert_tainted_value(term, TaintReason::CONTROL_FLOW);
+
         if (auto *invoke = dyn_cast<InvokeInst>(term)) {
-          if (invoke->getUnwindDest() == bb) {
+          if (invoke->getUnwindDest() == bb &&
+              can_except_in_precompute(invoke)) {
+            auto new_val =
+                insert_tainted_value(term, TaintReason::CONTROL_FLOW);
             new_val->addReason(TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
             // it may need to be re-visited if we find out that we do need the
             // exception path
             new_val->visited = false;
           } else {
-            assert(invoke->getNormalDest() == bb);
+            if (invoke->getUnwindDest() == bb) {
+              // this exception block cannot be visited in precompute
+              continue;
+            } else {
+              assert(invoke->getNormalDest() == bb);
+            }
           }
         }
+        auto new_val = insert_tainted_value(term, TaintReason::CONTROL_FLOW);
       }
     } else {
       // BB is function entry block
