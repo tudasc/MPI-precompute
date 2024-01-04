@@ -261,6 +261,7 @@ inline bool is_call_to_std(llvm::CallBase *call) {
   return is_func_from_std(call->getCalledFunction());
 }
 
+// we should not mess around with the globals defined by std::
 inline bool is_global_from_std(llvm::GlobalValue *global) {
   assert(global);
   if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
@@ -279,6 +280,10 @@ inline bool is_global_from_std(llvm::GlobalValue *global) {
   }
 
   if (std::regex_match(demangled, std::regex("^(typeinfo for )?std::(.+)"))) {
+    return true;
+  }
+
+  if (global->getName() == "__dso_handle") {
     return true;
   }
   return false;
