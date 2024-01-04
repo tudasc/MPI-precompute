@@ -333,25 +333,6 @@ void PrecalculationAnalysis::find_all_tainted_vals() {
 
   tainted_values.erase(*pos);
   // done removing of MPI init
-
-  // only for asserting that the subset is valid:
-  std::set<BasicBlock *> tainted_blocks;
-  // taint all the blocks that are relevant
-  std::transform(tainted_values.begin(), tainted_values.end(),
-                 std::inserter(tainted_blocks, tainted_blocks.begin()),
-                 [](auto v) -> BasicBlock * {
-                   if (auto *inst = dyn_cast<Instruction>(v->v))
-                     return inst->getParent();
-                   else
-                     return nullptr;
-                 });
-  tainted_blocks.erase(nullptr);
-  // assert CFG is valid
-  for (auto *bb : tainted_blocks) {
-    for (auto pred = pred_begin(bb); pred != pred_end(bb); ++pred) {
-      assert(tainted_blocks.find(*pred) != tainted_blocks.end());
-    }
-  }
 }
 
 void PrecalculationAnalysis::visit_load(
