@@ -42,6 +42,29 @@ using namespace llvm;
 // the order of visiting the values should make no difference
 // #define SHUFFLE_VALUES_FOR_TESTING
 
+// an interaction with std::cout can not except during precompute (any exception
+// would be considered fatal anyway) therefore we do not need to analyze the
+// interactions with std::cout
+bool is_interaction_with_cout(llvm::CallBase *call) {
+
+  if (call->isIndirectCall()) {
+    return false;
+  }
+
+  if (call->getCalledFunction()->getName() == "printf") {
+    return true;
+  }
+
+  auto *cout = call->getModule()->getGlobalVariable("_ZSt4cout");
+  if (cout) {
+    if (call->getNumOperands() > 1 && call->getArgOperand(0) == cout) {
+      assert(is_func_from_std(call->getCalledFunction()));
+      return true;
+    }
+  }
+  return false;
+}
+
 void print_childrens(const std::shared_ptr<TaintedValue> &parent,
                      unsigned int indent = 0) {
   if (indent > 10 || parent == nullptr || parent->v == nullptr)
@@ -92,7 +115,7 @@ void PrecalculationAnalysis::analyze_functions() {
   }
 
   for (const auto &pair : function_analysis) {
-    pair.second->analyze_can_except_in_precompute();
+    pair.second->analyze_can_except_in_precompute(this);
   }
 }
 
@@ -173,8 +196,11 @@ bool is_free(llvm::CallBase *call) {
   return is_free(call->getCalledFunction());
 }
 
-void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute() {
+void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
+    const PrecalculationAnalysis *precompute_analysis) {
 
+  // the precompute_analysis object is not fully initialized yet, as we are
+  // currently analyzing the functions
   assert(not analysis_except_in_precompute);
 
   if (func->hasFnAttribute(llvm::Attribute::NoUnwind)) {
@@ -183,14 +209,6 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute() {
     return;
   }
 
-  // TODO
-  // std::basic_ostream<char, std::char_traits<char> >& std::operator<<(...) can
-  // also not "except" for our purpose at least if ostream is std::cout
-  // (_ZSt4cout as parameter 1)
-
-  // this kind of exception would be fatal during precompute anyway
-  // this means not executing the function to test if the exception is raised is
-  // OK as exception would lead to abort anyway
   if (is_allocation(func)      // out of mem is fatal
       || is_mpi_function(func) // mpi cannot throw recoverable exceptions
   ) {
@@ -211,19 +229,29 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute() {
     return;
   }
 
-  // TODO better analysis needed??
-  //  if they invoke the function that may except they need to resume exception
-  //  handling aka if they catch they dont throw
   analysis_except_in_precompute = true; // this one is currently analyzed
-  for (const auto &c : callees) {
-    if (not c.expired()) {
-      auto callee = c.lock();
-      if (not callee->analysis_except_in_precompute) {
-        callee->analyze_can_except_in_precompute();
-        if (callee->can_except_in_precompute) {
-          analysis_except_in_precompute = false;
-          assert(can_except_in_precompute);
-          return;
+  for (auto &BB : *func) {
+    for (auto &inst : BB) {
+      if (auto *call = dyn_cast<CallBase>(&inst)) {
+        if (not is_interaction_with_cout(call)) {
+          for (auto *cc :
+               precompute_analysis->get_possible_call_targets(call)) {
+            auto callee = precompute_analysis->get_function_analysis(cc);
+            assert(callees.find(callee) != callees.end());
+            // callee may not be properly initialized yet
+            if (not callee->analysis_except_in_precompute) {
+              callee->analyze_can_except_in_precompute(precompute_analysis);
+              if (callee->can_except_in_precompute) {
+                analysis_except_in_precompute = false;
+                assert(can_except_in_precompute);
+                // TODO better analysis needed??
+                //  if they invoke the function that may except they need to
+                //  resume exception handling aka if they catch and deal with
+                //  exception: they dont throw
+                return;
+              }
+            }
+          }
         }
       }
     }
@@ -285,8 +313,8 @@ void PrecalculationAnalysis::find_all_tainted_vals() {
 
   print_analysis_result_remarks();
 
-  // if tags or control flow depend on argc or argv MPI_Init will be tainted (as
-  // it writes argc and argv)
+  // if tags or control flow depend on argc or argv MPI_Init will be tainted
+  // (as it writes argc and argv)
 
   auto pos = std::find_if(
       tainted_values.begin(), tainted_values.end(), [](auto v) -> bool {
@@ -513,8 +541,8 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // cast TO ptr is not allowed
     assert(not cast->getType()->isPointerTy() &&
            "Casting an integer to a ptr is not supported");
-    // cast from ptr is allowed (e.g. to check if a ptr is aligned with a modulo
-    // operation) as long as it is not casted back into a ptr
+    // cast from ptr is allowed (e.g. to check if a ptr is aligned with a
+    // modulo operation) as long as it is not casted back into a ptr
 
     insert_tainted_value(cast->getOperand(0), v);
     v->visited = true;
@@ -911,8 +939,8 @@ void PrecalculationAnalysis::visit_call(
             for (auto &arg : call->args()) {
               auto arg_info = insert_tainted_value(arg, call_info);
 
-              // for ptr parameters: we need to respect if the func reads/writes
-              // them
+              // for ptr parameters: we need to respect if the func
+              // reads/writes them
               if (arg->getType()->isPointerTy()) {
                 analyze_ptr_usage_in_std(call, arg_info);
               }
@@ -1418,8 +1446,8 @@ std::string get_name_without_templates(const std::string &demangled_name) {
   return result;
 }
 
-// only gets the name of a function if a demangled name contains a return param
-// or template args
+// only gets the name of a function if a demangled name contains a return
+// param or template args
 std::string get_function_name(const std::string &demangled_name) {
 
   auto no_template = get_name_without_templates(demangled_name);
@@ -1461,7 +1489,8 @@ bool is_func_from_std(llvm::Function *func) {
   auto demangled_fname =
       get_function_name(llvm::demangle(func->getName().str()));
 
-  // errs() << "Test if in std:\n" << func->getName() <<demangled_fname << "\n";
+  // errs() << "Test if in std:\n" << func->getName() <<demangled_fname <<
+  // "\n";
 
   // startswith std::
   if (demangled_fname.rfind("std::", 0) == 0) {
@@ -1481,10 +1510,25 @@ bool is_func_from_std(llvm::Function *func) {
   // TODO why it is not in TLI info??
   if (func->getName() == "rand") {
     // calling rand in precompute is actually "safe",
-    // as one should usa a random seed anyway it doesn't matter if we call it in
-    // precompute
+    // as one should usa a random seed anyway it doesn't matter if we call it
+    // in precompute
     return true;
   }
 
+  return false;
+}
+
+bool PrecalculationAnalysis::can_except_in_precompute(
+    llvm::CallBase *call) const {
+
+  if (is_interaction_with_cout(call)) {
+    return false;
+  }
+
+  for (auto *f : get_possible_call_targets(call)) {
+    if (function_analysis.at(f)->can_except_in_precompute) {
+      return true;
+    }
+  }
   return false;
 }

@@ -33,6 +33,8 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "ptr_info.h"
 #include "taintedValue.h"
 
+class PrecalculationAnalysis;
+
 class PrecalculationFunctionAnalysis {
 public:
   // analysis Part
@@ -94,7 +96,8 @@ public:
   std::set<std::weak_ptr<PrecalculationFunctionAnalysis>, std::owner_less<>>
       callees;
 
-  void analyze_can_except_in_precompute();
+  void analyze_can_except_in_precompute(
+      const PrecalculationAnalysis *precompute_analysis);
 };
 
 class PrecalculationAnalysis {
@@ -209,6 +212,7 @@ public:
 
   bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
   bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke) const;
+  bool can_except_in_precompute(llvm::CallBase *call) const;
 
 private:
   void
