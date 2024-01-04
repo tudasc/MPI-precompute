@@ -587,6 +587,13 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // allowed
     insert_tainted_value(ptoi->getPointerOperand(), v);
     v->visited = true;
+
+  } else if (isa<ShuffleVectorInst>(v->v) || isa<ExtractElementInst>(v->v) ||
+             isa<InsertElementInst>(v->v)) {
+    for (auto *operand : llvm::cast<Instruction>(v->v)->operand_values()) {
+      insert_tainted_value(operand, v);
+    }
+    v->visited = true;
   } else {
     errs() << "Support for analyzing this Value is not implemented yet\n";
     v->v->dump();
