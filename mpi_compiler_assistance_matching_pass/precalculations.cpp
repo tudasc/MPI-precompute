@@ -243,15 +243,16 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
             // callee may not be properly initialized yet
             if (not callee->analysis_except_in_precompute) {
               callee->analyze_can_except_in_precompute(precompute_analysis);
-              if (callee->can_except_in_precompute) {
-                analysis_except_in_precompute = false;
-                assert(can_except_in_precompute);
-                // TODO better analysis needed??
-                //  if they invoke the function that may except they need to
-                //  resume exception handling aka if they catch and deal with
-                //  exception: they dont throw
-                return;
-              }
+            }
+            if (callee->can_except_in_precompute &&
+                (not(callee == shared_from_this()))) {
+              analysis_except_in_precompute = false;
+              assert(can_except_in_precompute);
+              // TODO better analysis needed??
+              //  if they invoke the function that may except they need to
+              //  resume exception handling aka if they catch and deal with
+              //  exception: they dont throw
+              return;
             }
           }
         }

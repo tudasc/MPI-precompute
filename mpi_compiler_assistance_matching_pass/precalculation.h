@@ -35,7 +35,8 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 class PrecalculationAnalysis;
 
-class PrecalculationFunctionAnalysis {
+class PrecalculationFunctionAnalysis
+    : public std::enable_shared_from_this<PrecalculationFunctionAnalysis> {
 public:
   // analysis Part
   explicit PrecalculationFunctionAnalysis(llvm::Function *F) : func(F) {
