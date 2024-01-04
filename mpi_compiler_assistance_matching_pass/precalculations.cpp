@@ -989,7 +989,8 @@ void PrecalculationAnalysis::visit_call(
 
   // we need to check the control flow if a exception is raised
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-    if (is_invoke_exception_case_needed(invoke)) {
+    if (is_invoke_exception_case_needed(invoke) &&
+        can_except_in_precompute(invoke)) {
 
       // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this
@@ -1017,9 +1018,6 @@ void PrecalculationAnalysis::visit_call(
                      TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED &&
                  call_info->has_specific_reason());
           continue; // ignore otherwise
-        }
-        if (not function_analysis.at(func)->can_except_in_precompute) {
-          continue;
         }
         if (is_func_from_std(func)) {
           // calling into std is safe, as no side effects will occur (other
