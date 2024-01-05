@@ -361,10 +361,12 @@ void PrecalculationAnalysis::visit_store_from_value(
     const std::shared_ptr<TaintedValue> &store_info) {
   auto *store = dyn_cast<StoreInst>(store_info->v);
   assert(store);
+  // capturing of ptr
 
   assert(is_tainted(store->getValueOperand()));
   // TODO needed_from=false???
-  auto new_val = insert_tainted_value(store->getPointerOperand(), store_info);
+  auto new_val =
+      insert_tainted_value(store->getPointerOperand(), store_info, false);
   new_val->ptr_info->setIsWrittenTo(true);
   if (store->getValueOperand()->getType()->isPointerTy()) {
     auto val_info = get_taint_info(store->getValueOperand());
@@ -387,11 +389,13 @@ void PrecalculationAnalysis::visit_store_from_ptr(
   // we only need the stored value if it is used later
   if (ptr->ptr_info->isReadFrom()) {
     auto new_val =
-        insert_tainted_value(store->getValueOperand(), store_info, false);
+        insert_tainted_value(store->getValueOperand(), store_info, true);
+    // we need to include all 3 the ptr the store and the stored val
     include_value_in_precompute(new_val);
     include_value_in_precompute(store_info);
+    include_value_in_precompute(ptr);
     // TODO in destructor we may not need it
-    //  if all reads are before in CFG we also dont need it
+    //  if all important reads are before in CFG we also dont need it
   }
 }
 
