@@ -76,7 +76,7 @@ void print_childrens(const std::shared_ptr<TaintedValue> &parent,
     errs() << "\t";
   }
   parent->v->dump();
-  for (const auto &c : parent->children) {
+  for (const auto &c : parent->needs) {
     print_childrens(c, indent + 1);
   }
 }
@@ -90,7 +90,7 @@ void print_parents(const std::shared_ptr<TaintedValue> &child,
     errs() << "\t";
   }
   child->v->dump();
-  for (const auto &p : child->parents) {
+  for (const auto &p : child->needed_for) {
     print_parents(p, indent + 1);
   }
 }
@@ -349,8 +349,6 @@ void PrecalculationAnalysis::visit_load(
   assert(loaded_from->is_pointer());
   assert(loaded_from->ptr_info);
   loaded_from->ptr_info->setIsReadFrom(true);
-  assert(load_info->isIncludeInPrecompute());
-  include_value_in_precompute(loaded_from);
 
   if (load_info->is_pointer()) {
     loaded_from->ptr_info->setIsUsedDirectly(true, load_info->ptr_info);
@@ -365,15 +363,11 @@ void PrecalculationAnalysis::visit_store_from_value(
   assert(store);
 
   assert(is_tainted(store->getValueOperand()));
+  // TODO needed_from=false???
   auto new_val = insert_tainted_value(store->getPointerOperand(), store_info);
-  if (not new_val->ptr_info) {
-    new_val->ptr_info = std::make_shared<PtrUsageInfo>(store_info);
-  }
   new_val->ptr_info->setIsWrittenTo(true);
   if (store->getValueOperand()->getType()->isPointerTy()) {
-    auto val_info =
-        insert_tainted_value(store->getValueOperand(),
-                             nullptr); // will just do a finding of the value
+    auto val_info = get_taint_info(store->getValueOperand());
     new_val->ptr_info->setIsUsedDirectly(true, val_info->ptr_info);
   } else {
     new_val->ptr_info->setIsUsedDirectly(true);
@@ -392,9 +386,10 @@ void PrecalculationAnalysis::visit_store_from_ptr(
   ptr->ptr_info->setIsWrittenTo(true);
   // we only need the stored value if it is used later
   if (ptr->ptr_info->isReadFrom()) {
-    auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
+    auto new_val =
+        insert_tainted_value(store->getValueOperand(), store_info, false);
     include_value_in_precompute(new_val);
-    assert(store_info->isIncludeInPrecompute());
+    include_value_in_precompute(store_info);
     // TODO in destructor we may not need it
     //  if all reads are before in CFG we also dont need it
   }
@@ -644,6 +639,8 @@ void PrecalculationAnalysis::visit_ptr_usages(
   }
 
   for (auto *u : ptr->v->users()) {
+    // TODO refactor
+    // TODO if store in destructor we may not need it
     if (auto *s = dyn_cast<StoreInst>(u)) {
       // if we don't read the ptr directly, we don't need to capture the stores
       //  e.g. a struct ptr where the first member is not used
@@ -663,7 +660,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
     if (auto *l = dyn_cast<LoadInst>(u)) {
       if (l->getType()->isPointerTy()) {
         // if a ptr is loaded we need to trace its usages
-        insert_tainted_value(l, ptr);
+        insert_tainted_value(l, ptr, false);
       } // else no need to take care about this, reading the val is allowed
       continue;
     }
@@ -674,8 +671,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
     if (auto *gep = dyn_cast<GetElementPtrInst>(u)) {
       // if gep is relevant
       if (ptr->ptr_info->is_member_relevant(gep)) {
-        insert_tainted_value(gep, ptr);
-        // ptr info will be constructed when the gep is visited
+        insert_tainted_value(gep, ptr, false);
       }
       continue;
     }
@@ -686,8 +682,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
              "Constexpr other than GEP for ptr currently not implemented");
       // if gep is relevant
       if (ptr->ptr_info->is_member_relevant(gep)) {
-        insert_tainted_value(gep, ptr);
-        // ptr info will be constructed when the gep is visited
+        insert_tainted_value(gep, ptr, false);
       }
       as_inst->deleteValue(); // don't keep temporary instruction
       continue;
@@ -700,19 +695,14 @@ void PrecalculationAnalysis::visit_ptr_usages(
     }
     if (auto *phi = dyn_cast<PHINode>(u)) {
       // follow the phi
-      insert_tainted_value(phi, ptr);
-      // the ptr info will be properly constructed when the phi is visited
+      insert_tainted_value(phi, ptr, false);
       continue;
     }
     if (auto *select = dyn_cast<SelectInst>(u)) {
       // follow the resulting ptr
-      auto select_info = insert_tainted_value(select, ptr);
-      if (select_info->ptr_info == nullptr) {
-        select_info->ptr_info = ptr->ptr_info;
-        select_info->ptr_info->add_ptr_info_user(select_info);
-      } else {
-        ptr->ptr_info->merge_with(select_info->ptr_info);
-      }
+      auto select_info = insert_tainted_value(select, ptr, false);
+      ptr->ptr_info->merge_with(select_info->ptr_info);
+
       continue;
     }
     if (auto *ret = dyn_cast<ReturnInst>(u)) {
@@ -1106,10 +1096,9 @@ void PrecalculationAnalysis::visit_call_from_ptr(
   }
 
   assert(not ptr_given_as_arg.empty());
+  assert(ptr->ptr_info);
 
-  assert(ptr->ptr_info); // otherwise no need to trace this ptr usage
-
-  auto call_info = insert_tainted_value(call, ptr);
+  auto call_info = insert_tainted_value(call, ptr, false);
 
   errs() << "Visit\n";
   call->dump();
@@ -1125,6 +1114,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         // the needed value is the result of reading the comm
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
         auto new_val = insert_tainted_value(call, ptr);
+        // TODO treat it like a store to ptr
+        include_value_in_precompute(new_val);
         new_val = insert_tainted_value(call->getArgOperand(0),
                                        ptr); // we also need to keep the comm
         new_val->visited = false; // may need to be revisited it we discover
@@ -1161,6 +1152,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         // TODO bad smell: duplicate code
         for (auto &arg : call->args()) {
           auto arg_info = insert_tainted_value(arg, call_info);
+          // TODO only if ptr is written
+          include_value_in_precompute(arg_info);
 
           // for ptr parameters: we need to respect if the func reads/writes
           // them
@@ -1180,7 +1173,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
 
       for (auto &arg : call->args()) {
         auto arg_info = insert_tainted_value(arg, call_info);
-
+        // TODO only if ptr is written
+        include_value_in_precompute(arg_info);
         // for ptr parameters: we need to respect if the func reads/writes
         // them
         if (arg->getType()->isPointerTy()) {
@@ -1203,7 +1197,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         func->dump();
         assert(false);
       } else {
-        auto new_val = insert_tainted_value(arg, ptr);
+        auto new_val = insert_tainted_value(arg, ptr, false);
         ptr->ptr_info->merge_with(new_val->ptr_info);
         assert(new_val->ptr_info == ptr->ptr_info);
       }
@@ -1217,7 +1211,7 @@ void PrecalculationAnalysis::include_value_in_precompute(
   if (not taint_info->isIncludeInPrecompute()) {
     taint_info->setIncludeInPrecompute();
     insert_necessary_control_flow(taint_info->v);
-    for (const auto &p : taint_info->parents) {
+    for (const auto &p : taint_info->needs) {
       include_value_in_precompute(p);
     }
   } // else: already included, nothing to do
@@ -1237,22 +1231,22 @@ PrecalculationAnalysis::insert_tainted_value(llvm::Value *v,
       // create empty info
       inserted_elem->ptr_info = std::make_shared<PtrUsageInfo>(inserted_elem);
     }
-    include_value_in_precompute(inserted_elem);
+
   } else {
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
                                   [&v](const auto &vv) { return vv->v == v; });
-    assert(inserted_elem->isIncludeInPrecompute());
   }
-
   inserted_elem->addReason(reason);
+  include_value_in_precompute(inserted_elem);
 
   assert(inserted_elem != nullptr);
   return inserted_elem;
 }
 
 std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
-    llvm::Value *v, const std::shared_ptr<TaintedValue> &from) {
+    llvm::Value *v, const std::shared_ptr<TaintedValue> &from,
+    bool needed_from) {
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
   if (not is_tainted(v)) {
@@ -1282,25 +1276,37 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       // we don't care why the Control flow was tagged for the parent
       inserted_elem->addReason(from->getReason() &
                                TaintReason::REASONS_TO_PROPERGATE);
-      inserted_elem->parents.insert(from);
-      from->children.insert(inserted_elem);
-      if (from->isIncludeInPrecompute()) {
-        include_value_in_precompute(inserted_elem);
+      if (needed_from) {
+        inserted_elem->needed_for.insert(from);
+        from->needs.insert(inserted_elem);
+        if (from->isIncludeInPrecompute()) {
+          include_value_in_precompute(inserted_elem);
+        }
+      } else {
+        from->needed_for.insert(inserted_elem);
+        inserted_elem->needs.insert(from);
       }
     }
   } else {
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
                                   [&v](const auto &vv) { return vv->v == v; });
-    if (from != nullptr) {
-      inserted_elem->parents.insert(from);
-      from->children.insert(inserted_elem);
-      // we dont care why the Control flow was tagged for te parent
+    if (from != nullptr && needed_from) {
+      inserted_elem->needed_for.insert(from);
+      from->needs.insert(inserted_elem);
+      // we don't care why the Control flow was tagged for te parent
       inserted_elem->addReason(from->getReason() &
                                TaintReason::REASONS_TO_PROPERGATE);
       if (from->isIncludeInPrecompute()) {
-        assert(inserted_elem->isIncludeInPrecompute());
+        include_value_in_precompute(inserted_elem);
       }
+    }
+    if (from != nullptr && not needed_from) {
+      inserted_elem->needs.insert(from);
+      from->needed_for.insert(inserted_elem);
+      // we don't care why the Control flow was tagged for te parent
+      inserted_elem->addReason(from->getReason() &
+                               TaintReason::REASONS_TO_PROPERGATE);
     }
   }
 
@@ -1339,6 +1345,12 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
       }
     } else {
       // BB is function entry block
+
+      if (bb->getParent()->getName() ==
+          "_ZN19CommManagerStandard18begin_halo_receiveEv") {
+        v->dump();
+        assert(false);
+      }
       insert_functions_to_include(bb->getParent());
     }
   }

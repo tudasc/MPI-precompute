@@ -102,8 +102,8 @@ public:
 
   // one can have multiple children and parents e.g. one call with several args
   // whose return value is used multiple times
-  std::set<std::shared_ptr<TaintedValue>> children = {};
-  std::set<std::shared_ptr<TaintedValue>> parents = {};
+  std::set<std::shared_ptr<TaintedValue>> needs = {};
+  std::set<std::shared_ptr<TaintedValue>> needed_for = {};
   // additional information for pointers
   std::shared_ptr<PtrUsageInfo> ptr_info = nullptr;
 

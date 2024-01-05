@@ -134,7 +134,8 @@ private:
   void include_value_in_precompute(const std::shared_ptr<TaintedValue> &);
   std::shared_ptr<TaintedValue>
   insert_tainted_value(llvm::Value *v,
-                       const std::shared_ptr<TaintedValue> &from = nullptr);
+                       const std::shared_ptr<TaintedValue> &from = nullptr,
+                       bool needed_from = true);
 
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
@@ -186,11 +187,19 @@ private:
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
-public:
+private:
   bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) { return vv->v == v; }) !=
            tainted_values.end();
+  }
+
+public:
+  bool is_included_in_precompute(llvm::Value *v) const {
+    return std::find_if(tainted_values.begin(), tainted_values.end(),
+                        [&v](const auto &vv) {
+                          return (vv->v == v && vv->isIncludeInPrecompute());
+                        }) != tainted_values.end();
   }
 
   template <class container>

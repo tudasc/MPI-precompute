@@ -45,7 +45,7 @@ llvm::Function *get_global_re_init_function(
     // if Comm World is needed there is no need to initialize it again, it
     // cannot be modified comm World will have no ptr info and therefore is
     // Written to check cannot be made
-    if (precompute_analyis_result.is_tainted(&global) &&
+    if (precompute_analyis_result.is_included_in_precompute(&global) &&
         &global != implementation_specifics->COMM_WORLD) {
       assert(global.getType()->isPointerTy());
       auto global_info = precompute_analyis_result.get_taint_info(&global);
@@ -301,8 +301,9 @@ void replace_calls_in_copy(
           continue;
         } else {
           call->dump();
-          assert(not precompute_analyis_result.is_tainted(callee) ||
-                 // callee is the original function
+          assert(
+              not precompute_analyis_result.is_included_in_precompute(callee) ||
+              // callee is the original function
                  // which should not be a user function
                  is_func_from_std(callee) || is_mpi_function(callee) ||
                  callee->isIntrinsic());
@@ -385,7 +386,7 @@ void replace_calls_in_copy(
       }
 
       for (unsigned int i = 0; i < call->arg_size(); ++i) {
-        if (not precompute_analyis_result.is_tainted(
+        if (not precompute_analyis_result.is_included_in_precompute(
                 orig_call->getArgOperand(i))) {
           // set unused arg to 0 (so we don't need to compute it)
           call->setArgOperand(
@@ -427,7 +428,7 @@ void prune_function_copy(
 
     Instruction *inst = &*I;
     auto *old_v = func->new_to_old_map[inst];
-    if (not precompute_analyis_result.is_tainted(old_v)) {
+    if (not precompute_analyis_result.is_included_in_precompute(old_v)) {
       if (auto *call = dyn_cast<CallBase>(inst)) {
         if (PrecomputeFunctions::get_instance()->is_call_to_precompute(call)) {
           // do not remove
@@ -444,7 +445,7 @@ void prune_function_copy(
       // but it actually is exception free for our purpose
       // meaning if it throws no MPI is used
 
-      assert(precompute_analyis_result.is_tainted(old_v));
+      assert(precompute_analyis_result.is_included_in_precompute(old_v));
       auto *old_ivoke = dyn_cast<InvokeInst>(old_v);
       assert(old_ivoke);
 
@@ -459,7 +460,8 @@ void prune_function_copy(
 
           bool all_tainted = true;
           for (auto &vv : old_ivoke->args()) {
-            if (not precompute_analyis_result.is_tainted(cast<Value>(&vv))) {
+            if (not precompute_analyis_result.is_included_in_precompute(
+                    cast<Value>(&vv))) {
               all_tainted = false;
             }
           }
