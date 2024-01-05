@@ -1042,7 +1042,7 @@ void PrecalculationAnalysis::visit_call(
             if (auto *cc = dyn_cast<CallBase>(&inst)) {
               if (can_except_in_precompute(cc)) {
                 insert_tainted_value(cc, TaintReason::CONTROL_FLOW);
-                }
+              }
             }
         }
       }

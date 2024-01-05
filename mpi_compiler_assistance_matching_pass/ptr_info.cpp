@@ -99,6 +99,9 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     other->merged_with = shared_from_this();
     other->is_valid = false;
     assert(this->is_valid);
+    auto obj_to_merge_to = shared_from_this();
+    // this may go out of scope so we capture the shared ptr early in this
+    // function
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
@@ -131,7 +134,6 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
       // will merge the info_of_direct_usage
     }
 
-    auto obj_to_merge_to = shared_from_this();
     // this may be invalidated (if gep is result of self)
     for (const auto &pos : other->important_members) {
       while (obj_to_merge_to->merged_with != nullptr) {
@@ -211,7 +213,12 @@ void PtrUsageInfo::add_important_member(
   assert(is_valid);
   assert(this->merged_with == nullptr);
 
-  // we dont keep track of if the GEP results in ptr again
+  auto to_propergate = shared_from_this();
+  // this can go out of scope so we need to capture a shared ptr to it first
+
+  // auto reference_to_self = shared_from_this();
+
+  // we don't keep track of if the GEP results in ptr again
   if (result_ptr == shared_from_this()) {
     return; // nothing to do
     // e.g. an iterator where it++ is realized as a GEP instruction
@@ -234,9 +241,6 @@ void PtrUsageInfo::add_important_member(
           to_merge.insert(pair.second);
         }
       }
-      for (auto &m : to_merge) {
-        result_ptr->merge_with(m);
-      }
 
       // std::erase_if in c++20
       for (auto iter = important_members.begin();
@@ -248,6 +252,13 @@ void PtrUsageInfo::add_important_member(
         }
       }
       important_members[member_idx] = result_ptr;
+      // the std:: set still holds references of the shared ptr, so they won't
+      // be destroyed
+
+      // merging may invalidate this
+      for (auto &m : to_merge) {
+        result_ptr->merge_with(m);
+      }
     } else {
       // exact match regarding wildcards
       existing_info.second->merge_with(result_ptr);
@@ -256,11 +267,10 @@ void PtrUsageInfo::add_important_member(
 
   // this may be invalid if it needs to be merged due to an iterator++ being
   // realized as GEP
-  auto to_propergate = shared_from_this();
+
   while (to_propergate->merged_with) {
     to_propergate = to_propergate->merged_with;
   }
-
   // TODO if merge does not change anything: nothing to do
   // but propergate "changes" is not wrong in either case
   to_propergate->propergate_changes();
