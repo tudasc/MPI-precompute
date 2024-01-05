@@ -274,11 +274,14 @@ void PrecalculationAnalysis::add_precalculations(
     auto *tag = get_tag_value(call, is_send);
     auto *src = get_src_value(call, is_send);
 
-    insert_tainted_value(tag, TaintReason::COMPUTE_TAG);
-    insert_tainted_value(src, TaintReason::COMPUTE_DEST);
+    auto tag_info = insert_tainted_value(tag, TaintReason::COMPUTE_TAG);
+    include_value_in_precompute(tag_info);
+    auto dest_info = insert_tainted_value(src, TaintReason::COMPUTE_DEST);
+    include_value_in_precompute(dest_info);
     // TODO precompute comm as well?
-    auto new_val = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
-    new_val->visited = true;
+    auto call_info = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
+    include_value_in_precompute(call_info);
+    call_info->visited = true;
   }
 
   find_all_tainted_vals();
@@ -344,12 +347,10 @@ void PrecalculationAnalysis::visit_load(
 
   auto loaded_from = insert_tainted_value(load->getPointerOperand(), load_info);
   assert(loaded_from->is_pointer());
-
-  if (loaded_from->ptr_info == nullptr) {
-    loaded_from->ptr_info = std::make_shared<PtrUsageInfo>(loaded_from);
-  }
   assert(loaded_from->ptr_info);
   loaded_from->ptr_info->setIsReadFrom(true);
+  assert(load_info->isIncludeInPrecompute());
+  include_value_in_precompute(loaded_from);
 
   if (load_info->is_pointer()) {
     loaded_from->ptr_info->setIsUsedDirectly(true, load_info->ptr_info);
@@ -385,14 +386,17 @@ void PrecalculationAnalysis::visit_store_from_ptr(
   assert(store);
 
   assert(is_tainted(store->getPointerOperand()));
-  // does only the find:
-  auto ptr = insert_tainted_value(store->getPointerOperand(), store_info);
+  auto ptr = get_taint_info(store->getPointerOperand());
   ptr->ptr_info->setIsUsedDirectly(
       true, store_info->ptr_info); // null if stored value is no ptr
   ptr->ptr_info->setIsWrittenTo(true);
   // we only need the stored value if it is used later
   if (ptr->ptr_info->isReadFrom()) {
     auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
+    include_value_in_precompute(new_val);
+    assert(store_info->isIncludeInPrecompute());
+    // TODO in destructor we may not need it
+    //  if all reads are before in CFG we also dont need it
   }
 }
 
@@ -641,7 +645,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
 
   for (auto *u : ptr->v->users()) {
     if (auto *s = dyn_cast<StoreInst>(u)) {
-      // if we dont read the ptr directly, we dont need to capture the stores
+      // if we don't read the ptr directly, we don't need to capture the stores
       //  e.g. a struct ptr where the first member is not used
       if (s->getPointerOperand() == ptr->v) {
         // store to this ptr
@@ -685,7 +689,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
         insert_tainted_value(gep, ptr);
         // ptr info will be constructed when the gep is visited
       }
-      as_inst->deleteValue(); // dont keep temporary instruction
+      as_inst->deleteValue(); // don't keep temporary instruction
       continue;
     }
     if (isa<ICmpInst>(u)) {
@@ -770,6 +774,7 @@ void PrecalculationAnalysis::insert_functions_to_include(llvm::Function *func) {
     for (auto *call : fun_to_precalc->callsites) {
       auto call_info =
           insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
+      include_value_in_precompute(call_info);
       call_info->visited = false; // may need to re visit if it was later
                                   // discovered that it is important
     }
@@ -1206,6 +1211,18 @@ void PrecalculationAnalysis::visit_call_from_ptr(
   }
 }
 
+void PrecalculationAnalysis::include_value_in_precompute(
+    const std::shared_ptr<TaintedValue> &taint_info) {
+
+  if (not taint_info->isIncludeInPrecompute()) {
+    taint_info->setIncludeInPrecompute();
+    insert_necessary_control_flow(taint_info->v);
+    for (const auto &p : taint_info->parents) {
+      include_value_in_precompute(p);
+    }
+  } // else: already included, nothing to do
+}
+
 std::shared_ptr<TaintedValue>
 PrecalculationAnalysis::insert_tainted_value(llvm::Value *v,
                                              TaintReason reason) {
@@ -1220,12 +1237,12 @@ PrecalculationAnalysis::insert_tainted_value(llvm::Value *v,
       // create empty info
       inserted_elem->ptr_info = std::make_shared<PtrUsageInfo>(inserted_elem);
     }
-    // insert what is necessary for Control flow to go here
-    insert_necessary_control_flow(v);
+    include_value_in_precompute(inserted_elem);
   } else {
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
                                   [&v](const auto &vv) { return vv->v == v; });
+    assert(inserted_elem->isIncludeInPrecompute());
   }
 
   inserted_elem->addReason(reason);
@@ -1239,9 +1256,10 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
   if (not is_tainted(v)) {
+    // only if not already in set
 
     if (auto *inst = dyn_cast<Instruction>(v)) {
-      // dont analyze std::s internals
+      // don't analyze std::s internals
       if (is_func_from_std(inst->getFunction())) {
         // inst->getFunction()->dump();
 
@@ -1253,22 +1271,23 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       assert(not is_func_from_std(inst->getFunction()));
     }
 
-    // only if not already in set
     inserted_elem = std::make_shared<TaintedValue>(v);
+    tainted_values.insert(inserted_elem);
+
     if (v->getType()->isPointerTy()) {
       // create empty info
       inserted_elem->ptr_info = std::make_shared<PtrUsageInfo>(inserted_elem);
     }
     if (from != nullptr) {
-      // we dont care why the Control flow was tagged for te parent
+      // we don't care why the Control flow was tagged for the parent
       inserted_elem->addReason(from->getReason() &
                                TaintReason::REASONS_TO_PROPERGATE);
       inserted_elem->parents.insert(from);
       from->children.insert(inserted_elem);
+      if (from->isIncludeInPrecompute()) {
+        include_value_in_precompute(inserted_elem);
+      }
     }
-    tainted_values.insert(inserted_elem);
-    // insert what is necessary for Control flow to go here
-    insert_necessary_control_flow(v);
   } else {
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
@@ -1279,6 +1298,9 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       // we dont care why the Control flow was tagged for te parent
       inserted_elem->addReason(from->getReason() &
                                TaintReason::REASONS_TO_PROPERGATE);
+      if (from->isIncludeInPrecompute()) {
+        assert(inserted_elem->isIncludeInPrecompute());
+      }
     }
   }
 

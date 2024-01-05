@@ -131,6 +131,7 @@ private:
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
   std::set<std::shared_ptr<TaintedValue>> tainted_values;
 
+  void include_value_in_precompute(const std::shared_ptr<TaintedValue> &);
   std::shared_ptr<TaintedValue>
   insert_tainted_value(llvm::Value *v,
                        const std::shared_ptr<TaintedValue> &from = nullptr);

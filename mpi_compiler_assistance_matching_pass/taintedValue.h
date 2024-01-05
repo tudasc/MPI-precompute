@@ -27,28 +27,28 @@ Licensed under the Apache License, Version 2.0 (the "License");
 class PtrUsageInfo;
 
 enum TaintReason : int {
-  OTHER = 0, // unspecified
-  COMPUTE_TAG = 1 << 0,
-  COMPUTE_DEST = 1 << 1,
-
-  CONTROL_FLOW = 1 << 2,
+  OTHER = 0,         // unspecified
+  ANALYSIS = 1 << 0, // is analyzed if we need to include it
+  COMPUTE_TAG = 1 << 1,
+  COMPUTE_DEST = 1 << 2,
+  CONTROL_FLOW = 1 << 3,
 
   // Bitmask to select only the genreal reasons to propergate tot the specific
   // reason
-  REASONS_TO_PROPERGATE = COMPUTE_TAG | COMPUTE_DEST | CONTROL_FLOW,
+  REASONS_TO_PROPERGATE = ANALYSIS | COMPUTE_TAG | COMPUTE_DEST | CONTROL_FLOW,
 
   // need the return value of a call not only its presence:
   // implies that the control flow need to pass to the callee to calculate
   // return value
-  CONTROL_FLOW_RETURN_VALUE_NEEDED = CONTROL_FLOW | 1 << 3,
+  CONTROL_FLOW_RETURN_VALUE_NEEDED = CONTROL_FLOW | 1 << 4,
   // need the control flow to pass this call to reach callee
-  CONTROL_FLOW_CALLEE_NEEDED = CONTROL_FLOW | 1 << 4,
+  CONTROL_FLOW_CALLEE_NEEDED = CONTROL_FLOW | 1 << 5,
   // need the control flow to call this call to check for exception
-  CONTROL_FLOW_EXCEPTION_NEEDED = CONTROL_FLOW | 1 << 5,
+  CONTROL_FLOW_EXCEPTION_NEEDED = CONTROL_FLOW | 1 << 6,
   // for invoke: this invoke can be replaced with an unconditional br to normal
   // dest as exception handling code is not relevant for precompute nor is the
   // return value
-  CONTROL_FLOW_ONLY_PRESENCE_NEEDED = CONTROL_FLOW | 1 << 6,
+  CONTROL_FLOW_ONLY_PRESENCE_NEEDED = CONTROL_FLOW | 1 << 7,
 };
 
 struct TaintedValue {
@@ -57,6 +57,7 @@ struct TaintedValue {
 
 private:
   int _reason = OTHER;
+  bool _include_in_precompute = false;
 
 public:
   int getReason() const { return _reason; }
@@ -84,6 +85,17 @@ public:
       return _reason & ~REASONS_TO_PROPERGATE;
     }
   };
+
+  bool isIncludeInPrecompute() const { return _include_in_precompute; }
+  void setIncludeInPrecompute() {
+    if (not _include_in_precompute) {
+      // assert(_reason & ANALYSIS);
+      _reason = _reason & (~ANALYSIS); // remove the reason ANALYSIS
+      _include_in_precompute = true;
+      // TODO do I rly need to re-visit it?
+      visited = false;
+    }
+  }
 
 public:
   bool visited = false;
