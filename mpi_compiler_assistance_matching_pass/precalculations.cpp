@@ -870,17 +870,13 @@ bool should_call_intrinsic(Intrinsic::ID id) {
       Intrinsic::getName(id).starts_with("llvm.x86.sse"); // NOLINT
 }
 
-void PrecalculationAnalysis::analyze_ptr_usage_in_std(
+bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
 
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
   assert(not call->isIndirectCall());
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
-
-  // errs() << "in : " << call->getCalledFunction()->getName() << " \n";
-  // ptr_arg_info->v->dump();
-
   long arg_no = -1;
 
   for (unsigned i = 0; i < call->getNumOperands(); ++i) {
@@ -893,14 +889,72 @@ void PrecalculationAnalysis::analyze_ptr_usage_in_std(
 
   auto *arg = call->getCalledFunction()->getArg(arg_no);
   if (not arg->hasAttribute(llvm::Attribute::ReadNone)) {
-    // errs() << "Is READ\n";
-    ptr_arg_info->ptr_info->setIsReadFrom(true);
-  }
 
-  if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
-    // errs() << "Is WRITTEN\n";
-    ptr_arg_info->ptr_info->setIsWrittenTo(true);
+    return true;
   }
+  return false;
+}
+
+bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
+    llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
+
+  assert(ptr_arg_info->v->getType()->isPointerTy());
+  assert(ptr_arg_info->ptr_info);
+  assert(not call->isIndirectCall());
+  assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
+  long arg_no = -1;
+
+  for (unsigned i = 0; i < call->getNumOperands(); ++i) {
+    if (call->getArgOperand(i) == ptr_arg_info->v) {
+      arg_no = i;
+      break;
+    }
+  }
+  assert(arg_no != -1);
+
+  auto *arg = call->getCalledFunction()->getArg(arg_no);
+  if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
+    return true;
+  }
+  return false;
+}
+
+void PrecalculationAnalysis::include_call_to_std(
+    std::shared_ptr<TaintedValue> call_info) {
+
+  assert(isa<CallBase>(call_info->v));
+  auto *call = cast<CallBase>(call_info->v);
+  assert(not call->isIndirectCall());
+
+  auto *func = call->getCalledFunction();
+  assert(
+      (func->isIntrinsic() && should_call_intrinsic(func->getIntrinsicID())) ||
+      is_func_from_std(func));
+
+  // calling into std is safe, as no side effects will occur (other
+  // than for the given parameters)
+  //  as std is designed to have as fw side effects as possible
+  // TODO implement check for exception std::rand and std::cout/cin
+  // we just need to make shure all parameters are given
+
+  for (auto &arg : call->args()) {
+    auto arg_info = insert_tainted_value(arg, call_info);
+
+    // for ptr parameters: we need to respect if the func
+    // reads/writes them
+    if (arg->getType()->isPointerTy()) {
+
+      if (is_ptr_usage_in_std_read(call, arg_info)) {
+        arg_info->ptr_info->setIsReadFrom(true);
+      }
+      if (is_ptr_usage_in_std_write(call, arg_info)) {
+        arg_info->ptr_info->setIsWrittenTo(true);
+      }
+      // need all args to be present for the call
+      include_value_in_precompute(arg_info);
+    }
+  }
+  include_value_in_precompute(call_info);
 }
 
 void PrecalculationAnalysis::visit_call(
@@ -925,52 +979,28 @@ void PrecalculationAnalysis::visit_call(
             should_call_intrinsic(func->getIntrinsicID())) {
           if (not should_ignore_intrinsic(func->getIntrinsicID())) {
             // consider it same as call to std
-            // TODO bad smell: duplicate code
-            for (auto &arg : call->args()) {
-              auto arg_info = insert_tainted_value(arg, call_info);
-
-              // for ptr parameters: we need to respect if the func
-              // reads/writes them
-              if (arg->getType()->isPointerTy()) {
-                analyze_ptr_usage_in_std(call, arg_info);
-              }
-            }
+            include_call_to_std(call_info);
+            continue;
           }
-
-          // ignore intrinsics
-          continue;
-        }
-        if (is_func_from_std(func)) {
-          // calling into std is safe, as no side effects will occur (other
-          // than for the given parameters)
-          //  as std is designed to have as fw side effects as possible
-          // TODO implement check for exception std::rand and std::cout/cin
-          // we just need to make shure all parameters are given
-          for (auto &arg : call->args()) {
-            auto arg_info = insert_tainted_value(arg, call_info);
-
-            // for ptr parameters: we need to respect if the func reads/writes
-            // them
-            if (arg->getType()->isPointerTy()) {
-              analyze_ptr_usage_in_std(call, arg_info);
-            }
+          if (is_func_from_std(func)) {
+            include_call_to_std(call_info);
+            continue;
           }
-          continue;
-        }
-        if (func->isDeclaration()) {
-          errs() << "\n";
-          call->dump();
-          func->dump();
-          errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
-                 << func->isIntrinsic() << "\n";
-        }
-        assert(not func->isDeclaration() &&
-               "cannot analyze if calling external function for return value "
-               "has "
-               "side effects");
-        for (auto &bb : *func) {
-          if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
-            insert_tainted_value(ret, call_info);
+          if (func->isDeclaration()) {
+            errs() << "\n";
+            call->dump();
+            func->dump();
+            errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
+                   << func->isIntrinsic() << "\n";
+          }
+          assert(not func->isDeclaration() &&
+                 "cannot analyze if calling external function for return value "
+                 "has "
+                 "side effects");
+          for (auto &bb : *func) {
+            if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
+              insert_tainted_value(ret, call_info);
+            }
           }
         }
       }
@@ -989,40 +1019,12 @@ void PrecalculationAnalysis::visit_call(
 
       for (auto *func : possible_targets) {
         if (func->isIntrinsic() &&
-            (func->getIntrinsicID() == Intrinsic::lifetime_start ||
-             func->getIntrinsicID() == Intrinsic::lifetime_end ||
-             func->getIntrinsicID() == Intrinsic::type_test ||
-             func->getIntrinsicID() == Intrinsic::public_type_test ||
-             func->getIntrinsicID() == Intrinsic::assume ||
-             func->getIntrinsicID() == Intrinsic::type_checked_load)) {
+            should_ignore_intrinsic(func->getIntrinsicID())) {
           // ignore intrinsics
           continue;
         }
-
-        if (func == mpi_func->mpi_send_init ||
-            func == mpi_func->mpi_recv_init) {
-          // ma need to visit it again if we find that exception control flow
-          // is needed
-
-          assert(call_info->getReason() |
-                     TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED &&
-                 call_info->has_specific_reason());
-          continue; // ignore otherwise
-        }
         if (is_func_from_std(func)) {
-          // calling into std is safe, as no side effects will occur (other
-          // than for the given parameters)
-          //  as std is designed to haf as fw side effects as possible
-          // TODO implement check for exception std::rand and std::cout/cin
-          for (auto &arg : call->args()) {
-            auto arg_info = insert_tainted_value(arg, call_info);
-
-            // for ptr parameters: we need to respect if thes func
-            // reads/writes them
-            if (arg->getType()->isPointerTy()) {
-              analyze_ptr_usage_in_std(call, arg_info);
-            }
-          }
+          include_call_to_std(call_info);
           continue;
         }
         if (func->isDeclaration()) {
@@ -1046,17 +1048,16 @@ void PrecalculationAnalysis::visit_call(
         }
       }
     }
-  }
 
-  if (call->isIndirectCall()) {
-    // we need to taint the function ptr
-    auto func_ptr_info =
-        insert_tainted_value(call->getCalledOperand(), call_info);
-    // may be already set if this ptr was tainted before
-    if (func_ptr_info->ptr_info == nullptr) {
-      func_ptr_info->ptr_info = std::make_shared<PtrUsageInfo>(func_ptr_info);
+    if (call->isIndirectCall() && ((is_invoke_exception_case_needed(invoke) &&
+                                    can_except_in_precompute(invoke)) ||
+                                   need_return_val)) {
+      // we need to taint the function ptr
+      auto func_ptr_info =
+          insert_tainted_value(call->getCalledOperand(), call_info);
       func_ptr_info->ptr_info->setIsUsedDirectly(true);
       func_ptr_info->ptr_info->setIsCalled(true);
+      include_value_in_precompute(func_ptr_info);
     }
   }
 }
@@ -1078,36 +1079,35 @@ void PrecalculationAnalysis::visit_call_from_ptr(
     return;
   }
 
-  auto *func = call->getCalledFunction();
-  if (not call->isIndirectCall() &&
-      (func == mpi_func->mpi_send || func == mpi_func->mpi_Isend ||
-       func == mpi_func->mpi_recv || func == mpi_func->mpi_Irecv)) {
-    assert(ptr_given_as_arg.size() == 1);
-    if (*ptr_given_as_arg.begin() == 0) {
-      ptr->v->dump();
-      call->dump();
-      assert(false && "Tracking Communication to get the envelope is currently "
-                      "not supported");
-    } else {
-      // we know that the other arguments are not important e.g. not written
-      // to like if the communicator is used
-      return;
-    }
-  }
-  if (not call->isIndirectCall() && is_free(call)) {
-    // the precompute library will take care of free, so no need to taint it
-    return;
-  }
+  auto call_info = insert_tainted_value(call, ptr, false);
 
+  auto *func = call->getCalledFunction();
   assert(not ptr_given_as_arg.empty());
   assert(ptr->ptr_info);
-
-  auto call_info = insert_tainted_value(call, ptr, false);
 
   errs() << "Visit\n";
   call->dump();
 
-  for (auto *func : get_possible_call_targets(call)) {
+  if (not call->isIndirectCall()) {
+    if (func == mpi_func->mpi_send || func == mpi_func->mpi_Isend ||
+        func == mpi_func->mpi_recv || func == mpi_func->mpi_Irecv) {
+      assert(ptr_given_as_arg.size() == 1);
+      if (*ptr_given_as_arg.begin() == 0) {
+        ptr->v->dump();
+        call->dump();
+        assert(false &&
+               "Tracking Communication to get the envelope is currently "
+               "not supported");
+      } else {
+        // we know that the other arguments are not important e.g. not written
+        // to like if the communicator is used
+        return;
+      }
+    }
+    if (not call->isIndirectCall() && is_free(call)) {
+      // the precompute library will take care of free, so no need to taint it
+      return;
+    }
 
     if (func == mpi_func->mpi_comm_size || func == mpi_func->mpi_comm_rank) {
       // we know it is safe to execute these "readonly" funcs
@@ -1119,75 +1119,54 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
         auto new_val = insert_tainted_value(call, ptr);
         // TODO treat it like a store to ptr
+        // value is only necessary it ptr is read
         include_value_in_precompute(new_val);
         new_val = insert_tainted_value(call->getArgOperand(0),
                                        ptr); // we also need to keep the comm
         new_val->visited = false; // may need to be revisited it we discover
                                   // that this is important
+        ptr->ptr_info->setIsWrittenTo(true);
+        include_value_in_precompute(ptr);
       }
-      continue;
+      return;
     }
     if (func == mpi_func->mpi_init || func == mpi_func->mpi_init_thread) {
       // skip: MPI_Init will only transfer the cmd line args to all processes,
       // not modify them otherwise
-      continue;
+      return;
     }
     if (func == mpi_func->mpi_send_init || func == mpi_func->mpi_recv_init) {
       // skip: these functions will be managed seperately anyway
       // it may be the case, that e.g. the buffer or request aliases with
       // something important
-      continue;
+      return;
     }
     if (is_allocation(func)) {
       // skip: alloc needs to be handled differently
       // but needs to be tainted so it will be replaced later
-      continue;
+
+      assert(false && "a ptr given into an allocation call???");
+      return;
     }
 
-    if (should_exclude_function_for_debugging(func)) {
-      // skip:
-      // TODO
-      continue;
+    if (func->isIntrinsic() &&
+        should_ignore_intrinsic(func->getIntrinsicID())) {
+      // skip
+      return;
     }
 
-    if (func->isIntrinsic() && should_call_intrinsic(func->getIntrinsicID())) {
-      if (not should_ignore_intrinsic(func->getIntrinsicID())) {
-        // consider it same as call to std
-        // TODO bad smell: duplicate code
-        for (auto &arg : call->args()) {
-          auto arg_info = insert_tainted_value(arg, call_info);
-          // TODO only if ptr is written
-          include_value_in_precompute(arg_info);
-
-          // for ptr parameters: we need to respect if the func reads/writes
-          // them
-          if (arg->getType()->isPointerTy()) {
-            analyze_ptr_usage_in_std(call, arg_info);
-          }
-        }
+    if ((func->isIntrinsic() &&
+         should_call_intrinsic(func->getIntrinsicID())) ||
+        is_func_from_std(func)) {
+      if (ptr->ptr_info->isReadFrom() && is_ptr_usage_in_std_write(call, ptr)) {
+        include_call_to_std(call_info);
+        assert(ptr->ptr_info->isWrittenTo());
       }
-      continue;
+      return;
     }
+  }
 
-    if (is_func_from_std(func)) {
-      // calling into std is safe, as no side effects will occur (other than
-      // for the given parameters)
-      //  as std is designed to haf as fw side effects as possible
-      // TODO implement check for exception std::rand and std::cout/cin
-
-      for (auto &arg : call->args()) {
-        auto arg_info = insert_tainted_value(arg, call_info);
-        // TODO only if ptr is written
-        include_value_in_precompute(arg_info);
-        // for ptr parameters: we need to respect if the func reads/writes
-        // them
-        if (arg->getType()->isPointerTy()) {
-          analyze_ptr_usage_in_std(call, arg_info);
-        }
-      }
-      continue;
-    }
-
+  for (auto *func : get_possible_call_targets(call)) {
     for (auto arg_num : ptr_given_as_arg) {
       auto *arg = func->getArg(arg_num);
       if (arg->hasAttribute(Attribute::NoCapture) &&
@@ -1333,8 +1312,8 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
             auto new_val =
                 insert_tainted_value(term, TaintReason::CONTROL_FLOW);
             new_val->addReason(TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
-            // it may need to be re-visited if we find out that we do need the
-            // exception path
+            // it may need to be re-visited if we find out that we do need
+            // the exception path
             new_val->visited = false;
           } else {
             if (invoke->getUnwindDest() == bb) {
@@ -1544,8 +1523,8 @@ bool is_func_from_std(llvm::Function *func) {
   // TODO why it is not in TLI info??
   if (func->getName() == "rand") {
     // calling rand in precompute is actually "safe",
-    // as one should usa a random seed anyway it doesn't matter if we call it
-    // in precompute
+    // as one should usa a random seed anyway it doesn't matter if we call
+    // it in precompute
     return true;
   }
 

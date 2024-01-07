@@ -187,6 +187,9 @@ private:
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
+  // materialize call
+  void include_call_to_std(std::shared_ptr<TaintedValue> call_info);
+
 private:
   bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
@@ -226,9 +229,12 @@ public:
   bool can_except_in_precompute(llvm::CallBase *call) const;
 
 private:
-  void
-  analyze_ptr_usage_in_std(llvm::CallBase *call,
+  bool
+  is_ptr_usage_in_std_read(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
+  bool
+  is_ptr_usage_in_std_write(llvm::CallBase *call,
+                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
 public:
   std::vector<llvm::Function *>
