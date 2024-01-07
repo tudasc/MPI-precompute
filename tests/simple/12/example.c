@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  DATA = malloc(sizeof(double) * 100);
+  DATA = (double *)malloc(sizeof(double) * 100);
   for (int i = 0; i < 100; i++) {
     DATA[i] = 42.0;
   }
