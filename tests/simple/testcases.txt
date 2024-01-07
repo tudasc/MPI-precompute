@@ -13,7 +13,7 @@ tests 03 to 09 target the implementation of the communication
 13 usage of a function ptr
 14 usage of a cpp object
 15 inheritance with virtual table
-16 inheritance with virtual table
+16 inheritance with virtual table - tag is a different obj member in other subclass
 17 Waitall only on the sends and only after that Waitall on the recvs (tests communication Implementation)
 18 same as 16 but with For Loop over object members
 19 Reinitialization of Requests I
