@@ -1048,17 +1048,15 @@ void PrecalculationAnalysis::visit_call(
         }
       }
     }
+  }
 
-    if (call->isIndirectCall() && ((is_invoke_exception_case_needed(invoke) &&
-                                    can_except_in_precompute(invoke)) ||
-                                   need_return_val)) {
-      // we need to taint the function ptr
-      auto func_ptr_info =
-          insert_tainted_value(call->getCalledOperand(), call_info);
-      func_ptr_info->ptr_info->setIsUsedDirectly(true);
-      func_ptr_info->ptr_info->setIsCalled(true);
-      include_value_in_precompute(func_ptr_info);
-    }
+  if (call->isIndirectCall() && call_info->isIncludeInPrecompute()) {
+    // we need to taint the function ptr
+    auto func_ptr_info =
+        insert_tainted_value(call->getCalledOperand(), call_info);
+    func_ptr_info->ptr_info->setIsUsedDirectly(true);
+    func_ptr_info->ptr_info->setIsCalled(true);
+    include_value_in_precompute(func_ptr_info);
   }
 }
 
@@ -1177,7 +1175,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
       }
       if (func->isDeclaration()) {
         errs() << "Can not analyze usage of external function:\n";
-        func->dump();
+        ptr->v->dump();
+        call->dump();
         assert(false);
       } else {
         auto new_val = insert_tainted_value(arg, ptr, false);
@@ -1315,6 +1314,7 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
             // it may need to be re-visited if we find out that we do need
             // the exception path
             new_val->visited = false;
+            include_value_in_precompute(new_val);
           } else {
             if (invoke->getUnwindDest() == bb) {
               // this exception block cannot be visited in precompute
@@ -1325,6 +1325,7 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
           }
         }
         auto new_val = insert_tainted_value(term, TaintReason::CONTROL_FLOW);
+        include_value_in_precompute(new_val);
       }
     } else {
       // BB is function entry block
