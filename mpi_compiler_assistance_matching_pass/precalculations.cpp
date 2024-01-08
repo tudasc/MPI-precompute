@@ -950,9 +950,9 @@ void PrecalculationAnalysis::include_call_to_std(
       if (is_ptr_usage_in_std_write(call, arg_info)) {
         arg_info->ptr_info->setIsWrittenTo(true);
       }
-      // need all args to be present for the call
-      include_value_in_precompute(arg_info);
     }
+    // need all args to be present for the call
+    include_value_in_precompute(arg_info);
   }
   include_value_in_precompute(call_info);
 }
