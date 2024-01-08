@@ -462,16 +462,10 @@ void prune_function_copy(
                 is_mpi_call(old_ivoke))) {
           to_prune.push_back(inst);
         } else {
-
-          bool all_tainted = true;
-          for (auto &vv : old_ivoke->args()) {
-            if (not precompute_analyis_result.is_included_in_precompute(
-                    cast<Value>(&vv))) {
-              all_tainted = false;
-            }
-          }
-          // can be replaced with unconditional br to normal dest
-          if (not all_tainted) {
+          // call to std
+          if (not precompute_analyis_result.can_except_in_precompute(
+                  old_ivoke)) {
+            // can be replaced with unconditional br to normal dest
             to_prune.push_back(inst);
           }
         }
