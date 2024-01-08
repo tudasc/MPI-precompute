@@ -304,9 +304,9 @@ void replace_calls_in_copy(
           assert(
               not precompute_analyis_result.is_included_in_precompute(callee) ||
               // callee is the original function
-                 // which should not be a user function
-                 is_func_from_std(callee) || is_mpi_function(callee) ||
-                 callee->isIntrinsic());
+              // which should not be a user function
+              is_func_from_std(callee) || is_mpi_function(callee) ||
+              callee->isIntrinsic());
           // it is not used: nothing to do, later pruning step will remove it
         }
       }
@@ -358,6 +358,11 @@ void replace_calls_in_copy(
                  << precompute_analyis_result.is_invoke_exception_case_needed(
                         cast<InvokeInst>(func->new_to_old_map[call]))
                  << " needed for callee?" << func_info->include_in_precompute
+                 << "\n"
+                 << "included? "
+                 << precompute_analyis_result
+                        .get_taint_info(func->new_to_old_map[call])
+                        ->isIncludeInPrecompute()
                  << "\n";
           can_omit = false;
         }
