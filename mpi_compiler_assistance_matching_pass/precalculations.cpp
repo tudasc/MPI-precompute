@@ -1265,7 +1265,12 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
         }
       } else {
         from->needed_for.insert(inserted_elem);
-        inserted_elem->needs.insert(from);
+        auto pair = inserted_elem->needs.insert(from);
+        if (pair.second) // was inserted
+        {
+          // may need to re-visit if we discover that we need it later
+          inserted_elem->visited = false;
+        }
       }
     }
   } else {
