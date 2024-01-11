@@ -973,34 +973,33 @@ void PrecalculationAnalysis::visit_call(
         auto arg_info = insert_tainted_value(arg, call_info);
       }
 
+    } else if (not call->isIndirectCall() &&
+               call->getCalledFunction()->isIntrinsic() &&
+               should_call_intrinsic(
+                   call->getCalledFunction()->getIntrinsicID())) {
+      if (not should_ignore_intrinsic(
+              call->getCalledFunction()->getIntrinsicID())) {
+        // consider it same as call to std
+        include_call_to_std(call_info);
+      }
+    } else if (is_call_to_std(call)) {
+      include_call_to_std(call_info);
     } else {
       for (auto *func : possible_targets) {
-        if (func->isIntrinsic() &&
-            should_call_intrinsic(func->getIntrinsicID())) {
-          if (not should_ignore_intrinsic(func->getIntrinsicID())) {
-            // consider it same as call to std
-            include_call_to_std(call_info);
-            continue;
-          }
-          if (is_func_from_std(func)) {
-            include_call_to_std(call_info);
-            continue;
-          }
-          if (func->isDeclaration()) {
-            errs() << "\n";
-            call->dump();
-            func->dump();
-            errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
-                   << func->isIntrinsic() << "\n";
-          }
-          assert(not func->isDeclaration() &&
-                 "cannot analyze if calling external function for return value "
-                 "has "
-                 "side effects");
-          for (auto &bb : *func) {
-            if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
-              insert_tainted_value(ret, call_info);
-            }
+        if (func->isDeclaration()) {
+          errs() << "\n";
+          call->dump();
+          func->dump();
+          errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
+                 << func->isIntrinsic() << "\n";
+        }
+        assert(not func->isDeclaration() &&
+               "cannot analyze if calling external function for return value "
+               "has "
+               "side effects");
+        for (auto &bb : *func) {
+          if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
+            insert_tainted_value(ret, call_info);
           }
         }
       }
