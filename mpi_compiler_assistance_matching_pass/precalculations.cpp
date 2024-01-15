@@ -67,8 +67,8 @@ bool is_interaction_with_cout(llvm::CallBase *call) {
   return false;
 }
 
-void print_childrens(const std::shared_ptr<TaintedValue> &parent,
-                     unsigned int indent = 0) {
+void print_needs(const std::shared_ptr<TaintedValue> &parent,
+                 unsigned int indent = 0) {
   if (indent > 10 || parent == nullptr || parent->v == nullptr)
     return;
 
@@ -77,12 +77,12 @@ void print_childrens(const std::shared_ptr<TaintedValue> &parent,
   }
   parent->v->dump();
   for (const auto &c : parent->needs) {
-    print_childrens(c, indent + 1);
+    print_needs(c, indent + 1);
   }
 }
 
-void print_parents(const std::shared_ptr<TaintedValue> &child,
-                   unsigned int indent = 0) {
+void print_needed_for(const std::shared_ptr<TaintedValue> &child,
+                      unsigned int indent = 0) {
   if (indent > 2 || child == nullptr || child->v == nullptr)
     return;
 
@@ -91,7 +91,7 @@ void print_parents(const std::shared_ptr<TaintedValue> &child,
   }
   child->v->dump();
   for (const auto &p : child->needed_for) {
-    print_parents(p, indent + 1);
+    print_needed_for(p, indent + 1);
   }
 }
 
