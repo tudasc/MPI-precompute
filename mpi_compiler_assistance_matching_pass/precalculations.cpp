@@ -754,7 +754,7 @@ void PrecalculationAnalysis::visit_ptr_ret(
 
   for (auto *call : fun_to_precalc->callsites) {
 
-    auto call_info = get_taint_info(call);
+    auto call_info = insert_tainted_value(call, ptr);
     assert(call_info->ptr_info != nullptr);
     ptr->ptr_info->merge_with(call_info->ptr_info);
   }
@@ -1142,6 +1142,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
     if (is_mpi_function(func)) {
       // TODO is there anything else in MPI we need to handle special??
 
+      call->dump();
+      errs() << "In: " << call->getFunction()->getName() << "\n";
       assert(not is_included_in_precompute(call));
       return;
     }
