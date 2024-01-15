@@ -300,7 +300,7 @@ void replace_calls_in_copy(
           to_replace.push_back(call);
           continue;
         } else {
-          call->dump();
+          // call->dump();
           assert(
               not precompute_analyis_result.is_included_in_precompute(callee) ||
               // callee is the original function
@@ -353,16 +353,15 @@ void replace_calls_in_copy(
         if (func_info->include_in_precompute ||
             precompute_analyis_result.is_retval_of_call_needed(orig_call) ||
             precompute_analyis_result.is_invoke_exception_case_needed(
-                cast<InvokeInst>(func->new_to_old_map[call]))) {
+                cast<InvokeInst>(orig_call))) {
           errs() << "Can NOT omit: needed for except case?"
                  << precompute_analyis_result.is_invoke_exception_case_needed(
-                        cast<InvokeInst>(func->new_to_old_map[call]))
+                        cast<InvokeInst>(orig_call))
                  << " needed for callee?" << func_info->include_in_precompute
                  << "\n"
                  << "included? "
-                 << precompute_analyis_result
-                        .get_taint_info(func->new_to_old_map[call])
-                        ->isIncludeInPrecompute()
+                 << precompute_analyis_result.is_included_in_precompute(
+                        orig_call)
                  << "\n";
           can_omit = false;
         }
