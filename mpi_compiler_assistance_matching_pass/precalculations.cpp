@@ -1138,6 +1138,14 @@ void PrecalculationAnalysis::visit_call_from_ptr(
       // something important
       return;
     }
+
+    if (is_mpi_function(func)) {
+      // TODO is there anything else in MPI we need to handle special??
+
+      assert(not is_included_in_precompute(call));
+      return;
+    }
+
     if (is_allocation(func)) {
       // skip: alloc needs to be handled differently
       // but needs to be tainted so it will be replaced later
@@ -1176,6 +1184,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         errs() << "Can not analyze usage of external function:\n";
         ptr->v->dump();
         call->dump();
+        errs() << "In: " << call->getFunction()->getName() << "\n";
         assert(false);
       } else {
         auto new_val = insert_tainted_value(arg, ptr, false);
