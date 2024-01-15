@@ -369,6 +369,7 @@ void replace_calls_in_copy(
       }
 
       if (can_omit) {
+
         errs() << "REMOVE:  ";
         invoke->dump();
         IRBuilder<> builder = IRBuilder<>(invoke);
@@ -455,7 +456,8 @@ void prune_function_copy(
       assert(old_ivoke);
 
       if (not precompute_analyis_result.is_invoke_necessary_for_control_flow(
-              old_ivoke)) {
+              old_ivoke) &&
+          not precompute_analyis_result.is_retval_of_call_needed(old_ivoke)) {
         // call to std or MPI will be kept if all params are tainted
 
         if (not(is_func_from_std(old_ivoke->getCalledFunction()) ||
