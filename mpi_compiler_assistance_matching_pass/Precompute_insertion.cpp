@@ -458,15 +458,25 @@ void prune_function_copy(
       if (not precompute_analyis_result.is_invoke_necessary_for_control_flow(
               old_ivoke) &&
           not precompute_analyis_result.is_retval_of_call_needed(old_ivoke)) {
-        // call to std or MPI will be kept if all params are tainted
-
         if (not(is_func_from_std(old_ivoke->getCalledFunction()) ||
                 is_mpi_call(old_ivoke))) {
           to_prune.push_back(inst);
         } else {
-          // call to std
+          // call to std or mpi
+
+          // call to std or MPI will be kept if all params are tainted
+          bool all_tainted = true;
+
+          for (auto &arg : old_ivoke->args()) {
+            if (not precompute_analyis_result.is_included_in_precompute(
+                    cast<Value>(&arg))) {
+              all_tainted = false;
+            }
+          }
+
           if (not precompute_analyis_result.can_except_in_precompute(
-                  old_ivoke)) {
+                  old_ivoke) &&
+              not all_tainted) {
             // can be replaced with unconditional br to normal dest
             to_prune.push_back(inst);
           }
