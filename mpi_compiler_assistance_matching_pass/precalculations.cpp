@@ -1000,6 +1000,7 @@ void PrecalculationAnalysis::visit_call(
 
   bool need_return_val = is_retval_of_call_needed(call);
   if (need_return_val) {
+    call_info->addReason(CONTROL_FLOW_RETURN_VALUE_NEEDED);
     if (is_allocation(call)) {
       // nothing to do, just keep this call around, it will later be replaced
       for (auto &arg : call->args()) {
@@ -1074,7 +1075,8 @@ void PrecalculationAnalysis::visit_call(
           for (auto &inst : bb)
             if (auto *cc = dyn_cast<CallBase>(&inst)) {
               if (can_except_in_precompute(cc)) {
-                insert_tainted_value(cc, TaintReason::CONTROL_FLOW);
+                insert_tainted_value(
+                    cc, TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
               }
             }
         }

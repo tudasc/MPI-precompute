@@ -71,7 +71,7 @@ public:
       assert(llvm::isa<llvm::CallBase>(v));
     }
     if (_reason & (CONTROL_FLOW_EXCEPTION_NEEDED xor CONTROL_FLOW)) {
-      assert(llvm::isa<llvm::InvokeInst>(v));
+      assert(llvm::isa<llvm::CallBase>(v));
     }
     if (_reason & (CONTROL_FLOW_ONLY_PRESENCE_NEEDED xor CONTROL_FLOW)) {
       assert(llvm::isa<llvm::InvokeInst>(v));
