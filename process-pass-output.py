@@ -18,13 +18,14 @@ marker_text = "need for reason:"
 
 taint_reasons = {
     # 'OTHER': 0,
-    'COMPUTE_TAG': 1 << 0,
-    'COMPUTE_DEST': 1 << 1,
-    'CONTROL_FLOW': 1 << 2,
-    'CONTROL_FLOW_RETURN_VALUE_NEEDED': 1 << 3,
-    'CONTROL_FLOW_CALLEE_NEEDED': 1 << 4,
-    'CONTROL_FLOW_EXCEPTION_NEEDED': 1 << 5,
-    'CONTROL_FLOW_ONLY_PRESENCE_NEEDED': 1 << 6,
+    'ANALYSIS': 1 << 0,
+    'COMPUTE_TAG': 1 << 1,
+    'COMPUTE_DEST': 1 << 2,
+    'CONTROL_FLOW': 1 << 3,
+    'CONTROL_FLOW_RETURN_VALUE_NEEDED': 1 << 4,
+    'CONTROL_FLOW_CALLEE_NEEDED': 1 << 5,
+    'CONTROL_FLOW_EXCEPTION_NEEDED': 1 << 6,
+    'CONTROL_FLOW_ONLY_PRESENCE_NEEDED': 1 << 7,
 }
 
 
