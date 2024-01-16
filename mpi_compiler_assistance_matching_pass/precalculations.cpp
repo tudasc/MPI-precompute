@@ -42,6 +42,10 @@ using namespace llvm;
 // the order of visiting the values should make no difference
 // #define SHUFFLE_VALUES_FOR_TESTING
 
+// only gets the name of a function if a demangled name contains a return
+// param or template args
+std::string get_function_name(const std::string &demangled_name);
+
 // an interaction with std::cout can not except during precompute (any exception
 // would be considered fatal anyway) therefore we do not need to analyze the
 // interactions with std::cout
@@ -59,9 +63,20 @@ bool is_interaction_with_cout(llvm::CallBase *call) {
   if (cout) {
     call->dump();
 
-    if (call->arg_size() >= 1 && call->getArgOperand(0) == cout) {
+    if (call->arg_size() >= 2 && call->getArgOperand(0) == cout) {
       assert(is_func_from_std(call->getCalledFunction()));
       return true;
+    }
+    auto name = get_function_name(
+        llvm::demangle(call->getCalledFunction()->getName().str()));
+    if (name.find("operator<<") != std::string::npos) {
+      // if multiple chained usages of operator << operator << will be used on
+      // the result of first application of operator<<
+      assert(call->arg_size() >= 2);
+      if (auto *cc = dyn_cast<CallBase>(call->getArgOperand(0))) {
+        // errs() << "Defer to other call: interaction with cout:\n";
+        return is_interaction_with_cout(cc);
+      }
     }
   }
   return false;
