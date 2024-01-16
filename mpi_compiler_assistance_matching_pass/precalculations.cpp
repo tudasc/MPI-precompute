@@ -979,9 +979,11 @@ void PrecalculationAnalysis::include_call_to_std(
 
       if (is_ptr_usage_in_std_read(call, arg_info)) {
         arg_info->ptr_info->setIsReadFrom(true);
+        arg_info->ptr_info->setWholePtrIsRelevant(true);
       }
       if (is_ptr_usage_in_std_write(call, arg_info)) {
         arg_info->ptr_info->setIsWrittenTo(true);
+        arg_info->ptr_info->setWholePtrIsRelevant(true);
       }
     }
     // need all args to be present for the call

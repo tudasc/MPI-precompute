@@ -33,10 +33,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 // defined in taintedValue.h
 struct TaintedValue;
 
-// there will be cyclic shared ptr's leading to memory leak at the end of our
-// pass
-//  during our pass the merge_with function should make sure everything gets
-//  properly destroyed
 class PtrUsageInfo : public std::enable_shared_from_this<PtrUsageInfo> {
 public:
   explicit PtrUsageInfo(const std::shared_ptr<TaintedValue> &ptr) {

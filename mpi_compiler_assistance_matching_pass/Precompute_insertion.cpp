@@ -402,6 +402,7 @@ void replace_calls_in_copy(
       if (not call->isIndirectCall()) {
         // callee is the original function
         // which should not be a user function
+        // call->dump();
         assert(is_func_from_std(callee) || is_mpi_function(callee) ||
                callee->isIntrinsic());
       }
