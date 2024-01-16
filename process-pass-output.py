@@ -56,22 +56,39 @@ def annotate(module, remarks):
 
     for idx in idx_annotations:
         integer_part = remarks[idx].split(':')[-1].strip()
+        assert integer_part != ""
         reason = int(integer_part)
         annotation = get_annotation_string(reason)
         # the next line
         to_annotate = remarks[idx + 2]
-        # only the part before the debug symbols
+        assert to_annotate != ""
+
+        # only the part before the debug symbols amd attributes
         if "!" in to_annotate:
             pos = to_annotate.find("!")
             to_annotate = to_annotate[0:pos]
-        to_anno_idx = [i for i, v in enumerate(module) if to_annotate in v]
+        # and also before attributes
+        if "#" in to_annotate:
+            pos = to_annotate.find("#")
+            to_annotate = to_annotate[0:pos]
+        assert to_annotate != ""
+
+        to_anno_idx = [i for i, v in enumerate(module) if to_annotate.strip() in v]
+        # print(to_annotate.strip())
+        # print(remarks[idx + 1].strip())
+        # print(" ")
+        # assert len(to_anno_idx) > 0
+        # sometimes the names in the IR change??
+
         if not len(to_anno_idx) == 1:
-            func = remarks[idx + 1]
+            func = remarks[idx + 1].strip()
+            assert func != ""
             match_func_idx = [i for i, v in enumerate(function_defines) if "@" + func + "(" in v[1]]
             assert len(match_func_idx) == 1
             to_anno_idx = [i for i in to_anno_idx if
                            function_defines[match_func_idx[0]][0] < i < function_defines[match_func_idx[0] + 1][0]]
 
+        #assert len(to_anno_idx) > 0
         for ii in to_anno_idx:
             module[ii] = annotation + " " + module[ii]
 
