@@ -17,12 +17,14 @@
 #ifndef MACH_DEBUG_H
 #define MACH_DEBUG_H
 
-// #define DEBUG_MACH_PASS 1
+#include "llvm/IR/Function.h"
 
 #if DEBUG_MACH_PASS == 1
 #define Debug(x) x
 #else
 #define Debug(x)
 #endif
+
+void add_printf_ret_block(llvm::Function *func);
 
 #endif

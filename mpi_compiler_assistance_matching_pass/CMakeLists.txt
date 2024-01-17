@@ -8,6 +8,7 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         implementation_specific.h
         implementation_specific.cpp
         debug.h
+        debug.cpp
         analysis_results.h
         analysis_results.cpp
         replacement.h
