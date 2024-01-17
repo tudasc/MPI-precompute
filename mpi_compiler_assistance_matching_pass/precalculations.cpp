@@ -115,7 +115,7 @@ void print_needs(const std::shared_ptr<TaintedValue> &parent,
 
 void print_needed_for(const std::shared_ptr<TaintedValue> &child,
                       unsigned int indent = 0) {
-  if (indent > 2 || child == nullptr || child->v == nullptr)
+  if (indent > 4 || child == nullptr || child->v == nullptr)
     return;
 
   for (unsigned int i = 0; i < indent; ++i) {
@@ -1370,10 +1370,17 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
             include_value_in_precompute(new_val);
           } else {
             if (invoke->getUnwindDest() == bb) {
-              // this exception block cannot be visited in precompute
+              // this exception block cannot be visited in precompute anyway
               continue;
             } else {
               assert(invoke->getNormalDest() == bb);
+              auto new_val =
+                  insert_tainted_value(term, TaintReason::CONTROL_FLOW);
+              if (not can_except_in_precompute(invoke)) {
+                new_val->addReason(
+                    TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED);
+                // only the normal dest is needed
+              }
             }
           }
         }
