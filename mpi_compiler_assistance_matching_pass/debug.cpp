@@ -31,6 +31,11 @@ void add_printf_ret_block(llvm::Function *func) {
   auto printf_func = M->getOrInsertFunction("printf", ftype);
 
   for (auto &bb : *func) {
+    IRBuilder<> builder = IRBuilder<>(bb.getTerminator());
+    auto s = "func: " + func->getName().str() +
+             " block: " + bb.getName().str() + "\n";
+    builder.CreateCall(printf_func, builder.CreateGlobalString(s));
+
     if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
       IRBuilder<> builder = IRBuilder<>(ret);
       auto s = "Return from func: " + func->getName().str() + " from block " +
