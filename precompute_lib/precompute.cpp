@@ -9,6 +9,15 @@
 
 #define MEASURE_PRECOMPUTE_TIME
 
+// #define USE_MPI_TO_SPLIT_RANKS
+// DOES NOT WORK DUE TO LINKER ERROR
+//  as we link the precomputelib against mpi and need mpi for the precompute lib
+// TODO resolve the cmake magic to make this possible
+
+#ifdef USE_MPI_TO_SPLIT_RANKS
+#include "mpi.h"
+#endif
+
 #ifdef MEASURE_PRECOMPUTE_TIME
 #include <chrono>
 #endif
@@ -38,9 +47,20 @@ void init_precompute_lib() {
   status = IN_PRECOMPUTE;
   precomputed_vals = {};
   allocated_ptrs = {};
+#ifdef USE_MPI_TO_SPLIT_RANKS
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank != 0) {
+    int buf;
+    MPI_Recv(&buf, 1, MPI_INT, rank - 1, 42, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+  std::cout << "Rank " << rank << ":\n";
+#endif
+
 #ifdef PRINT_REGISTERED_VALUES
   std::cout << "Begin Precompute\n";
 #endif
+
 #ifdef MEASURE_PRECOMPUTE_TIME
   begin = std::chrono::steady_clock::now();
 #endif
@@ -93,6 +113,12 @@ void finish_precomputation() {
     free(ptr);
   }
   allocated_ptrs.clear();
+#ifdef USE_MPI_TO_SPLIT_RANKS
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  std::cout << "Rank " << rank << ":\n";
+#endif
 #ifdef PRINT_REGISTERED_VALUES
   std::cout << "End Precompute\n";
 #endif
@@ -103,6 +129,16 @@ void finish_precomputation() {
                                                                      begin)
                    .count()
             << " [µs]" << std::endl;
+#endif
+
+#ifdef USE_MPI_TO_SPLIT_RANKS
+  int size;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (rank < (size - 1)) {
+    int buf = 0;
+    // nex one can precompute
+    MPI_Send(&buf, 1, MPI_INT, rank + 1, 42, MPI_COMM_WORLD);
+  }
 #endif
 }
 
