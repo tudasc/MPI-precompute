@@ -37,5 +37,23 @@ void add_printf_ret_block(llvm::Function *func) {
                bb.getName().str() + "\n";
       builder.CreateCall(printf_func, builder.CreateGlobalString(s));
     }
+
+    if (auto *sw = dyn_cast<SwitchInst>(bb.getTerminator())) {
+      IRBuilder<> builder = IRBuilder<>(sw);
+      auto s = "Switch Value: %d In BB: " + bb.getName().str() + "\n";
+      builder.CreateCall(printf_func,
+                         {builder.CreateGlobalString(s), sw->getCondition()});
+    }
+
+    for (auto &inst : bb) {
+      if (auto *store = dyn_cast<StoreInst>(&inst)) {
+        if (store->getPointerOperand()->getName() == "ImplId") {
+          IRBuilder<> builder = IRBuilder<>(store);
+          auto s = "SStore To ImplID: %d In BB: " + bb.getName().str() + "\n";
+          builder.CreateCall(printf_func, {builder.CreateGlobalString(s),
+                                           store->getValueOperand()});
+        }
+      }
+    }
   }
 }
