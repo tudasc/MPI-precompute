@@ -258,7 +258,7 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
 
   if (func->isDeclaration()) {
     // don't know: need to assume it can throw
-    func->dump();
+    // func->dump();
     assert(can_except_in_precompute);
     return;
   }
@@ -1113,8 +1113,6 @@ void PrecalculationAnalysis::visit_call_from_ptr(
     return;
   }
 
-  auto call_info = insert_tainted_value(call, ptr, false);
-
   auto *func = call->getCalledFunction();
   assert(not ptr_given_as_arg.empty());
   assert(ptr->ptr_info);
@@ -1149,6 +1147,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         // nothing to: do only reads the communicator
         // ptr is the communicator
       } else {
+        auto call_info = insert_tainted_value(call, ptr, false);
         // the needed value is the result of reading the comm
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
         auto new_val = insert_tainted_value(call, ptr);
@@ -1161,6 +1160,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
                                   // that this is important
         ptr->ptr_info->setIsWrittenTo(true);
         include_value_in_precompute(ptr);
+        include_value_in_precompute(call_info);
       }
       return;
     }
@@ -1170,7 +1170,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
       return;
     }
     if (func == mpi_func->mpi_send_init || func == mpi_func->mpi_recv_init) {
-      // skip: these functions will be managed seperately anyway
+      // skip: these functions will be managed separately anyway
       // it may be the case, that e.g. the buffer or request aliases with
       // something important
       return;
@@ -1178,7 +1178,6 @@ void PrecalculationAnalysis::visit_call_from_ptr(
 
     if (is_mpi_function(func)) {
       // TODO is there anything else in MPI we need to handle special??
-
       call->dump();
       errs() << "In: " << call->getFunction()->getName() << "\n";
       assert(not is_included_in_precompute(call));
@@ -1188,6 +1187,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
     if (is_allocation(func)) {
       // skip: alloc needs to be handled differently
       // but needs to be tainted so it will be replaced later
+      auto call_info = insert_tainted_value(call, ptr, false);
 
       assert(false && "a ptr given into an allocation call???");
       return;
@@ -1203,6 +1203,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
          should_call_intrinsic(func->getIntrinsicID())) ||
         is_func_from_std(func)) {
       if (ptr->ptr_info->isReadFrom() && is_ptr_usage_in_std_write(call, ptr)) {
+        auto call_info = insert_tainted_value(call, ptr, false);
         include_call_to_std(call_info);
         assert(ptr->ptr_info->isWrittenTo());
       }
@@ -1226,6 +1227,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         errs() << "In: " << call->getFunction()->getName() << "\n";
         assert(false);
       } else {
+        auto call_info = insert_tainted_value(call, ptr, false);
         auto new_val = insert_tainted_value(arg, ptr, false);
         ptr->ptr_info->merge_with(new_val->ptr_info);
         assert(new_val->ptr_info == ptr->ptr_info);
