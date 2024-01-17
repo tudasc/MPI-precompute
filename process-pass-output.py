@@ -6,6 +6,7 @@ import sys
 
 output_orig = "IR_orig.txt"
 output_modified = "IR_modified.txt"
+output_modified_executable = "IR_modified.txt_executable"
 output_pass_remarks = "pass_comments.txt"
 
 # markers used by the pass
@@ -110,6 +111,11 @@ def print_modified(module):
         the_file.write("\n".join(to_print))
 
 
+def print_modified_executable(module):
+    with open(output_modified_executable, 'w') as the_file:
+        the_file.write("\n".join(module[1:]))
+
+
 def print_remarks(remarks):
     with open(output_pass_remarks, 'w') as the_file:
         the_file.write("\n".join(remarks))
@@ -148,6 +154,7 @@ def main():
 
     print_orig(original_mod, pass_comments)
     print_modified(altered_mod)
+    print_modified_executable(altered_mod)
     print_remarks(pass_comments)
 
     print("end Processing")
