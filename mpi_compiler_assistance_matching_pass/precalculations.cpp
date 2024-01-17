@@ -420,8 +420,7 @@ void PrecalculationAnalysis::visit_store_from_ptr(
   ptr->ptr_info->setIsWrittenTo(true);
   // we only need the stored value if it is used later
   if (ptr->ptr_info->isReadFrom()) {
-    auto new_val =
-        insert_tainted_value(store->getValueOperand(), store_info, true);
+    auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
     // we need to include all 3 the ptr the store and the stored val
     include_value_in_precompute(new_val);
     include_value_in_precompute(store_info);
