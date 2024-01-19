@@ -1354,7 +1354,16 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
   if (auto *cc = dyn_cast<CallBase>(v)) {
     if (is_retval_of_call_needed(cc) && not cc->isIndirectCall()) {
       auto *func = cc->getCalledFunction();
-      cc->dump();
+      // TODO proper management why this is not working as is
+      // TODO this is only a hotfix
+      if (not(get_function_analysis(func)->include_in_precompute ||
+              // part of the special functions which content is not analyzed
+              is_func_from_std(func) || func->isIntrinsic() ||
+              is_mpi_function(func))) {
+        inserted_elem->visited = false;
+      }
+
+      // cc->dump();
       if (not(get_function_analysis(func)->include_in_precompute ||
               // part of the special functions which content is not analyzed
               is_func_from_std(func) || func->isIntrinsic() ||
