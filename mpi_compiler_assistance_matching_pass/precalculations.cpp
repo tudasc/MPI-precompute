@@ -528,7 +528,6 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     assert(uop->getNumOperands() == 1);
     assert(not uop->getType()->isPointerTy());
     insert_tainted_value(uop->getOperand(0), v);
-    insert_tainted_value(uop->getOperand(0), v);
     v->visited = true;
   } else if (auto *cmp = dyn_cast<CmpInst>(v->v)) {
     // cmp
