@@ -1145,20 +1145,20 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         // nothing to: do only reads the communicator
         // ptr is the communicator
       } else {
-        auto call_info = insert_tainted_value(call, ptr, false);
         // the needed value is the result of reading the comm
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
-        auto new_val = insert_tainted_value(call, ptr);
-        // TODO treat it like a store to ptr
+        // treat it like a store to ptr:
         // value is only necessary it ptr is read
-        include_value_in_precompute(new_val);
-        new_val = insert_tainted_value(call->getArgOperand(0),
-                                       ptr); // we also need to keep the comm
-        new_val->visited = false; // may need to be revisited it we discover
-                                  // that this is important
-        ptr->ptr_info->setIsWrittenTo(true);
-        include_value_in_precompute(ptr);
-        include_value_in_precompute(call_info);
+        if (ptr->ptr_info->isReadFrom()) {
+          auto call_info = insert_tainted_value(call, ptr, false);
+          auto comm_info =
+              insert_tainted_value(call->getArgOperand(0),
+                                   ptr); // we also need to keep the comm
+          ptr->ptr_info->setIsWrittenTo(true);
+          include_value_in_precompute(ptr);
+          include_value_in_precompute(call_info);
+          include_value_in_precompute(comm_info);
+        }
       }
       return;
     }
