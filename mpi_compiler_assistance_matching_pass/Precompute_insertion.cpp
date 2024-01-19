@@ -604,6 +604,8 @@ void insert_precomputation(
 
   for (const auto &pair : functions_copied) {
     prune_function_copy(pair.second, precompute_analyis_result);
+    // debug:
+    add_printf_ret_block(pair.second->F_copy);
   }
 
   auto *entry_point = precompute_analyis_result.getEntryPoint();

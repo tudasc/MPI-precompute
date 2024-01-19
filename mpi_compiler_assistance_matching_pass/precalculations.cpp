@@ -846,9 +846,6 @@ bool PrecalculationAnalysis::is_retval_of_call_needed(
       auto taint_info = get_taint_info(v);
       if (taint_info->getReason() !=
           TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
-        errs() << "NEEDED IN:\n";
-        v->dump();
-        errs() << "Reason: " << taint_info->getReason() << " \n";
         return true;
       }
     }
@@ -1283,7 +1280,6 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       // don't analyze std::s internals
       if (is_func_from_std(inst->getFunction())) {
         // inst->getFunction()->dump();
-
         inst->dump();
         errs() << "from:";
         from->v->dump();
@@ -1498,6 +1494,7 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
   // debug_printings();
 }
 
+// TODO: move to debug file?
 void PrecalculationAnalysis::debug_printings() {
   errs() << "ADDITIONAL DEBUG PRINTING\n";
 
