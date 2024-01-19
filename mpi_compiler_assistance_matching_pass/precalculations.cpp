@@ -1295,7 +1295,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
     }
 
     inserted_elem = std::make_shared<TaintedValue>(v);
-    tainted_values.insert(inserted_elem);
+    auto pair = tainted_values.insert(inserted_elem);
+    assert(pair.second); // assert it is newly inserted
 
     if (v->getType()->isPointerTy()) {
       // create empty info
@@ -1321,7 +1322,7 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
         }
       }
     }
-  } else {
+  } else { // already present
     // the present value form the set
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
                                   [&v](const auto &vv) { return vv->v == v; });
@@ -1341,6 +1342,14 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       // we don't care why the Control flow was tagged for te parent
       inserted_elem->addReason(from->getReason() &
                                TaintReason::REASONS_TO_PROPERGATE);
+    }
+  }
+
+  if (auto *cc = dyn_cast<CallBase>(v)) {
+    if (is_retval_of_call_needed(cc)) {
+      assert(get_function_analysis(cc->getCalledFunction())
+                 ->include_in_precompute ||
+             inserted_elem->visited == false);
     }
   }
 
