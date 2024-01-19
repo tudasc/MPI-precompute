@@ -1353,10 +1353,12 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
   }
 
   if (auto *cc = dyn_cast<CallBase>(v)) {
-    if (is_retval_of_call_needed(cc)) {
-      assert(get_function_analysis(cc->getCalledFunction())
-                 ->include_in_precompute ||
-             inserted_elem->visited == false);
+    if (is_retval_of_call_needed(cc) && not cc->isIndirectCall()) {
+      auto *func = cc->getCalledFunction();
+      assert(get_function_analysis(func)->include_in_precompute ||
+             // part of the special functions which content is not analyzed
+             is_func_from_std(func) || func->isIntrinsic() ||
+             is_mpi_function(func) || inserted_elem->visited == false);
     }
   }
 
