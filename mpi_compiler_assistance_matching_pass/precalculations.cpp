@@ -1314,12 +1314,7 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
         }
       } else {
         from->needed_for.insert(inserted_elem);
-        auto pair = inserted_elem->needs.insert(from);
-        if (pair.second) // was inserted
-        {
-          // may need to re-visit if we discover that we need it later
-          inserted_elem->visited = false;
-        }
+        inserted_elem->needs.insert(from);
       }
     }
   } else { // already present
@@ -1327,8 +1322,13 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
     inserted_elem = *std::find_if(tainted_values.begin(), tainted_values.end(),
                                   [&v](const auto &vv) { return vv->v == v; });
     if (from != nullptr && needed_from) {
-      inserted_elem->needed_for.insert(from);
+      auto pair = inserted_elem->needed_for.insert(from);
       from->needs.insert(inserted_elem);
+      if (pair.second) // was inserted
+      {
+        // may need to re-visit if we discover that we need it later
+        inserted_elem->visited = false;
+      }
       // we don't care why the Control flow was tagged for te parent
       inserted_elem->addReason(from->getReason() &
                                TaintReason::REASONS_TO_PROPERGATE);
@@ -1339,9 +1339,16 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
     if (from != nullptr && not needed_from) {
       inserted_elem->needs.insert(from);
       from->needed_for.insert(inserted_elem);
+      auto pair = inserted_elem->needs.insert(from);
       // we don't care why the Control flow was tagged for te parent
       inserted_elem->addReason(from->getReason() &
                                TaintReason::REASONS_TO_PROPERGATE);
+
+      if (pair.second) // was inserted
+      {
+        // may need to re-visit if we discover that we need it later
+        inserted_elem->visited = false;
+      }
     }
   }
 
