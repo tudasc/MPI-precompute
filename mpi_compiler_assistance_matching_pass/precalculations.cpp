@@ -1006,7 +1006,6 @@ void PrecalculationAnalysis::visit_call(
       for (auto &arg : call->args()) {
         auto arg_info = insert_tainted_value(arg, call_info);
       }
-
     } else if (not call->isIndirectCall() &&
                call->getCalledFunction()->isIntrinsic() &&
                should_call_intrinsic(
@@ -1044,7 +1043,6 @@ void PrecalculationAnalysis::visit_call(
   if (auto *invoke = dyn_cast<InvokeInst>(call)) {
     if (is_invoke_exception_case_needed(invoke) &&
         can_except_in_precompute(invoke)) {
-
       // if it will not cause an exception, there is no need to have an invoke
       // in this case control flow will not break if we just skip this
       // function, as we know that it does not make the flow go away due to an
@@ -1337,7 +1335,6 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       }
     }
     if (from != nullptr && not needed_from) {
-      inserted_elem->needs.insert(from);
       from->needed_for.insert(inserted_elem);
       auto pair = inserted_elem->needs.insert(from);
       // we don't care why the Control flow was tagged for te parent
@@ -1352,15 +1349,35 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
     }
   }
 
+  // this code is asserting that we will visit the call if the retval is needed
+#ifndef NDEBUG
   if (auto *cc = dyn_cast<CallBase>(v)) {
     if (is_retval_of_call_needed(cc) && not cc->isIndirectCall()) {
       auto *func = cc->getCalledFunction();
-      assert(get_function_analysis(func)->include_in_precompute ||
-             // part of the special functions which content is not analyzed
-             is_func_from_std(func) || func->isIntrinsic() ||
-             is_mpi_function(func) || inserted_elem->visited == false);
+      cc->dump();
+      if (not(get_function_analysis(func)->include_in_precompute ||
+              // part of the special functions which content is not analyzed
+              is_func_from_std(func) || func->isIntrinsic() ||
+              is_mpi_function(func) ||
+              // or we need to visit it in order to analyze the function
+              !inserted_elem->visited)) {
+        // at least one user must be open to be visited in order to discover
+        // that this call is important
+        bool all_retval_users_visited = true;
+        for (auto *u : cc->users()) {
+          if (auto *ii = dyn_cast<Instruction>(u)) {
+            if (is_tainted(ii)) {
+              if (not get_taint_info(ii)->visited) {
+                all_retval_users_visited = false;
+              }
+            }
+          }
+        }
+        assert(not all_retval_users_visited);
+      }
     }
   }
+#endif
 
   assert(inserted_elem != nullptr);
   return inserted_elem;
