@@ -1367,7 +1367,12 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
         for (auto *u : cc->users()) {
           if (auto *ii = dyn_cast<Instruction>(u)) {
             if (is_tainted(ii)) {
-              if (not get_taint_info(ii)->visited) {
+
+              if (not get_taint_info(ii)->visited ||
+                  get_taint_info(ii)->getReason() ==
+                      TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
+                // if the other is only tainted for its presence it does not use
+                // the retval
                 all_retval_users_visited = false;
               }
             }
