@@ -63,23 +63,6 @@
 
 using namespace llvm;
 
-int get_num_undefs(const Module &M) {
-  int num_undef = 0;
-  for (const Function &F : M) {
-    for (const BasicBlock &BB : F) {
-      for (const Instruction &I : BB) {
-        // Check if the instruction has any undef operands.
-        for (const Use &U : I.operands()) {
-          if (U && isa<UndefValue>(U)) {
-            num_undef++;
-          }
-        }
-      }
-    }
-  }
-  return num_undef;
-}
-
 RequiredAnalysisResults *analysis_results;
 
 struct mpi_functions *mpi_func;

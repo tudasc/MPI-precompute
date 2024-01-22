@@ -18,6 +18,8 @@
 #define MACH_DEBUG_H
 
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+#include <llvm/IR/Constants.h>
 
 #if DEBUG_MACH_PASS == 1
 #define Debug(x) x
@@ -26,5 +28,28 @@
 #endif
 
 void add_printf_ret_block(llvm::Function *func);
+
+inline int get_num_undefs(const llvm::Function &F) {
+  int num_undef = 0;
+  for (auto &BB : F) {
+    for (auto &I : BB) {
+      // Check if the instruction has any undef operands.
+      for (auto &U : I.operands()) {
+        if (U && isa<llvm::UndefValue>(U)) {
+          num_undef++;
+        }
+      }
+    }
+  }
+  return num_undef;
+}
+
+inline int get_num_undefs(const llvm::Module &M) {
+  int num_undef = 0;
+  for (auto &F : M) {
+    num_undef += get_num_undefs(F);
+  }
+  return num_undef;
+}
 
 #endif
