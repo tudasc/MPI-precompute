@@ -395,8 +395,9 @@ void replace_exceptionless_invoke_with_call(
     for (auto &arg : invoke->args()) {
       args.push_back(cast<Value>(&arg));
     }
-    auto *new_call = builder.CreateCall(invoke->getCalledFunction(), args,
-                                        invoke->getName());
+    auto *new_call =
+        builder.CreateCall(invoke->getFunctionType(),
+                           invoke->getCalledOperand(), args, invoke->getName());
     auto *br = builder.CreateBr(invoke->getNormalDest());
     invoke->replaceAllUsesWith(new_call);
     invoke->eraseFromParent();
@@ -408,7 +409,6 @@ void replace_exceptionless_invoke_with_call(
   // it will be done again for optimization
   // but here it is necessary, so that the removal of br instructions during
   // pruning step will not lead to unreachable code by accident
-
   std::vector<BasicBlock *> bbs;
   // collect before changing to not break iterator
   for (auto &bb : *func->F_copy) {
