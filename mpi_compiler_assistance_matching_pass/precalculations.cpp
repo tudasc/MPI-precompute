@@ -298,12 +298,13 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
 }
 void PrecalculationFunctionAnalysis::re_visit_callsites() {
 
-  assert(include_in_precompute);
   if (auto prec = precalculatioanalysis.lock()) {
     for (auto *c : callsites) {
 
-      auto ti = prec->get_taint_info(c);
-      ti->visited = false;
+      if (prec->is_tainted(c)) {
+        auto ti = prec->get_taint_info(c);
+        ti->visited = false;
+      }
     }
   }
 }

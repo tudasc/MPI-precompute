@@ -226,7 +226,7 @@ private:
   // materialize call
   void include_call_to_std(std::shared_ptr<TaintedValue> call_info);
 
-private:
+public:
   bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) { return vv->v == v; }) !=
