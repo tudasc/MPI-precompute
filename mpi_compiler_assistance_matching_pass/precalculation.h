@@ -100,6 +100,7 @@ public:
   std::set<std::weak_ptr<PrecalculationFunctionAnalysis>, std::owner_less<>>
       callees;
 
+  // TODO do we actually need this?
   // set of ptrs possibly written or Read when calling this func
   // contains direct read and writes
   // TODO Getter to receive the recursive set including all callees

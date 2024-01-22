@@ -32,7 +32,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 // defined in taintedValue.h
 struct TaintedValue;
-
+class PrecalculationAnalysis;
 class PtrUsageInfo;
 
 // specialized comparison operators that include the fact that objects may be
@@ -71,20 +71,8 @@ public:
     assert(is_valid);
     return is_written_to;
   }
-  void setIsWrittenTo(llvm::Instruction *store) {
-    if (merged_with) {
-      merged_with->setIsWrittenTo(store);
-      return;
-    }
-    assert(is_valid);
-    assert(llvm::isa<llvm::StoreInst>(store) ||
-           llvm::isa<llvm::CallBase>(store));
-    is_written_to = true;
-    auto pair = stores.insert(store);
-    if (pair.second) { // if it was inserted
-      propergate_changes();
-    }
-  }
+  void setIsWrittenTo(llvm::Instruction *store,
+                      const PrecalculationAnalysis *precalc_analysis);
   bool isCalled() const {
     if (merged_with) {
       return merged_with->isCalled();
@@ -121,19 +109,8 @@ public:
     assert(is_valid);
     return is_read_from;
   }
-  void setIsReadFrom(llvm::Instruction *load) {
-    if (merged_with) {
-      merged_with->setIsWrittenTo(load);
-      return;
-    }
-    assert(is_valid);
-    assert(llvm::isa<llvm::LoadInst>(load) || llvm::isa<llvm::CallBase>(load));
-    is_read_from = true;
-    auto pair = loads.insert(load);
-    if (pair.second) { // if it was inserted
-      propergate_changes();
-    }
-  }
+  void setIsReadFrom(llvm::Instruction *load,
+                     const PrecalculationAnalysis *precalc_analysis);
 
   bool isWholePtrIsRelevant() const {
     if (merged_with) {

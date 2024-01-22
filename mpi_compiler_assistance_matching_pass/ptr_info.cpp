@@ -19,6 +19,7 @@
 #include "conflict_detection.h"
 #include "devirt_analysis.h"
 #include "mpi_functions.h"
+#include "precalculation.h"
 #include "taintedValue.h"
 #include <cassert>
 
@@ -357,6 +358,50 @@ const std::set<std::weak_ptr<TaintedValue>,
                std::owner_less<std::weak_ptr<TaintedValue>>> &
 PtrUsageInfo::getPtrsWithThisInfo() const {
   return ptrs_with_this_info;
+}
+
+void PtrUsageInfo::setIsWrittenTo(
+    llvm::Instruction *store, const PrecalculationAnalysis *precalc_analysis) {
+  if (merged_with) {
+    merged_with->setIsWrittenTo(store, precalc_analysis);
+    return;
+  }
+  assert(precalc_analysis);
+  assert(is_valid);
+  assert(llvm::isa<llvm::StoreInst>(store) || llvm::isa<llvm::CallBase>(store));
+  is_written_to = true;
+  auto pair = stores.insert(store);
+  if (pair.second) { // if it was inserted
+    propergate_changes();
+  }
+  // recursively mark all callsites potentially calling the function as stores
+  // as well
+  auto func = precalc_analysis->get_function_analysis(store->getFunction());
+  for (auto *call : func->callsites) {
+    setIsWrittenTo(call, precalc_analysis);
+  }
+}
+
+void PtrUsageInfo::setIsReadFrom(
+    llvm::Instruction *load, const PrecalculationAnalysis *precalc_analysis) {
+  if (merged_with) {
+    merged_with->setIsReadFrom(load, precalc_analysis);
+    return;
+  }
+  assert(precalc_analysis);
+  assert(is_valid);
+  assert(llvm::isa<llvm::LoadInst>(load) || llvm::isa<llvm::CallBase>(load));
+  is_written_to = true;
+  auto pair = loads.insert(load);
+  if (pair.second) { // if it was inserted
+    propergate_changes();
+  }
+  // recursively mark all callsites potentially calling the function as stores
+  // as well
+  auto func = precalc_analysis->get_function_analysis(load->getFunction());
+  for (auto *call : func->callsites) {
+    setIsReadFrom(call, precalc_analysis);
+  }
 }
 
 template <>
