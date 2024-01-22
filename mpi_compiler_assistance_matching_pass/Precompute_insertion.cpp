@@ -427,6 +427,8 @@ void prune_function_copy(
     const PrecalculationAnalysis &precompute_analyis_result) {
   std::vector<Instruction *> to_prune;
 
+  int prev_num_undef = get_num_undefs(*func->F_copy);
+
   // first  gather all instructions, so that the iterator does not get broken
   // if we remove stuff
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
@@ -510,7 +512,7 @@ void prune_function_copy(
     // (otherwise we would have tainted the exception handling code)
     if (auto *lp = dyn_cast<LandingPadInst>(inst)) {
       // lp->setCleanup(false);
-      lp->dump();
+      // lp->dump();
     } else {
       inst->replaceAllUsesWith(UndefValue::get(inst->getType()));
       inst->eraseFromParent();
@@ -524,10 +526,18 @@ void prune_function_copy(
       to_remove_bb.insert(&BB);
     }
   }
+
   // and remove BBs
   for (auto *BB : to_remove_bb) {
+    // if bb contains some instructions
+    for (auto &inst : *BB) {
+      inst.replaceAllUsesWith(UndefValue::get(inst.getType()));
+    }
     BB->eraseFromParent();
   }
+  // assert that no new undefs are introduced into func
+  //  not assert == as we could remove sume undefs
+  assert(prev_num_undef >= get_num_undefs(*func->F_copy));
 
   // one can now also combine blocks
 }
