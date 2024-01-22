@@ -291,11 +291,6 @@ void replace_calls_in_copy(
           continue;
         }
 
-        if (isa<InvokeInst>(call)) {
-          to_replace.push_back(call);
-          continue;
-        }
-
         if (precompute_analyis_result.is_func_included_in_precompute(
                 call->getCalledFunction())) {
           to_replace.push_back(call);
@@ -336,52 +331,6 @@ void replace_calls_in_copy(
       continue;
     }
 
-    if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-      // special case: it is an invoke that we don't need to call because no
-      // meaningful exception can be raised
-
-      errs() << "Test Removal:\n";
-      call->dump();
-
-      bool can_omit = true;
-      for (auto *target :
-           precompute_analyis_result.get_possible_call_targets(orig_call)) {
-
-        errs() << target->getName() << "\n";
-
-        auto func_info =
-            precompute_analyis_result.get_function_analysis(target);
-        if (func_info->include_in_precompute ||
-            precompute_analyis_result.is_retval_of_call_needed(orig_call) ||
-            precompute_analyis_result.is_invoke_exception_case_needed(
-                cast<InvokeInst>(orig_call))) {
-          errs() << "Can NOT omit: needed for except case?"
-                 << precompute_analyis_result.is_invoke_exception_case_needed(
-                        cast<InvokeInst>(orig_call))
-                 << " needed for callee?" << func_info->include_in_precompute
-                 << "\n"
-                 << "included? "
-                 << precompute_analyis_result.is_included_in_precompute(
-                        orig_call)
-                 << "\n";
-          can_omit = false;
-        }
-      }
-
-      if (can_omit) {
-
-        errs() << "REMOVE:  ";
-        invoke->dump();
-        IRBuilder<> builder = IRBuilder<>(invoke);
-        auto br = builder.CreateBr(invoke->getNormalDest());
-        func->new_to_old_map[br] = func->new_to_old_map[invoke];
-        invoke->replaceAllUsesWith(UndefValue::get(invoke->getType()));
-        // all users of retval will be removed in prune_function_copy
-        invoke->eraseFromParent();
-        continue;
-      }
-    }
-
     try {
       auto function_information =
           functions_copied.at(call->getCalledFunction());
@@ -420,6 +369,56 @@ void replace_calls_in_copy(
   }
 
   replace_usages_of_func_in_copy(func, functions_copied);
+}
+
+void replace_exceptionless_invoke_with_call(
+    const std::shared_ptr<PrecalculationFunctionCopy> &func,
+    const PrecalculationAnalysis &precompute_analyis_result) {
+  std::vector<InvokeInst *> ivokes;
+  for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
+       ++I) {
+
+    if (auto *invoke = dyn_cast<InvokeInst>(&*I)) {
+      auto *old_v = func->new_to_old_map[invoke];
+      if (not precompute_analyis_result.can_except_in_precompute(
+              cast<InvokeInst>(old_v))) {
+        ivokes.push_back(invoke);
+      }
+    }
+  }
+
+  for (auto *invoke : ivokes) {
+    auto *old_v = func->new_to_old_map[invoke];
+    IRBuilder<> builder = IRBuilder<>(invoke);
+
+    std::vector<Value *> args;
+    for (auto &arg : invoke->args()) {
+      args.push_back(cast<Value>(&arg));
+    }
+    auto *new_call = builder.CreateCall(invoke->getCalledFunction(), args,
+                                        invoke->getName());
+    auto *br = builder.CreateBr(invoke->getNormalDest());
+    invoke->replaceAllUsesWith(new_call);
+    invoke->eraseFromParent();
+
+    func->new_to_old_map[new_call] = old_v;
+    func->new_to_old_map[br] = old_v;
+  }
+
+#ifndef NDEBUG
+  // Optimization:
+  // one can now also combine blocks
+  // here it only serves better readability of IR for debugging
+  // as it will be done again later for optimization
+  std::vector<BasicBlock *> bbs;
+  // collect before changing to not break iterator
+  for (auto &bb : *func->F_copy) {
+    bbs.push_back(&bb);
+  }
+  for (auto *bb : bbs) {
+    llvm::MergeBlockIntoPredecessor(bb);
+  }
+#endif
 }
 
 // remove all unnecessary instruction
@@ -606,6 +605,8 @@ void insert_precomputation(
   // don't fuse this loops! we first need to initialize the copy before changing
   // calls
   for (const auto &pair : functions_copied) {
+    replace_exceptionless_invoke_with_call(pair.second,
+                                           precompute_analyis_result);
     replace_calls_in_copy(pair.second, precompute_analyis_result,
                           functions_copied);
   }
