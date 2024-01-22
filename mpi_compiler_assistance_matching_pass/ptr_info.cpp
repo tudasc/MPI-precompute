@@ -391,7 +391,7 @@ void PtrUsageInfo::setIsReadFrom(
   assert(precalc_analysis);
   assert(is_valid);
   assert(llvm::isa<llvm::LoadInst>(load) || llvm::isa<llvm::CallBase>(load));
-  is_written_to = true;
+  is_read_from = true;
   auto pair = loads.insert(load);
   if (pair.second) { // if it was inserted
     propergate_changes();

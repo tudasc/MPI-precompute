@@ -1185,12 +1185,13 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         assert(*ptr_given_as_arg.begin() == 1 && ptr_given_as_arg.size() == 1);
         // treat it like a store to ptr:
         // value is only necessary it ptr is read
-        if (ptr->ptr_info->isReadFrom()) {
+        ptr->ptr_info->setIsWrittenTo(call, this);
+
+        if (is_store_important(call, ptr->ptr_info)) {
           auto call_info = insert_tainted_value(call, ptr, false);
           auto comm_info =
               insert_tainted_value(call->getArgOperand(0),
                                    ptr); // we also need to keep the comm
-          ptr->ptr_info->setIsWrittenTo(call, this);
           include_value_in_precompute(ptr);
           include_value_in_precompute(call_info);
           include_value_in_precompute(comm_info);
