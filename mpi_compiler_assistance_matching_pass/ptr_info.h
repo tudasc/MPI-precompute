@@ -33,6 +33,29 @@ Licensed under the Apache License, Version 2.0 (the "License");
 // defined in taintedValue.h
 struct TaintedValue;
 
+class PtrUsageInfo;
+
+// specialized comparison operators that include the fact that objects may be
+// merged and are only shallow objs dispatching to another instance
+template <>
+bool std::operator==(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+template <>
+bool std::operator!=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+template <>
+bool std::operator<(const std::shared_ptr<PtrUsageInfo> &lhs,
+                    const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+template <>
+bool std::operator>(const std::shared_ptr<PtrUsageInfo> &lhs,
+                    const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+template <>
+bool std::operator<=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+template <>
+bool std::operator>=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+
 class PtrUsageInfo : public std::enable_shared_from_this<PtrUsageInfo> {
 public:
   explicit PtrUsageInfo(const std::shared_ptr<TaintedValue> &ptr) {
@@ -196,6 +219,24 @@ private:
       ptrs_with_this_info; // all possibly aliasing pointers
   // the ptr info does not have ownership (these values have ownership over the
   // ptr info)
+
+  // friend the comparison operators
+  friend bool
+  std::operator==(const std::shared_ptr<PtrUsageInfo> &lhs,
+                  const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+  friend bool
+  std::operator!=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                  const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+  friend bool std::operator<(const std::shared_ptr<PtrUsageInfo> &lhs,
+                             const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+  friend bool std::operator>(const std::shared_ptr<PtrUsageInfo> &lhs,
+                             const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+  friend bool
+  std::operator<=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                  const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
+  friend bool
+  std::operator>=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                  const std::shared_ptr<PtrUsageInfo> &rhs) noexcept;
 };
 
 #endif // MACH_PTR_INFO_H_

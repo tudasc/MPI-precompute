@@ -344,3 +344,93 @@ void PtrUsageInfo::dump() {
     pair.second->dump();
   }
 }
+
+template <>
+bool std::operator==(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() == rr.get();
+}
+
+template <>
+bool std::operator!=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() != rr.get();
+}
+
+template <>
+bool std::operator<(const std::shared_ptr<PtrUsageInfo> &lhs,
+                    const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() < rr.get();
+}
+
+template <>
+bool std::operator>(const std::shared_ptr<PtrUsageInfo> &lhs,
+                    const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() > rr.get();
+}
+
+template <>
+bool std::operator<=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() <= rr.get();
+}
+
+template <>
+bool std::operator>=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() >= rr.get();
+}
