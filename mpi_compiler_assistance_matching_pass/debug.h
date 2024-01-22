@@ -19,6 +19,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/Casting.h"
 #include <llvm/IR/Constants.h>
 
 #if DEBUG_MACH_PASS == 1
@@ -35,7 +36,7 @@ inline int get_num_undefs(const llvm::Function &F) {
     for (auto &I : BB) {
       // Check if the instruction has any undef operands.
       for (auto &U : I.operands()) {
-        if (U && isa<llvm::UndefValue>(U)) {
+        if (U && llvm::isa<llvm::UndefValue>(U)) {
           num_undef++;
         }
       }
