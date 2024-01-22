@@ -402,14 +402,13 @@ void replace_exceptionless_invoke_with_call(
     invoke->eraseFromParent();
 
     func->new_to_old_map[new_call] = old_v;
-    func->new_to_old_map[br] = old_v;
   }
 
-#ifndef NDEBUG
-  // Optimization:
   // one can now also combine blocks
-  // here it only serves better readability of IR for debugging
-  // as it will be done again later for optimization
+  // it will be done again for optimization
+  // but here it is necessary, so that the removal of br instructions during
+  // pruning step will not lead to unreachable code by accident
+
   std::vector<BasicBlock *> bbs;
   // collect before changing to not break iterator
   for (auto &bb : *func->F_copy) {
@@ -418,7 +417,6 @@ void replace_exceptionless_invoke_with_call(
   for (auto *bb : bbs) {
     llvm::MergeBlockIntoPredecessor(bb);
   }
-#endif
 }
 
 // remove all unnecessary instruction
@@ -448,62 +446,20 @@ void prune_function_copy(
       } else {
         to_prune.push_back(inst);
       }
-    } else if (isa<InvokeInst>(inst)) {
-      // an invoke can be tainted only because it may return an exception
-      // but it actually is exception free for our purpose
-      // meaning if it throws no MPI is used
-
-      assert(precompute_analyis_result.is_included_in_precompute(old_v));
-      auto *old_ivoke = dyn_cast<InvokeInst>(old_v);
-      assert(old_ivoke);
-
-      if (not precompute_analyis_result.is_invoke_necessary_for_control_flow(
-              old_ivoke) &&
-          not precompute_analyis_result.is_retval_of_call_needed(old_ivoke)) {
-        if (not(is_func_from_std(old_ivoke->getCalledFunction()) ||
-                is_mpi_call(old_ivoke))) {
-          to_prune.push_back(inst);
-        } else {
-          // call to std or mpi
-
-          // call to std or MPI will be kept if all params are tainted
-          bool all_tainted = true;
-
-          for (auto &arg : old_ivoke->args()) {
-            if (not precompute_analyis_result.is_included_in_precompute(
-                    cast<Value>(&arg))) {
-              all_tainted = false;
-            }
-          }
-
-          if (not precompute_analyis_result.can_except_in_precompute(
-                  old_ivoke) &&
-              not all_tainted) {
-            // can be replaced with unconditional br to normal dest
-            to_prune.push_back(inst);
-          }
-        }
-      }
     }
   }
 
   // remove stuff
   for (auto *inst : to_prune) {
     if (inst->isTerminator()) {
-      if (auto *invoke = dyn_cast<InvokeInst>(inst)) {
-        // an invoke that was determined not necessary will just be skipped
-        IRBuilder<> builder = IRBuilder<>(inst);
-        builder.CreateBr(invoke->getNormalDest());
+      // if this terminator was not tainted: we can immediately return from
+      // this function
+      IRBuilder<> builder = IRBuilder<>(inst);
+      if (inst->getFunction()->getReturnType()->isVoidTy()) {
+        builder.CreateRetVoid();
       } else {
-        // if this terminator was not tainted: we can immediately return from
-        // this function
-        IRBuilder<> builder = IRBuilder<>(inst);
-        if (inst->getFunction()->getReturnType()->isVoidTy()) {
-          builder.CreateRetVoid();
-        } else {
-          builder.CreateRet(
-              Constant::getNullValue(inst->getFunction()->getReturnType()));
-        }
+        builder.CreateRet(
+            Constant::getNullValue(inst->getFunction()->getReturnType()));
       }
     }
 
