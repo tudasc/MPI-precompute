@@ -403,8 +403,12 @@ void replace_exceptionless_invoke_with_call(
     invoke->eraseFromParent();
 
     func->new_to_old_map[new_call] = old_v;
+
+    // the br is not tainted
+    //  especially in the case where the ivoke could just be a br
   }
 
+  // TODO mark this as optimization only
   // one can now also combine blocks
   // it will be done again for optimization
   // but here it is necessary, so that the removal of br instructions during
@@ -443,6 +447,14 @@ void prune_function_copy(
           to_prune.push_back(inst);
         }
 
+      } else if (auto *br = dyn_cast<BranchInst>(inst)) {
+        // don't remove unconditional br
+        // if a block with an unconditional br is not needed its successor is
+        // also unreachable otherwise we may need the successor (it may be the
+        // result of split up of blocks)
+        if (br->isConditional()) {
+          to_prune.push_back(inst);
+        }
       } else {
         to_prune.push_back(inst);
       }
@@ -451,6 +463,7 @@ void prune_function_copy(
 
   // remove stuff
   for (auto *inst : to_prune) {
+
     if (inst->isTerminator()) {
       // if this terminator was not tainted: we can immediately return from
       // this function
