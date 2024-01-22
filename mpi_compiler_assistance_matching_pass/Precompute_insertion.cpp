@@ -525,6 +525,14 @@ void prune_function_copy(
 
   // Optimization:
   // one can now also combine blocks
+  std::vector<BasicBlock *> bbs;
+  // collect before changing to not break iterator
+  for (auto &bb : *func->F_copy) {
+    bbs.push_back(&bb);
+  }
+  for (auto *bb : bbs) {
+    llvm::MergeBlockIntoPredecessor(bb);
+  }
 
   func->F_copy->dump();
   // assert that no new undefs are introduced into func
@@ -536,7 +544,7 @@ void add_call_to_precalculation_to_main(
     llvm::Module &M,
     const std::shared_ptr<PrecalculationFunctionCopy> &entry_function,
     const PrecalculationAnalysis &precompute_analyis_result) {
-  // TODO code duplication wir auto pos=
+  // TODO code duplication with auto pos=
 
   // search for MPI_init or Init Thread as precalc may only take place after
   // that
