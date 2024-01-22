@@ -1143,6 +1143,21 @@ void PrecalculationAnalysis::visit_call(
     func_ptr_info->ptr_info->setIsCalled(true);
     include_value_in_precompute(func_ptr_info);
   }
+
+  // TODO
+  //  check if we need to include the call
+  if (not call_info->isIncludeInPrecompute()) {
+
+    for (auto *func : possible_targets) {
+      if (get_function_analysis(func)->include_all_callsites) {
+        // set it on parent
+        get_function_analysis(call->getFunction())->include_all_callsites =
+            true;
+        include_value_in_precompute(call_info);
+      }
+    }
+    // TODO if it stores an important value
+  }
 }
 
 void PrecalculationAnalysis::visit_call_from_ptr(
