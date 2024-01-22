@@ -125,6 +125,15 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
+    for (auto *s : other->stores) {
+      auto pair = stores.insert(s);
+      changed = changed | pair.second; // changed if a new elem was inserted
+    }
+    for (auto *s : other->loads) {
+      auto pair = loads.insert(s);
+      changed = changed | pair.second; // changed if a new elem was inserted
+    }
+
     if (changed) {
       propergate_changes();
     }

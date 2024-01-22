@@ -392,7 +392,7 @@ void PrecalculationAnalysis::visit_load(
   auto loaded_from = insert_tainted_value(load->getPointerOperand(), load_info);
   assert(loaded_from->is_pointer());
   assert(loaded_from->ptr_info);
-  loaded_from->ptr_info->setIsReadFrom(true);
+  loaded_from->ptr_info->setIsReadFrom(load);
 
   if (load_info->is_pointer()) {
     loaded_from->ptr_info->setIsUsedDirectly(true, load_info->ptr_info);
@@ -411,7 +411,7 @@ void PrecalculationAnalysis::visit_store_from_value(
   // TODO needed_from=false???
   auto new_val =
       insert_tainted_value(store->getPointerOperand(), store_info, false);
-  new_val->ptr_info->setIsWrittenTo(true);
+  new_val->ptr_info->setIsWrittenTo(store);
 
   auto func = get_function_analysis(store->getFunction());
   func->add_ptr_write(new_val->ptr_info);
@@ -455,7 +455,7 @@ void PrecalculationAnalysis::visit_store_from_ptr(
   auto ptr = get_taint_info(store->getPointerOperand());
   ptr->ptr_info->setIsUsedDirectly(
       true, store_info->ptr_info); // null if stored value is no ptr
-  ptr->ptr_info->setIsWrittenTo(true);
+  ptr->ptr_info->setIsWrittenTo(store);
 
   auto func = get_function_analysis(store->getFunction());
   func->add_ptr_write(ptr->ptr_info);
@@ -1014,11 +1014,11 @@ void PrecalculationAnalysis::include_call_to_std(
     if (arg->getType()->isPointerTy()) {
 
       if (is_ptr_usage_in_std_read(call, arg_info)) {
-        arg_info->ptr_info->setIsReadFrom(true);
+        arg_info->ptr_info->setIsReadFrom(call);
         arg_info->ptr_info->setWholePtrIsRelevant(true);
       }
       if (is_ptr_usage_in_std_write(call, arg_info)) {
-        arg_info->ptr_info->setIsWrittenTo(true);
+        arg_info->ptr_info->setIsWrittenTo(call);
         arg_info->ptr_info->setWholePtrIsRelevant(true);
       }
     }
@@ -1190,7 +1190,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
           auto comm_info =
               insert_tainted_value(call->getArgOperand(0),
                                    ptr); // we also need to keep the comm
-          ptr->ptr_info->setIsWrittenTo(true);
+          ptr->ptr_info->setIsWrittenTo(call);
           include_value_in_precompute(ptr);
           include_value_in_precompute(call_info);
           include_value_in_precompute(comm_info);

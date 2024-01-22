@@ -71,16 +71,19 @@ public:
     assert(is_valid);
     return is_written_to;
   }
-  void setIsWrittenTo(bool isWrittenTo) {
+  void setIsWrittenTo(llvm::Instruction *store) {
     if (merged_with) {
-      merged_with->setIsWrittenTo(isWrittenTo);
+      merged_with->setIsWrittenTo(store);
       return;
     }
     assert(is_valid);
-    if ((not is_written_to) && isWrittenTo) {
+    assert(llvm::isa<llvm::StoreInst>(store) ||
+           llvm::isa<llvm::CallBase>(store));
+    is_written_to = true;
+    auto pair = stores.insert(store);
+    if (pair.second) { // if it was inserted
       propergate_changes();
     }
-    is_written_to = is_written_to | isWrittenTo;
   }
   bool isCalled() const {
     if (merged_with) {
@@ -118,16 +121,18 @@ public:
     assert(is_valid);
     return is_read_from;
   }
-  void setIsReadFrom(bool isReadFrom) {
+  void setIsReadFrom(llvm::Instruction *load) {
     if (merged_with) {
-      merged_with->setIsReadFrom(isReadFrom);
+      merged_with->setIsWrittenTo(load);
       return;
     }
     assert(is_valid);
-    if ((not is_read_from) && isReadFrom) {
+    assert(llvm::isa<llvm::LoadInst>(load) || llvm::isa<llvm::CallBase>(load));
+    is_read_from = true;
+    auto pair = loads.insert(load);
+    if (pair.second) { // if it was inserted
       propergate_changes();
     }
-    is_read_from = is_read_from | isReadFrom;
   }
 
   bool isWholePtrIsRelevant() const {
@@ -217,6 +222,12 @@ private:
   std::set<std::weak_ptr<TaintedValue>,
            std::owner_less<std::weak_ptr<TaintedValue>>>
       ptrs_with_this_info;
+
+  // all instruction categorized as store to this ptr
+  // may be a StoreInst or a CallBase
+  std::set<llvm::Instruction *> stores;
+  // only holds the important Loads
+  std::set<llvm::Instruction *> loads;
 
 public:
   const std::set<std::weak_ptr<TaintedValue>,
