@@ -101,7 +101,8 @@ public:
       callees;
 
   // set of ptrs possibly written or Read when calling this func
-  // set is recursive: including all callees
+  // contains direct read and writes
+  // TODO Getter to receive the recursive set including all callees
   std::set<std::shared_ptr<PtrUsageInfo>> ptr_read;
   std::set<std::shared_ptr<PtrUsageInfo>> ptr_written;
 
@@ -214,6 +215,13 @@ private:
   void visit_ptr_usages(const std::shared_ptr<TaintedValue> &ptr);
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
+
+  bool is_store_important(llvm::Instruction *inst,
+                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
+  bool is_store_important(llvm::CallBase *call,
+                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
+  bool is_store_important(llvm::StoreInst *store,
+                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
 
   // materialize call
   void include_call_to_std(std::shared_ptr<TaintedValue> call_info);

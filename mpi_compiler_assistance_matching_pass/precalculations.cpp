@@ -411,6 +411,10 @@ void PrecalculationAnalysis::visit_store_from_value(
   auto new_val =
       insert_tainted_value(store->getPointerOperand(), store_info, false);
   new_val->ptr_info->setIsWrittenTo(true);
+
+  auto func = get_function_analysis(store->getFunction());
+  func->add_ptr_write(new_val->ptr_info);
+
   if (store->getValueOperand()->getType()->isPointerTy()) {
     auto val_info = get_taint_info(store->getValueOperand());
     new_val->ptr_info->setIsUsedDirectly(true, val_info->ptr_info);
@@ -451,27 +455,18 @@ void PrecalculationAnalysis::visit_store_from_ptr(
   ptr->ptr_info->setIsUsedDirectly(
       true, store_info->ptr_info); // null if stored value is no ptr
   ptr->ptr_info->setIsWrittenTo(true);
+
+  auto func = get_function_analysis(store->getFunction());
+  func->add_ptr_write(ptr->ptr_info);
+
   // we only need the stored value if it is used later
-  if (ptr->ptr_info->isReadFrom()) {
+  if (is_store_important(store, ptr->ptr_info)) {
 
-    // TODO in destructor we may not need it
-    //  if all important reads are before in CFG we also dont need it
-    // !! TODO THIS IS ONLY A HOTFIX!!
-    // we assume everything inside a destructor is not needed at all
-    auto *parent_func = store->getFunction();
-    auto demangled_name =
-        get_function_name(llvm::demangle(parent_func->getName().str()));
-    auto f_name_only = extract_function_without_namespace(demangled_name);
-
-    // not start with ~ as destructors are named with ~
-    if (f_name_only[0] != '~') {
-
-      auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
-      // we need to include all 3 the ptr the store and the stored val
-      include_value_in_precompute(new_val);
-      include_value_in_precompute(store_info);
-      include_value_in_precompute(ptr);
-    }
+    auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
+    // we need to include all 3: the ptr, the store, and the stored val
+    include_value_in_precompute(new_val);
+    include_value_in_precompute(store_info);
+    include_value_in_precompute(ptr);
   }
 }
 
@@ -1695,4 +1690,59 @@ bool PrecalculationAnalysis::can_except_in_precompute(
     }
   }
   return false;
+}
+
+bool PrecalculationAnalysis::is_store_important(
+    llvm::Instruction *inst, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
+  if (isa<StoreInst>(inst)) {
+    return is_store_important(cast<StoreInst>(inst), ptr_info);
+  }
+  if (isa<CallBase>(inst)) {
+    return is_store_important(cast<CallBase>(inst), ptr_info);
+  }
+  assert(false && "Not a store instruction");
+}
+
+bool PrecalculationAnalysis::is_store_important(
+    llvm::StoreInst *store, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
+
+  // the ptr must be used
+  assert(std::find_if(ptr_info->getPtrsWithThisInfo().begin(),
+                      ptr_info->getPtrsWithThisInfo().end(),
+                      [&store](auto elem) {
+                        if (auto elem_instance = elem.lock()) {
+                          return elem_instance->v == store->getPointerOperand();
+                        }
+                        return false;
+                      }) != ptr_info->getPtrsWithThisInfo().end());
+  if (not ptr_info->isReadFrom()) {
+    return false;
+  }
+
+  // TODO in destructor we may not need it
+  //  if all important reads are before in CFG we also dont need it
+  // !! TODO THIS IS ONLY A HOTFIX!!
+  // we assume everything inside a destructor is not needed at all
+  auto *parent_func = store->getFunction();
+  auto demangled_name =
+      get_function_name(llvm::demangle(parent_func->getName().str()));
+  auto f_name_only = extract_function_without_namespace(demangled_name);
+
+  // not start with ~ as destructors are named with ~
+  if (f_name_only[0] == '~') {
+    return false;
+  }
+
+  return true;
+}
+
+bool PrecalculationAnalysis::is_store_important(
+    llvm::CallBase *call, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
+
+  // TODO can we add a the ptr must be used assertion?
+
+  if (not ptr_info->isReadFrom()) {
+    return false;
+  }
+  return true;
 }

@@ -216,7 +216,15 @@ private:
   // std::set<std::shared_ptr<PtrUsageInfo>> parents;
   std::set<std::weak_ptr<TaintedValue>,
            std::owner_less<std::weak_ptr<TaintedValue>>>
-      ptrs_with_this_info; // all possibly aliasing pointers
+      ptrs_with_this_info;
+
+public:
+  const std::set<std::weak_ptr<TaintedValue>,
+                 std::owner_less<std::weak_ptr<TaintedValue>>> &
+  getPtrsWithThisInfo() const;
+
+private:
+  // all possibly aliasing pointers
   // the ptr info does not have ownership (these values have ownership over the
   // ptr info)
 

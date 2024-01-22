@@ -344,6 +344,11 @@ void PtrUsageInfo::dump() {
     pair.second->dump();
   }
 }
+const std::set<std::weak_ptr<TaintedValue>,
+               std::owner_less<std::weak_ptr<TaintedValue>>> &
+PtrUsageInfo::getPtrsWithThisInfo() const {
+  return ptrs_with_this_info;
+}
 
 template <>
 bool std::operator==(const std::shared_ptr<PtrUsageInfo> &lhs,
