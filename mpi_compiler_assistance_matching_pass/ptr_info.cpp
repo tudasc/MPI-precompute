@@ -373,12 +373,15 @@ void PtrUsageInfo::setIsWrittenTo(
   auto pair = stores.insert(store);
   if (pair.second) { // if it was inserted
     propergate_changes();
-  }
-  // recursively mark all callsites potentially calling the function as stores
-  // as well
-  auto func = precalc_analysis->get_function_analysis(store->getFunction());
-  for (auto *call : func->callsites) {
-    setIsWrittenTo(call, precalc_analysis);
+
+    // recursively mark all callsites potentially calling the function as stores
+    // as well
+    auto func = precalc_analysis->get_function_analysis(store->getFunction());
+    for (auto *call : func->callsites) {
+      if (call != store) {
+        setIsWrittenTo(call, precalc_analysis);
+      }
+    }
   }
 }
 
@@ -395,12 +398,15 @@ void PtrUsageInfo::setIsReadFrom(
   auto pair = loads.insert(load);
   if (pair.second) { // if it was inserted
     propergate_changes();
-  }
-  // recursively mark all callsites potentially calling the function as stores
-  // as well
-  auto func = precalc_analysis->get_function_analysis(load->getFunction());
-  for (auto *call : func->callsites) {
-    setIsReadFrom(call, precalc_analysis);
+
+    // recursively mark all callsites potentially calling the function as stores
+    // as well
+    auto func = precalc_analysis->get_function_analysis(load->getFunction());
+    for (auto *call : func->callsites) {
+      if (call != load) {
+        setIsReadFrom(call, precalc_analysis);
+      }
+    }
   }
 }
 
