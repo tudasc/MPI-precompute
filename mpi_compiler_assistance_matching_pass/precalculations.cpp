@@ -318,14 +318,17 @@ void PrecalculationAnalysis::add_precalculations(
     auto *tag = get_tag_value(call, is_send);
     auto *src = get_src_value(call, is_send);
 
+    function_analysis.at(call->getFunction())->include_all_callsites = true;
+
     auto tag_info = insert_tainted_value(tag, TaintReason::COMPUTE_TAG);
     include_value_in_precompute(tag_info);
     auto dest_info = insert_tainted_value(src, TaintReason::COMPUTE_DEST);
     include_value_in_precompute(dest_info);
-    // TODO precompute comm as well?
+
     auto call_info = insert_tainted_value(call, TaintReason::CONTROL_FLOW);
     include_value_in_precompute(call_info);
-    call_info->visited = true;
+    call_info->visited = true; // dont need to visit the call that will be
+                               // replaced with register precompute
   }
 
   find_all_tainted_vals();
@@ -832,7 +835,7 @@ void PrecalculationAnalysis::visit_ptr_ret(
   }
 }
 
-void PrecalculationAnalysis::insert_functions_to_include(llvm::Function *func) {
+void PrecalculationAnalysis::insert_function_to_include(llvm::Function *func) {
 
   auto fun_to_precalc = function_analysis.at(func);
   if (not fun_to_precalc->include_in_precompute) {
@@ -840,9 +843,17 @@ void PrecalculationAnalysis::insert_functions_to_include(llvm::Function *func) {
     for (auto *call : fun_to_precalc->callsites) {
       auto call_info =
           insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
-      include_value_in_precompute(call_info);
       call_info->visited = false; // may need to re visit if it was later
                                   // discovered that it is important
+
+      if (fun_to_precalc->include_all_callsites) {
+        // propagate include_all_callsites
+        auto parent = function_analysis.at(call->getFunction());
+        parent->include_all_callsites = true;
+        insert_function_to_include(call->getFunction());
+
+        include_value_in_precompute(call_info);
+      }
     }
   }
 }
@@ -1106,13 +1117,17 @@ void PrecalculationAnalysis::visit_call(
                "cannot analyze if external function may throw an exception");
         for (auto &bb : *func) {
           if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
-            insert_tainted_value(res, TaintReason::CONTROL_FLOW);
+            assert(call_info->isIncludeInPrecompute());
+            auto new_val = insert_tainted_value(res, TaintReason::CONTROL_FLOW);
+            include_value_in_precompute(new_val);
           }
           for (auto &inst : bb)
             if (auto *cc = dyn_cast<CallBase>(&inst)) {
               if (can_except_in_precompute(cc)) {
-                insert_tainted_value(
+                assert(call_info->isIncludeInPrecompute());
+                auto new_val = insert_tainted_value(
                     cc, TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
+                include_value_in_precompute(new_val);
               }
             }
         }
@@ -1280,6 +1295,14 @@ void PrecalculationAnalysis::include_value_in_precompute(
 
   if (not taint_info->isIncludeInPrecompute()) {
     taint_info->setIncludeInPrecompute();
+    // DEBUG ONLY
+    if (auto *cc = dyn_cast<CallBase>(taint_info->v)) {
+      if (cc->getCalledFunction()->getName() == "_Z8get_rankv") {
+        errs() << "Where is inclusion happening?\n";
+        errs() << to_string(boost::stacktrace::stacktrace());
+      }
+    }
+
     insert_necessary_control_flow(taint_info->v);
     for (const auto &p : taint_info->needs) {
       include_value_in_precompute(p);
@@ -1308,7 +1331,6 @@ PrecalculationAnalysis::insert_tainted_value(llvm::Value *v,
                                   [&v](const auto &vv) { return vv->v == v; });
   }
   inserted_elem->addReason(reason);
-  include_value_in_precompute(inserted_elem);
 
   assert(inserted_elem != nullptr);
   return inserted_elem;
@@ -1479,13 +1501,7 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
       }
     } else {
       // BB is function entry block
-
-      if (bb->getParent()->getName() ==
-          "_ZN19CommManagerStandard18begin_halo_receiveEv") {
-        v->dump();
-        assert(false);
-      }
-      insert_functions_to_include(bb->getParent());
+      insert_function_to_include(bb->getParent());
     }
   }
 }

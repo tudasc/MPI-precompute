@@ -91,6 +91,11 @@ public:
   bool analysis_except_in_precompute =
       false; // used avoid endless recursion on recursive call chains
 
+  // always include all calls to this func (it must always execute aka contains
+  // the register precompute cals) for other functions, if the writes done by
+  // the func are not important anymore, we can skip calling them
+  bool include_all_callsites = false;
+
   // used outside of call instructions
   bool is_func_ptr_captured;
 
@@ -186,7 +191,7 @@ public:
   }
 
 private:
-  void insert_functions_to_include(llvm::Function *func);
+  void insert_function_to_include(llvm::Function *func);
 
   // TODO we need some kind of heuristic to check if precalculation of all msg
   // tags seems to be worth it
