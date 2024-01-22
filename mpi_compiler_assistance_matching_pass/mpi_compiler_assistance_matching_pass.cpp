@@ -159,8 +159,8 @@ struct MPICompilerAssistanceMatchingPass
     auto *main_func = M.getFunction("main");
     assert(main_func);
 
-    auto precalcuation = PrecalculationAnalysis(M, main_func);
-    precalcuation.add_precalculations(combined_init_list);
+    auto precalcuation = std::make_shared<PrecalculationAnalysis>(M, main_func);
+    precalcuation->add_precalculations(combined_init_list);
 
     bool replacement = !combined_init_list.empty();
     // otherwise nothing should be done
