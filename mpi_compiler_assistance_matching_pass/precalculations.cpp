@@ -1295,6 +1295,8 @@ void PrecalculationAnalysis::include_value_in_precompute(
 
   if (not taint_info->isIncludeInPrecompute()) {
     taint_info->setIncludeInPrecompute();
+
+    // TODO
     // DEBUG ONLY
     if (auto *cc = dyn_cast<CallBase>(taint_info->v)) {
       if (cc->getCalledFunction()->getName() == "_Z8get_rankv") {
@@ -1492,12 +1494,20 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
                 new_val->addReason(
                     TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED);
                 // only the normal dest is needed
+                // NOT include_value_in_precompute(new_val);
+                // we dont need the invoke to check if exception is thrown as we
+                // know no meaningful exception can be thrown
+              } else {
+                // can except
+                include_value_in_precompute(new_val);
+                new_val->addReason(TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
               }
             }
           }
+        } else {
+          auto new_val = insert_tainted_value(term, TaintReason::CONTROL_FLOW);
+          include_value_in_precompute(new_val);
         }
-        auto new_val = insert_tainted_value(term, TaintReason::CONTROL_FLOW);
-        include_value_in_precompute(new_val);
       }
     } else {
       // BB is function entry block
