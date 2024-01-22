@@ -5,6 +5,7 @@
 #include "mpi_functions.h"
 #include "precalculation.h"
 #include "precompute_funcs.h"
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
@@ -520,26 +521,15 @@ void prune_function_copy(
   }
 
   // perform DCE by removing now unused BBs
-  std::set<BasicBlock *> to_remove_bb;
-  for (auto &BB : *func->F_copy) {
-    if (pred_empty(&BB) && not BB.isEntryBlock()) {
-      to_remove_bb.insert(&BB);
-    }
-  }
+  llvm::EliminateUnreachableBlocks(*func->F_copy);
 
-  // and remove BBs
-  for (auto *BB : to_remove_bb) {
-    // if bb contains some instructions
-    for (auto &inst : *BB) {
-      inst.replaceAllUsesWith(UndefValue::get(inst.getType()));
-    }
-    BB->eraseFromParent();
-  }
-  // assert that no new undefs are introduced into func
-  //  not assert == as we could remove sume undefs
-  assert(prev_num_undef >= get_num_undefs(*func->F_copy));
-
+  // Optimization:
   // one can now also combine blocks
+
+  func->F_copy->dump();
+  // assert that no new undefs are introduced into func
+  //  not assert == as we could remove some undefs
+  assert(prev_num_undef >= get_num_undefs(*func->F_copy));
 }
 
 void add_call_to_precalculation_to_main(
