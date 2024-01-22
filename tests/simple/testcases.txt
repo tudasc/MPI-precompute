@@ -22,5 +22,6 @@ tests 03 to 09 target the implementation of the communication
 22 Reading tags from file
 23 Catch exception and use different tag in this case
 24 output to std::cout with multiple chained << commands
+25 multiple calls to MPI get rank wrapper but only one cll is important
 cmake-c the pass should process the cmake sample snipped used to determine mpi version
 cmake-cpp
