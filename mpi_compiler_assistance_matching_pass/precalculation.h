@@ -39,7 +39,9 @@ class PrecalculationFunctionAnalysis
     : public std::enable_shared_from_this<PrecalculationFunctionAnalysis> {
 public:
   // analysis Part
-  explicit PrecalculationFunctionAnalysis(llvm::Function *F) : func(F) {
+  explicit PrecalculationFunctionAnalysis(
+      llvm::Function *F, std::weak_ptr<PrecalculationAnalysis> precalc)
+      : func(F), precalculatioanalysis(std::move(precalc)) {
     // assert(not F->isDeclaration() && "Cannot analyze external function");
 
     is_func_ptr_captured = false;
@@ -73,6 +75,7 @@ public:
   }
   std::set<unsigned int> args_to_use = {};
   llvm::Function *func;
+  std::weak_ptr<PrecalculationAnalysis> precalculatioanalysis;
   std::set<llvm::GlobalValue *> aliases;
   const std::set<llvm::GlobalValue *> &getAliases() const { return aliases; }
 
@@ -97,11 +100,36 @@ public:
   std::set<std::weak_ptr<PrecalculationFunctionAnalysis>, std::owner_less<>>
       callees;
 
+  // set of ptrs possibly written or Read when calling this func
+  // set is recursive: including all callees
+  std::set<std::shared_ptr<PtrUsageInfo>> ptr_read;
+  std::set<std::shared_ptr<PtrUsageInfo>> ptr_written;
+
+  // invalidate the analysis of call sites of this function
+  void re_visit_callsites();
+
+  void add_ptr_read(const std::shared_ptr<PtrUsageInfo> &read) {
+    assert(read->isReadFrom());
+    auto pair = ptr_read.insert(read);
+    if (pair.second) { // was inserted
+      re_visit_callsites();
+    }
+  }
+
+  void add_ptr_write(const std::shared_ptr<PtrUsageInfo> &write) {
+    assert(write->isWrittenTo());
+    auto pair = ptr_written.insert(write);
+    if (pair.second) { // was inserted
+      re_visit_callsites();
+    }
+  }
+
   void analyze_can_except_in_precompute(
       const PrecalculationAnalysis *precompute_analysis);
 };
 
-class PrecalculationAnalysis {
+class PrecalculationAnalysis
+    : std::enable_shared_from_this<PrecalculationAnalysis> {
 public:
   PrecalculationAnalysis(llvm::Module &M, llvm::Function *entry_point)
       : M(M), entry_point(entry_point), virtual_call_sites(DevirtAnalysis(M)) {

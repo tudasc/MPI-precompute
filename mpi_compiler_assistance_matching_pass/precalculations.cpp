@@ -131,7 +131,7 @@ void PrecalculationAnalysis::analyze_functions() {
   // create
   for (auto &f : M) {
     function_analysis[&f] =
-        std::make_shared<PrecalculationFunctionAnalysis>(&f);
+        std::make_shared<PrecalculationFunctionAnalysis>(&f, weak_from_this());
   }
 
   // populate callees and callsites
@@ -295,6 +295,17 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
   // no callee can except (this implies that no call to trow was detected)
   analysis_except_in_precompute = false;
   can_except_in_precompute = false;
+}
+void PrecalculationFunctionAnalysis::re_visit_callsites() {
+
+  assert(include_in_precompute);
+  if (auto prec = precalculatioanalysis.lock()) {
+    for (auto *c : callsites) {
+
+      auto ti = prec->get_taint_info(c);
+      ti->visited = false;
+    }
+  }
 }
 
 void PrecalculationAnalysis::add_precalculations(
