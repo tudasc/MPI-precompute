@@ -1237,10 +1237,14 @@ void PrecalculationAnalysis::visit_call_from_ptr(
     if ((func->isIntrinsic() &&
          should_call_intrinsic(func->getIntrinsicID())) ||
         is_func_from_std(func)) {
-      if (ptr->ptr_info->isReadFrom() && is_ptr_usage_in_std_write(call, ptr)) {
-        auto call_info = insert_tainted_value(call, ptr, false);
-        include_call_to_std(call_info);
-        assert(ptr->ptr_info->isWrittenTo());
+
+      if (is_ptr_usage_in_std_write(call, ptr)) {
+        ptr->ptr_info->setIsWrittenTo(call, this);
+        if (is_store_important(call, ptr->ptr_info)) {
+          auto call_info = insert_tainted_value(call, ptr, false);
+          include_call_to_std(call_info);
+          assert(ptr->ptr_info->isWrittenTo());
+        }
       }
       return;
     }
