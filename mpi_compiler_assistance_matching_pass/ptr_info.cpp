@@ -360,7 +360,8 @@ void PtrUsageInfo::dump() {
       errs() << idx << ", ";
     }
     errs() << "\n";
-    // pair.second->dump();
+    if (pair.first==std::vector<long>{0,2}){
+     pair.second->dump();}
   }
 }
 const std::set<std::weak_ptr<TaintedValue>,

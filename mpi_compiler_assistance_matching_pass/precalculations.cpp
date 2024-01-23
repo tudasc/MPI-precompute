@@ -779,7 +779,16 @@ void PrecalculationAnalysis::visit_ptr_usages(
     if (auto *l = dyn_cast<LoadInst>(u)) {
       if (l->getType()->isPointerTy()) {
         // if a ptr is loaded we need to trace its usages
-        insert_tainted_value(l, ptr, false);
+
+        //TODO !!!!!
+        // we need better analysis here
+
+        if (ptr->ptr_info->isUsedDirectly() && ptr->ptr_info->getInfoOfDirectUsage()) {
+          if (ptr->ptr_info->getInfoOfDirectUsage()->isReadFrom())
+          {
+            insert_tainted_value(l, ptr, false);
+          }
+        }
       } // else no need to take care about this, reading the val is allowed
       continue;
     }
@@ -1417,12 +1426,12 @@ void PrecalculationAnalysis::include_value_in_precompute(
   if (not taint_info->isIncludeInPrecompute()) {
     taint_info->setIncludeInPrecompute();
 
-    // TODO
-    // DEBUG ONLY
     if (auto *cc = dyn_cast<StoreInst>(taint_info->v)) {
       assert(is_store_important(
           cc, get_taint_info(cc->getPointerOperand())->ptr_info));
       if (cc->getPointerOperand()->getName() == "NBodies") {
+        // TODO
+        // DEBUG ONLY
         /*
         errs() << "Where is inclusion happening?\n";
         errs() << to_string(boost::stacktrace::stacktrace());
@@ -1696,7 +1705,7 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
       inst->dump();
     }
   }
-  // debug_printings();
+  debug_printings();
 }
 
 // TODO: move to debug file?
@@ -1714,6 +1723,7 @@ void PrecalculationAnalysis::debug_printings() {
       }
     }
   }
+  // assert(false);
 }
 std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
 PrecalculationAnalysis::getFunctionsToInclude() const {
