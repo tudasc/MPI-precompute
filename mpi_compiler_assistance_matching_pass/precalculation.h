@@ -284,6 +284,11 @@ public:
 
 private:
   void insert_necessary_control_flow(llvm::Value *v);
+  void visit_call_for_retval(const std::shared_ptr<TaintedValue> &call_info);
+  void
+  visit_invoke_for_exception(const std::shared_ptr<TaintedValue> &call_info);
+  bool check_if_call_should_be_included(
+      const std::shared_ptr<TaintedValue> &call_info);
 };
 
 inline bool is_allocation(llvm::Function *func) {

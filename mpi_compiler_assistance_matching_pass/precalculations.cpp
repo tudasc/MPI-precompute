@@ -1049,43 +1049,7 @@ void PrecalculationAnalysis::visit_call(
 
   bool need_return_val = is_retval_of_call_needed(call);
   if (need_return_val) {
-    call_info->addReason(CONTROL_FLOW_RETURN_VALUE_NEEDED);
-    if (is_allocation(call)) {
-      // nothing to do, just keep this call around, it will later be replaced
-      for (auto &arg : call->args()) {
-        auto arg_info = insert_tainted_value(arg, call_info);
-      }
-    } else if (not call->isIndirectCall() &&
-               call->getCalledFunction()->isIntrinsic() &&
-               should_call_intrinsic(
-                   call->getCalledFunction()->getIntrinsicID())) {
-      if (not should_ignore_intrinsic(
-              call->getCalledFunction()->getIntrinsicID())) {
-        // consider it same as call to std
-        include_call_to_std(call_info);
-      }
-    } else if (is_call_to_std(call)) {
-      include_call_to_std(call_info);
-    } else {
-      for (auto *func : possible_targets) {
-        if (func->isDeclaration()) {
-          errs() << "\n";
-          call->dump();
-          func->dump();
-          errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
-                 << func->isIntrinsic() << "\n";
-        }
-        assert(not func->isDeclaration() &&
-               "cannot analyze if calling external function for return value "
-               "has "
-               "side effects");
-        for (auto &bb : *func) {
-          if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
-            insert_tainted_value(ret, call_info);
-          }
-        }
-      }
-    }
+    visit_call_for_retval(call_info);
   }
 
   // we need to check the control flow if an exception is raised
@@ -1097,41 +1061,7 @@ void PrecalculationAnalysis::visit_call(
       // function, as we know that it does not make the flow go away due to an
       // exception
 
-      for (auto *func : possible_targets) {
-        if (func->isIntrinsic() &&
-            should_ignore_intrinsic(func->getIntrinsicID())) {
-          // ignore intrinsics
-          continue;
-        }
-        if (is_func_from_std(func)) {
-          include_call_to_std(call_info);
-          continue;
-        }
-        if (func->isDeclaration()) {
-          call->dump();
-          func->dump();
-          errs() << "Reason: " << call_info->getReason() << "\n";
-          errs() << "In: " << call->getFunction()->getName() << "\n";
-        }
-        assert(not func->isDeclaration() &&
-               "cannot analyze if external function may throw an exception");
-        for (auto &bb : *func) {
-          if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
-            assert(call_info->isIncludeInPrecompute());
-            auto new_val = insert_tainted_value(res, TaintReason::CONTROL_FLOW);
-            include_value_in_precompute(new_val);
-          }
-          for (auto &inst : bb)
-            if (auto *cc = dyn_cast<CallBase>(&inst)) {
-              if (can_except_in_precompute(cc)) {
-                assert(call_info->isIncludeInPrecompute());
-                auto new_val = insert_tainted_value(
-                    cc, TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
-                include_value_in_precompute(new_val);
-              }
-            }
-        }
-      }
+      visit_invoke_for_exception(call_info);
     }
   }
 
@@ -1148,15 +1078,111 @@ void PrecalculationAnalysis::visit_call(
   //  check if we need to include the call
   if (not call_info->isIncludeInPrecompute()) {
 
-    for (auto *func : possible_targets) {
-      if (get_function_analysis(func)->include_all_callsites) {
-        // set it on parent
-        get_function_analysis(call->getFunction())->include_all_callsites =
-            true;
-        include_value_in_precompute(call_info);
+    if (check_if_call_should_be_included(call_info)) {
+      include_value_in_precompute(call_info);
+    }
+  }
+}
+
+bool PrecalculationAnalysis::check_if_call_should_be_included(
+    const std::shared_ptr<TaintedValue> &call_info) {
+  auto *call = cast<CallBase>(call_info->v);
+  for (auto *func : get_possible_call_targets(call)) {
+    if (get_function_analysis(func)->include_all_callsites) {
+      // set it on parent
+      get_function_analysis(call->getFunction())->include_all_callsites = true;
+      return true;
+    }
+  }
+  // TODO if it stores an important value
+
+  return false;
+}
+
+void PrecalculationAnalysis::visit_invoke_for_exception(
+    const std::shared_ptr<TaintedValue> &call_info) {
+
+  auto *ivoke = cast<InvokeInst>(call_info->v);
+  assert(is_invoke_exception_case_needed(ivoke));
+  for (auto *func : get_possible_call_targets(ivoke)) {
+    if (func->isIntrinsic() &&
+        should_ignore_intrinsic(func->getIntrinsicID())) {
+      // ignore intrinsics
+      continue;
+    }
+    if (is_func_from_std(func)) {
+      include_call_to_std(call_info);
+      continue;
+    }
+    if (func->isDeclaration()) {
+      ivoke->dump();
+      func->dump();
+      errs() << "Reason: " << call_info->getReason() << "\n";
+      errs() << "In: " << ivoke->getFunction()->getName() << "\n";
+    }
+    assert(not func->isDeclaration() &&
+           "cannot analyze if external function may throw an exception");
+    for (auto &bb : *func) {
+      if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
+        assert(call_info->isIncludeInPrecompute());
+        auto new_val = insert_tainted_value(res, CONTROL_FLOW);
+        include_value_in_precompute(new_val);
+      }
+      for (auto &inst : bb)
+        if (auto *cc = dyn_cast<CallBase>(&inst)) {
+          if (can_except_in_precompute(cc)) {
+            assert(call_info->isIncludeInPrecompute());
+            auto new_val =
+                insert_tainted_value(cc, CONTROL_FLOW_EXCEPTION_NEEDED);
+            include_value_in_precompute(new_val);
+          }
+        }
+    }
+  }
+}
+
+void PrecalculationAnalysis::visit_call_for_retval(
+    const std::shared_ptr<TaintedValue> &call_info) {
+
+  auto *call = cast<CallBase>(call_info->v);
+  assert(is_retval_of_call_needed(call));
+
+  call_info->addReason(CONTROL_FLOW_RETURN_VALUE_NEEDED);
+  if (is_allocation(call)) {
+    // nothing to do, just keep this call around, it will later be replaced
+    for (auto &arg : call->args()) {
+      auto arg_info = insert_tainted_value(arg, call_info);
+    }
+  } else if (not call->isIndirectCall() &&
+             call->getCalledFunction()->isIntrinsic() &&
+             should_call_intrinsic(
+                 call->getCalledFunction()->getIntrinsicID())) {
+    if (not should_ignore_intrinsic(
+            call->getCalledFunction()->getIntrinsicID())) {
+      // consider it same as call to std
+      include_call_to_std(call_info);
+    }
+  } else if (is_call_to_std(call)) {
+    include_call_to_std(call_info);
+  } else {
+    for (auto *func : get_possible_call_targets(call)) {
+      if (func->isDeclaration()) {
+        errs() << "\n";
+        call->dump();
+        func->dump();
+        errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
+               << func->isIntrinsic() << "\n";
+      }
+      assert(not func->isDeclaration() &&
+             "cannot analyze if calling external function for return value "
+             "has "
+             "side effects");
+      for (auto &bb : *func) {
+        if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
+          insert_tainted_value(ret, call_info);
+        }
       }
     }
-    // TODO if it stores an important value
   }
 }
 
