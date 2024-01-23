@@ -768,29 +768,12 @@ void PrecalculationAnalysis::visit_ptr_usages(
     // don't keep the temporary instruction around
   }
 
-  if (not ptr->ptr_info->isReadFrom()) {
-    // this pointers CONTENT (the pointee) is currently not needed
-    // if it is needed later it will be visited again
-    // if only the ptr value is needed: no need to keep track of its content
-    return;
-  }
-
   for (auto *u : ptr->v->users()) {
     // TODO refactor
     if (auto *s = dyn_cast<StoreInst>(u)) {
-      // if we don't read the ptr directly, we don't need to capture the stores
-      //  e.g. a struct ptr where the first member is not used
-      if (s->getPointerOperand() == ptr->v) {
-        // store to this ptr
-        if ((ptr->ptr_info->isUsedDirectly() ||
-             ptr->ptr_info->isWholePtrIsRelevant()) &&
-            ptr->ptr_info->isReadFrom()) {
-          auto new_val = insert_tainted_value(s, ptr, false);
-        }
-      } else {
-        // or when the ptr is captured
-        auto new_val = insert_tainted_value(s, ptr, false);
-      }
+
+      // taint the store to analyze if it is important
+      auto new_val = insert_tainted_value(s, ptr, false);
       continue;
     }
     if (auto *l = dyn_cast<LoadInst>(u)) {
