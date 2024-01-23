@@ -243,7 +243,7 @@ private:
                           const std::shared_ptr<PtrUsageInfo> &ptr_info);
 
   // materialize call
-  void include_call_to_std(std::shared_ptr<TaintedValue> call_info);
+  void include_call_to_std(const std::shared_ptr<TaintedValue> &call_info);
 
 public:
   bool is_tainted(llvm::Value *v) const {

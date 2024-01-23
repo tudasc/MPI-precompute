@@ -1056,7 +1056,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
 }
 
 void PrecalculationAnalysis::include_call_to_std(
-    std::shared_ptr<TaintedValue> call_info) {
+    const std::shared_ptr<TaintedValue> &call_info) {
 
   assert(isa<CallBase>(call_info->v));
   auto *call = cast<CallBase>(call_info->v);
@@ -1167,7 +1167,7 @@ bool PrecalculationAnalysis::check_if_call_should_be_included(
       return true;
     }
     // if it stores an important value
-    for (const auto &ptr : func_analysis->ptr_written) {
+    for (const auto &ptr : func_analysis->getPtrWritten_recursive()) {
       if (is_store_important(call, ptr)) {
         return true;
       }
@@ -1197,6 +1197,10 @@ void PrecalculationAnalysis::visit_invoke_for_exception(
   auto *ivoke = cast<InvokeInst>(call_info->v);
   assert(is_invoke_exception_case_needed(ivoke));
   for (auto *func : get_possible_call_targets(ivoke)) {
+    if (not get_function_analysis(func)->can_except_in_precompute) {
+      // no exception possible: nothing to do
+      continue;
+    }
     if (func->isIntrinsic() &&
         should_ignore_intrinsic(func->getIntrinsicID())) {
       // ignore intrinsics
