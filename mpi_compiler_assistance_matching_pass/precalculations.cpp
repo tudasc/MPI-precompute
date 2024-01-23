@@ -1955,6 +1955,7 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
 
   std::set<Instruction *> stores;
   stores.insert(inst);
+  get_all_transitive_insts(stores);
 
   for (auto *l : loads) {
     for (auto *s : stores) {
