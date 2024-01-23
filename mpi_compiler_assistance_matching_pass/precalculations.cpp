@@ -1720,10 +1720,15 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
 void PrecalculationAnalysis::debug_printings() {
   errs() << "ADDITIONAL DEBUG PRINTING\n";
 
+  std::set<std::shared_ptr<PtrUsageInfo>> dumped;
+
   for (const auto &v : tainted_values) {
     if (v->v->getName() == "this") {
-      v->ptr_info->dump();
-      break;
+      auto pair = dumped.insert(v->ptr_info);
+      if (pair.second) {
+        errs() << "THIS PTR\n";
+        v->ptr_info->dump();
+      }
     }
   }
 }

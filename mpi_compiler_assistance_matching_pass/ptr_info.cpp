@@ -337,6 +337,15 @@ void PtrUsageInfo::dump() {
   for (const auto &u : ptrs_with_this_info) {
     errs() << "\t";
     u.lock()->v->dump();
+    errs() << "\t";
+    errs() << "\t";
+    if (auto *inst = dyn_cast<Instruction>(u.lock()->v)) {
+      errs() << "in : " << inst->getFunction()->getName();
+    }
+    if (auto *arg = dyn_cast<Argument>(u.lock()->v)) {
+      errs() << "in : " << arg->getParent()->getName();
+    }
+    errs() << "\n";
   }
   errs() << "Is Read : " << is_read_from << "\n";
   errs() << "Is Written : " << is_written_to << "\n";
@@ -351,7 +360,7 @@ void PtrUsageInfo::dump() {
       errs() << idx << ", ";
     }
     errs() << "\n";
-    pair.second->dump();
+    // pair.second->dump();
   }
 }
 const std::set<std::weak_ptr<TaintedValue>,
