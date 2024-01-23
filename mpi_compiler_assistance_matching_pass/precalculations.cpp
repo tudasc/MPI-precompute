@@ -309,6 +309,62 @@ void PrecalculationFunctionAnalysis::re_visit_callsites() {
   }
 }
 
+void PrecalculationFunctionAnalysis::getPtrRead_recursive_impl(
+    std::set<std::shared_ptr<PtrUsageInfo>> &result,
+    std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> &visited)
+    const {
+
+  auto pair = visited.insert(shared_from_this());
+  if (pair.second) { // was inserted
+    for (const auto &ptr : ptr_read) {
+      result.insert(ptr);
+    }
+    for (const auto &c : callees) {
+      if (auto callee = c.lock()) {
+        callee->getPtrRead_recursive_impl(result, visited);
+      }
+    }
+  }
+}
+
+std::set<std::shared_ptr<PtrUsageInfo>>
+PrecalculationFunctionAnalysis::getPtrRead_recursive() const {
+
+  std::set<std::shared_ptr<PtrUsageInfo>> result;
+  std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> visited;
+  getPtrRead_recursive_impl(result, visited);
+
+  return result;
+}
+
+void PrecalculationFunctionAnalysis::getPtrWritten_recursive_impl(
+    std::set<std::shared_ptr<PtrUsageInfo>> &result,
+    std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> &visited)
+    const {
+
+  auto pair = visited.insert(shared_from_this());
+  if (pair.second) { // was inserted
+    for (const auto &ptr : ptr_written) {
+      result.insert(ptr);
+    }
+    for (const auto &c : callees) {
+      if (auto callee = c.lock()) {
+        callee->getPtrWritten_recursive_impl(result, visited);
+      }
+    }
+  }
+}
+
+std::set<std::shared_ptr<PtrUsageInfo>>
+PrecalculationFunctionAnalysis::getPtrWritten_recursive() const {
+
+  std::set<std::shared_ptr<PtrUsageInfo>> result;
+  std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> visited;
+  getPtrWritten_recursive_impl(result, visited);
+
+  return result;
+}
+
 void PrecalculationAnalysis::add_precalculations(
     const std::vector<llvm::CallBase *> &to_precompute) {
   to_replace_with_envelope_register = to_precompute;

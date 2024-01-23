@@ -105,13 +105,26 @@ public:
   std::set<std::weak_ptr<PrecalculationFunctionAnalysis>, std::owner_less<>>
       callees;
 
-  // TODO do we actually need this?
   // set of ptrs possibly written or Read when calling this func
   // contains direct read and writes
-  // TODO Getter to receive the recursive set including all callees
   std::set<std::shared_ptr<PtrUsageInfo>> ptr_read;
   std::set<std::shared_ptr<PtrUsageInfo>> ptr_written;
 
+  // includes al callees
+  std::set<std::shared_ptr<PtrUsageInfo>> getPtrRead_recursive() const;
+  std::set<std::shared_ptr<PtrUsageInfo>> getPtrWritten_recursive() const;
+
+private:
+  void getPtrRead_recursive_impl(
+      std::set<std::shared_ptr<PtrUsageInfo>> &result,
+      std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> &visited)
+      const;
+  void getPtrWritten_recursive_impl(
+      std::set<std::shared_ptr<PtrUsageInfo>> &result,
+      std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> &visited)
+      const;
+
+public:
   // invalidate the analysis of call sites of this function
   void re_visit_callsites();
 
