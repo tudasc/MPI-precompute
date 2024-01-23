@@ -470,7 +470,7 @@ void PrecalculationAnalysis::visit_store_from_value(
   // capturing of ptr
 
   assert(is_tainted(store->getValueOperand()));
-  // TODO needed_from=false???
+
   auto new_val =
       insert_tainted_value(store->getPointerOperand(), store_info, false);
   new_val->ptr_info->setIsWrittenTo(store, this);
@@ -524,7 +524,6 @@ void PrecalculationAnalysis::visit_store_from_ptr(
 
   // we only need the stored value if it is used later
   if (is_store_important(store, ptr->ptr_info)) {
-
     auto new_val = insert_tainted_value(store->getValueOperand(), store_info);
     // we need to include all 3: the ptr, the store, and the stored val
     include_value_in_precompute(new_val);
@@ -778,7 +777,6 @@ void PrecalculationAnalysis::visit_ptr_usages(
 
   for (auto *u : ptr->v->users()) {
     // TODO refactor
-    // TODO if store in destructor we may not need it
     if (auto *s = dyn_cast<StoreInst>(u)) {
       // if we don't read the ptr directly, we don't need to capture the stores
       //  e.g. a struct ptr where the first member is not used
@@ -787,11 +785,11 @@ void PrecalculationAnalysis::visit_ptr_usages(
         if ((ptr->ptr_info->isUsedDirectly() ||
              ptr->ptr_info->isWholePtrIsRelevant()) &&
             ptr->ptr_info->isReadFrom()) {
-          auto new_val = insert_tainted_value(s, ptr);
+          auto new_val = insert_tainted_value(s, ptr, false);
         }
       } else {
         // or when the ptr is captured
-        auto new_val = insert_tainted_value(s, ptr);
+        auto new_val = insert_tainted_value(s, ptr, false);
       }
       continue;
     }
@@ -1438,10 +1436,20 @@ void PrecalculationAnalysis::include_value_in_precompute(
 
     // TODO
     // DEBUG ONLY
-    if (auto *cc = dyn_cast<CallBase>(taint_info->v)) {
-      if (cc->getCalledFunction()->getName() == "_Z8get_rankv") {
+    if (auto *cc = dyn_cast<StoreInst>(taint_info->v)) {
+      assert(is_store_important(
+          cc, get_taint_info(cc->getPointerOperand())->ptr_info));
+      if (cc->getPointerOperand()->getName() == "NBodies") {
+        /*
         errs() << "Where is inclusion happening?\n";
         errs() << to_string(boost::stacktrace::stacktrace());
+        assert(is_tainted(cc->getPointerOperand()));
+
+        assert(is_store_important(cc,
+        get_taint_info(cc->getPointerOperand())->ptr_info));
+
+        assert(false);
+         */
       }
     }
 
