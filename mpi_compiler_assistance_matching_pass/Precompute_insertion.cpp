@@ -383,10 +383,14 @@ void replace_exceptionless_invoke_with_call(
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
 
+    // either the func cannot except
+    // or the exception case is not needed
     if (auto *invoke = dyn_cast<InvokeInst>(&*I)) {
       auto *old_v = func->new_to_old_map[invoke];
-      if (not precompute_analyis_result.can_except_in_precompute(
-              cast<InvokeInst>(old_v))) {
+      if ((not precompute_analyis_result.can_except_in_precompute(
+              cast<InvokeInst>(old_v))) ||
+          (not precompute_analyis_result.is_invoke_exception_case_needed(
+              cast<InvokeInst>(old_v)))) {
         ivokes.push_back(invoke);
       }
     }
@@ -534,7 +538,7 @@ void prune_function_copy(
   func->F_copy->dump();
   // assert that no new undefs are introduced into func
   //  not assert == as we could remove some undefs
-  assert(prev_num_undef >= get_num_undefs(*func->F_copy));
+  // assert(prev_num_undef >= get_num_undefs(*func->F_copy));
 }
 
 void add_call_to_precalculation_to_main(

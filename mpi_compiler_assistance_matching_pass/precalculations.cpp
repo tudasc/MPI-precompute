@@ -298,6 +298,8 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
 }
 void PrecalculationFunctionAnalysis::re_visit_callsites() {
 
+  // TODO recursively re visit calls that may lead to this callsite??
+
   if (auto prec = precalculatioanalysis.lock()) {
     for (auto *c : callsites) {
 
@@ -1636,8 +1638,10 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
                 // know no meaningful exception can be thrown
               } else {
                 // can except
-                include_value_in_precompute(new_val);
+                // include_value_in_precompute(new_val);
                 new_val->addReason(TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
+                // if the exception Part is not tainted: remove and ignore any
+                // exception
               }
             }
           }
