@@ -1074,10 +1074,26 @@ void PrecalculationAnalysis::visit_call(
     include_value_in_precompute(func_ptr_info);
   }
 
-  // TODO
+  // analyze if call to str read/writes ptr
+  if (is_call_to_std(call)) {
+    for (auto &arg : call->args()) {
+      if (auto *v = dyn_cast<Value>(&arg)) {
+        if (is_tainted(v) && v->getType()->isPointerTy()) {
+          if (is_ptr_usage_in_std_write(call, get_taint_info(v))) {
+            get_function_analysis(call->getFunction())
+                ->add_ptr_write(get_taint_info(v)->ptr_info);
+          }
+          if (is_ptr_usage_in_std_read(call, get_taint_info(v))) {
+            get_function_analysis(call->getFunction())
+                ->add_ptr_read(get_taint_info(v)->ptr_info);
+          }
+        }
+      }
+    }
+  }
+
   //  check if we need to include the call
   if (not call_info->isIncludeInPrecompute()) {
-
     if (check_if_call_should_be_included(call_info)) {
       include_value_in_precompute(call_info);
     }
@@ -1088,13 +1104,33 @@ bool PrecalculationAnalysis::check_if_call_should_be_included(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallBase>(call_info->v);
   for (auto *func : get_possible_call_targets(call)) {
-    if (get_function_analysis(func)->include_all_callsites) {
+    auto func_analysis = get_function_analysis(func);
+    if (func_analysis->include_all_callsites) {
       // set it on parent
       get_function_analysis(call->getFunction())->include_all_callsites = true;
       return true;
     }
+    // if it stores an important value
+    for (const auto &ptr : func_analysis->ptr_written) {
+      if (is_store_important(call, ptr)) {
+        return true;
+      }
+    }
+
+    if (is_func_from_std(func)) {
+      for (auto &arg : call->args()) {
+        if (auto *v = dyn_cast<Value>(&arg)) {
+          if (is_tainted(v) && v->getType()->isPointerTy()) {
+            if (is_ptr_usage_in_std_write(call, get_taint_info(v)) &&
+                is_store_important(call, get_taint_info(v)->ptr_info)) {
+              include_call_to_std(call_info);
+              return true;
+            }
+          }
+        }
+      }
+    }
   }
-  // TODO if it stores an important value
 
   return false;
 }
