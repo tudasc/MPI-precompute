@@ -129,7 +129,8 @@ public:
   void re_visit_callsites();
 
   void add_ptr_read(const std::shared_ptr<PtrUsageInfo> &read) {
-    assert(read->isReadFrom());
+    // assert(read->isReadFrom());
+    // one may insert them before the read/write is analyzed
     auto pair = ptr_read.insert(read);
     if (pair.second) { // was inserted
       re_visit_callsites();
@@ -137,7 +138,8 @@ public:
   }
 
   void add_ptr_write(const std::shared_ptr<PtrUsageInfo> &write) {
-    assert(write->isWrittenTo());
+    // assert(write->isWrittenTo());
+    // one may insert them before the read/write is analyzed
     auto pair = ptr_written.insert(write);
     if (pair.second) { // was inserted
       re_visit_callsites();
