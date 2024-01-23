@@ -409,6 +409,13 @@ void PtrUsageInfo::setIsReadFrom(
     }
   }
 }
+const std::set<llvm::Instruction *> &PtrUsageInfo::getStores() const {
+  return stores;
+}
+
+const std::set<llvm::Instruction *> &PtrUsageInfo::getLoads() const {
+  return loads;
+}
 
 template <>
 bool std::operator==(const std::shared_ptr<PtrUsageInfo> &lhs,

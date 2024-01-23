@@ -203,6 +203,12 @@ private:
   // all instruction categorized as store to this ptr
   // may be a StoreInst or a CallBase
   std::set<llvm::Instruction *> stores;
+
+public:
+  const std::set<llvm::Instruction *> &getStores() const;
+  const std::set<llvm::Instruction *> &getLoads() const;
+
+private:
   // only holds the important Loads
   std::set<llvm::Instruction *> loads;
 

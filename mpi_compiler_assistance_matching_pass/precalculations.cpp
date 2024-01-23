@@ -27,6 +27,7 @@
 #include "precalculation.h"
 
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/Support/Casting.h"
@@ -1892,17 +1893,7 @@ bool PrecalculationAnalysis::is_store_important(
     return false;
   }
 
-  // TODO in destructor we may not need it
-  //  if all important reads are before in CFG we also dont need it
-  // !! TODO THIS IS ONLY A HOTFIX!!
-  // we assume everything inside a destructor is not needed at all
-  auto *parent_func = store->getFunction();
-  auto demangled_name =
-      get_function_name(llvm::demangle(parent_func->getName().str()));
-  auto f_name_only = extract_function_without_namespace(demangled_name);
-
-  // not start with ~ as destructors are named with ~
-  if (f_name_only[0] == '~') {
+  if (store_happens_after_all_loads(store, ptr_info)) {
     return false;
   }
 
@@ -1916,6 +1907,66 @@ bool PrecalculationAnalysis::is_store_important(
 
   if (not ptr_info->isReadFrom()) {
     return false;
+  }
+  if (store_happens_after_all_loads(call, ptr_info)) {
+    return false;
+  }
+
+  return true;
+}
+
+// TODO better function name
+//  if an instruction in foo is included in the set: the resulting set will also
+//  include all calls to foo
+void PrecalculationAnalysis::get_all_transitive_insts(
+    std::set<llvm::Instruction *> &instrs) {
+
+  std::set<llvm::Function *> visited;
+
+  // so that iterator over original set does not get broken
+  std::set<Instruction *> to_insert;
+
+  bool grown = true;
+
+  while (grown) {
+    grown = false;
+    for (auto *inst : instrs) {
+      auto pair = visited.insert(inst->getFunction());
+      if (pair.second) { // newly inserted
+        auto func = get_function_analysis(inst->getFunction());
+        for (auto *cc : func->callsites) {
+          to_insert.insert(cc);
+        }
+      }
+    }
+    for (auto *ii : to_insert) {
+      auto pair = instrs.insert(ii);
+      grown = grown | pair.second;
+    }
+  }
+}
+
+bool PrecalculationAnalysis::store_happens_after_all_loads(
+    llvm::Instruction *inst, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
+
+  auto loads = ptr_info->getLoads();
+  std::set<Function *> funcs;
+  get_all_transitive_insts(loads);
+
+  std::set<Instruction *> stores;
+  stores.insert(inst);
+
+  for (auto *l : loads) {
+    for (auto *s : stores) {
+      if (l->getFunction() == s->getFunction()) {
+        auto *domtree = analysis_results->getDomTree(*l->getFunction());
+        // load dominates store: happens before store
+        if (not domtree->dominates(l, s)) {
+          // found one example of load after store
+          return false;
+        }
+      }
+    }
   }
   return true;
 }

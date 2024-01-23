@@ -244,6 +244,12 @@ private:
   bool is_store_important(llvm::StoreInst *store,
                           const std::shared_ptr<PtrUsageInfo> &ptr_info);
 
+  bool
+  store_happens_after_all_loads(llvm::Instruction *inst,
+                                const std::shared_ptr<PtrUsageInfo> &ptr_info);
+
+  void get_all_transitive_insts(std::set<llvm::Instruction *> &instrs);
+
   // materialize call
   void include_call_to_std(const std::shared_ptr<TaintedValue> &call_info);
 
