@@ -16,6 +16,7 @@
 
 #include "mpi_functions.h"
 
+#include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/Pass.h"
@@ -45,18 +46,19 @@ llvm::AAResults *RequiredAnalysisResults::getAAResults(llvm::Function &f) {
 llvm::LoopInfo *RequiredAnalysisResults::getLoopInfo(llvm::Function &f) {
 
   return &FAM->getResult<LoopAnalysis>(f);
-  ;
 }
 llvm::ScalarEvolution *RequiredAnalysisResults::getSE(llvm::Function &f) {
 
   return &FAM->getResult<ScalarEvolutionAnalysis>(f);
-  ;
 }
 
 llvm::DominatorTree *RequiredAnalysisResults::getDomTree(llvm::Function &f) {
 
   return &FAM->getResult<DominatorTreeAnalysis>(f);
-  ;
 }
 
 llvm::TargetLibraryInfo *RequiredAnalysisResults::getTLI() { return TLI; }
+
+llvm::PostDominatorTree *RequiredAnalysisResults::getPostDomTree(Function &f) {
+  return &FAM->getResult<PostDominatorTreeAnalysis>(f);
+}
