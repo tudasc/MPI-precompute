@@ -538,7 +538,7 @@ void prune_function_copy(
   func->F_copy->dump();
   // assert that no new undefs are introduced into func
   //  not assert == as we could remove some undefs
-  // assert(prev_num_undef >= get_num_undefs(*func->F_copy));
+  assert(prev_num_undef >= get_num_undefs(*func->F_copy));
 }
 
 void add_call_to_precalculation_to_main(
