@@ -267,43 +267,48 @@ void replace_calls_in_copy(
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
     if (auto *call = dyn_cast<CallBase>(&*I)) {
-      if (call->isIndirectCall()) {
-        to_replace.push_back(call);
-      } else {
-        auto *callee = call->getCalledFunction();
-
-        if (callee == mpi_func->mpi_comm_rank ||
-            callee == mpi_func->mpi_comm_size) {
-          continue; // noting to do, keep original call
-        }
-        if (callee == mpi_func->mpi_send_init) {
+      if (precompute_analyis_result.is_included_in_precompute(
+              func->new_to_old_map[call])) {
+        // if it is not included, it will be removed anyway, so no need to
+        // change anything
+        if (call->isIndirectCall()) {
           to_replace.push_back(call);
-          continue;
-        }
-        if (callee == mpi_func->mpi_recv_init) {
-          to_replace.push_back(call);
-          continue;
-        }
-        // end handling calls to MPI
-
-        if (is_allocation(call)) {
-          to_replace.push_back(call);
-          continue;
-        }
-
-        if (precompute_analyis_result.is_func_included_in_precompute(
-                call->getCalledFunction())) {
-          to_replace.push_back(call);
-          continue;
         } else {
-          // call->dump();
-          assert(
-              not precompute_analyis_result.is_included_in_precompute(callee) ||
-              // callee is the original function
-              // which should not be a user function
-              is_func_from_std(callee) || is_mpi_function(callee) ||
-              callee->isIntrinsic());
-          // it is not used: nothing to do, later pruning step will remove it
+          auto *callee = call->getCalledFunction();
+
+          if (callee == mpi_func->mpi_comm_rank ||
+              callee == mpi_func->mpi_comm_size) {
+            continue; // noting to do, keep original call
+          }
+          if (callee == mpi_func->mpi_send_init) {
+            to_replace.push_back(call);
+            continue;
+          }
+          if (callee == mpi_func->mpi_recv_init) {
+            to_replace.push_back(call);
+            continue;
+          }
+          // end handling calls to MPI
+
+          if (is_allocation(call)) {
+            to_replace.push_back(call);
+            continue;
+          }
+
+          if (precompute_analyis_result.is_func_included_in_precompute(
+                  call->getCalledFunction())) {
+            to_replace.push_back(call);
+            continue;
+          } else {
+            // call->dump();
+            assert(not precompute_analyis_result.is_included_in_precompute(
+                       callee) ||
+                   // callee is the original function
+                   // which should not be a user function
+                   is_func_from_std(callee) || is_mpi_function(callee) ||
+                   callee->isIntrinsic());
+            // it is not used: nothing to do, later pruning step will remove it
+          }
         }
       }
     }
