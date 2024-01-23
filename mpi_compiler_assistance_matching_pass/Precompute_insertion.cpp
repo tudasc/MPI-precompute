@@ -502,6 +502,30 @@ void prune_function_copy(
     llvm::MergeBlockIntoPredecessor(bb);
   }
 
+  //  there can be wrong phis now
+  //  as we may removed some incoming blocks but not all (if we determined that
+  //  a particular path leads to an invalid exception for example)
+  for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
+       ++I) {
+
+    if (auto *phi = dyn_cast<PHINode>(&*I)) {
+
+      if (phi->getNumIncomingValues() != pred_size(phi->getParent())) {
+        std::vector<unsigned> incoming_vals_to_remove;
+        for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i) {
+          if (std::find(pred_begin(phi->getParent()),
+                        pred_end(phi->getParent()), phi->getIncomingBlock(i)) ==
+              pred_end(phi->getParent())) { // block not existant anmore
+            incoming_vals_to_remove.push_back(i);
+          }
+        }
+        for (auto i : incoming_vals_to_remove) {
+          phi->removeIncomingValue(i);
+        }
+      }
+    }
+  }
+
   func->F_copy->dump();
   // assert that no new undefs are introduced into func
   //  not assert == as we could remove some undefs
