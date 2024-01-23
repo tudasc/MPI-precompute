@@ -1963,8 +1963,8 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
         auto *domtree = analysis_results->getDomTree(*l->getFunction());
         auto *postdomtree = analysis_results->getPostDomTree(*l->getFunction());
         // load dominates store: happens before store
-        // or load post-dominates store (happens after)
-        if (not domtree->dominates(l, s) || postdomtree->dominates(l, s)) {
+        // or load post-dominates store: load happens after
+        if ((not domtree->dominates(l, s)) || postdomtree->dominates(l, s)) {
 
           return false;
         }
