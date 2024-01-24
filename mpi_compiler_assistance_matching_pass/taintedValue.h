@@ -35,7 +35,7 @@ enum TaintReason : int {
 
   // Bitmask to select only the genreal reasons to propergate tot the specific
   // reason
-  REASONS_TO_PROPERGATE = INCLUDED | COMPUTE_TAG | COMPUTE_DEST | CONTROL_FLOW,
+  REASONS_TO_PROPERGATE = COMPUTE_TAG | COMPUTE_DEST | CONTROL_FLOW,
 
   // need the return value of a call not only its presence:
   // implies that the control flow need to pass to the callee to calculate
@@ -62,6 +62,7 @@ private:
 public:
   int getReason() const { return _reason; }
   inline void addReason(int reason) {
+    assert(not(reason & INCLUDED));
     _reason = _reason | reason;
 
     if (_reason & (CONTROL_FLOW_CALLEE_NEEDED xor CONTROL_FLOW)) {
@@ -106,6 +107,6 @@ public:
   // additional information for pointers
   std::shared_ptr<PtrUsageInfo> ptr_info = nullptr;
 
-  bool is_pointer() { return v->getType()->isPointerTy(); };
+  bool is_pointer() const { return v->getType()->isPointerTy(); };
 };
 #endif // MACH_TAINTED_VALUE_H
