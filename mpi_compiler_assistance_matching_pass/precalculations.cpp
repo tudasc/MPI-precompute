@@ -493,7 +493,6 @@ void PrecalculationAnalysis::visit_store(
   assert(store);
 
   auto ptr = insert_tainted_value(store->getPointerOperand(), store_info, true);
-  auto val = insert_tainted_value(store->getValueOperand(), store_info, true);
   ptr->ptr_info->setIsUsedDirectly(
       true, store_info->ptr_info); // null if stored value is no ptr
   ptr->ptr_info->setIsWrittenTo(store, this);
@@ -503,6 +502,7 @@ void PrecalculationAnalysis::visit_store(
 
   if (is_store_important(store, ptr->ptr_info)) {
     // we need to include all 3: the ptr, the store, and the stored val
+    auto val = insert_tainted_value(store->getValueOperand(), store_info, true);
     include_value_in_precompute(val);
     include_value_in_precompute(store_info);
     include_value_in_precompute(ptr);
