@@ -784,12 +784,12 @@ void PrecalculationAnalysis::visit_ptr_usages(
       if (l->getType()->isPointerTy()) {
         // if a ptr is loaded we need to trace its usages
 
-        //TODO !!!!!
-        // we need better analysis here
+        // TODO !!!!!
+        //  we need better analysis here
 
-        if (ptr->ptr_info->isUsedDirectly() && ptr->ptr_info->getInfoOfDirectUsage()) {
-          if (ptr->ptr_info->getInfoOfDirectUsage()->isReadFrom())
-          {
+        if (ptr->ptr_info->isUsedDirectly() &&
+            ptr->ptr_info->getInfoOfDirectUsage()) {
+          if (ptr->ptr_info->getInfoOfDirectUsage()->isReadFrom()) {
             insert_tainted_value(l, ptr, false);
           }
         }
