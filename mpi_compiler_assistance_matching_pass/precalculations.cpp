@@ -471,8 +471,7 @@ void PrecalculationAnalysis::visit_store_from_value(
 
   assert(is_tainted(store->getValueOperand()));
 
-  auto new_val =
-      insert_tainted_value(store->getPointerOperand(), store_info, false);
+  auto new_val = insert_tainted_value(store->getPointerOperand(), store_info);
   new_val->ptr_info->setIsWrittenTo(store, this);
 
   auto func = get_function_analysis(store->getFunction());
