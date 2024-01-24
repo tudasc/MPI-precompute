@@ -740,6 +740,8 @@ void PrecalculationAnalysis::visit_ptr_usages(
       ptr->ptr_info->setIsWrittenTo(store, this);
       auto func = get_function_analysis(store->getFunction());
       func->add_ptr_write(ptr->ptr_info);
+      // may need to re-visit if we discovered its importance later
+      store_info->visited = false;
 
       continue;
     }
