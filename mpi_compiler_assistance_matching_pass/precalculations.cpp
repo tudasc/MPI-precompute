@@ -672,7 +672,7 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     v->visited = true;
 
   } else if (auto *br = dyn_cast<BranchInst>(v->v)) {
-    assert(v->getReason() == TaintReason::CONTROL_FLOW);
+    assert(v->getReason() & TaintReason::CONTROL_FLOW);
     v->visited = true;
     if (br->isConditional()) {
       insert_tainted_value(br->getCondition(), v);
@@ -680,11 +680,11 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
       // nothing to do
     }
   } else if (auto *sw = dyn_cast<SwitchInst>(v->v)) {
-    assert(v->getReason() == TaintReason::CONTROL_FLOW);
+    assert(v->getReason() & TaintReason::CONTROL_FLOW);
     v->visited = true;
     insert_tainted_value(sw->getCondition(), v);
   } else if (auto *resume = dyn_cast<ResumeInst>(v->v)) {
-    assert(v->getReason() == TaintReason::CONTROL_FLOW);
+    assert(v->getReason() & TaintReason::CONTROL_FLOW);
     // resume exception: nothing to do just keep it
     insert_tainted_value(resume->getOperand(0), v);
     v->visited = true;
@@ -693,7 +693,7 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     v->visited = true;
   } else if (isa<LandingPadInst>(v->v)) {
     // nothing to do, just keep around
-    assert(v->getReason() == TaintReason::CONTROL_FLOW);
+    assert(v->getReason() & TaintReason::CONTROL_FLOW);
     v->visited = true;
   } else if (auto *ext = dyn_cast<ExtractValueInst>(v->v)) {
     insert_tainted_value(ext->getAggregateOperand(), v);
@@ -768,11 +768,17 @@ void PrecalculationAnalysis::visit_ptr_usages(
   }
 
   for (auto *u : ptr->v->users()) {
-    // TODO refactor
-    if (auto *s = dyn_cast<StoreInst>(u)) {
+    if (auto *store = dyn_cast<StoreInst>(u)) {
 
       // taint the store to analyze if it is important
-      auto new_val = insert_tainted_value(s, ptr, false);
+      auto store_info = insert_tainted_value(store, ptr, false);
+      ptr->ptr_info->setIsUsedDirectly(
+          true, store_info->ptr_info); // null if stored value is no ptr
+      ptr->ptr_info->setIsWrittenTo(store, this);
+
+      auto func = get_function_analysis(store->getFunction());
+      func->add_ptr_write(ptr->ptr_info);
+
       continue;
     }
     if (auto *l = dyn_cast<LoadInst>(u)) {
