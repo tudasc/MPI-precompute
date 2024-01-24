@@ -28,14 +28,14 @@ class PtrUsageInfo;
 
 enum TaintReason : int {
   OTHER = 0,         // unspecified
-  ANALYSIS = 1 << 0, // is analyzed if we need to include it
+  INCLUDED = 1 << 0, // is included in Precompute
   COMPUTE_TAG = 1 << 1,
   COMPUTE_DEST = 1 << 2,
   CONTROL_FLOW = 1 << 3,
 
   // Bitmask to select only the genreal reasons to propergate tot the specific
   // reason
-  REASONS_TO_PROPERGATE = ANALYSIS | COMPUTE_TAG | COMPUTE_DEST | CONTROL_FLOW,
+  REASONS_TO_PROPERGATE = INCLUDED | COMPUTE_TAG | COMPUTE_DEST | CONTROL_FLOW,
 
   // need the return value of a call not only its presence:
   // implies that the control flow need to pass to the callee to calculate
@@ -89,8 +89,7 @@ public:
   bool isIncludeInPrecompute() const { return _include_in_precompute; }
   void setIncludeInPrecompute() {
     if (not _include_in_precompute) {
-      // assert(_reason & ANALYSIS);
-      _reason = _reason & (~ANALYSIS); // remove the reason ANALYSIS
+      _reason = _reason | INCLUDED;
       _include_in_precompute = true;
       // TODO do I rly need to re-visit it?
       visited = false;

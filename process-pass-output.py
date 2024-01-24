@@ -19,7 +19,7 @@ marker_text = "need for reason:"
 
 taint_reasons = {
     # 'OTHER': 0,
-    'ANALYSIS': 1 << 0,
+    'INCLUDED': 1 << 0,
     'COMPUTE_TAG': 1 << 1,
     'COMPUTE_DEST': 1 << 2,
     'CONTROL_FLOW': 1 << 3,
