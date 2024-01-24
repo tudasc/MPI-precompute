@@ -39,9 +39,9 @@ class PrecalculationFunctionAnalysis
     : public std::enable_shared_from_this<PrecalculationFunctionAnalysis> {
 public:
   // analysis Part
-  explicit PrecalculationFunctionAnalysis(
-      llvm::Function *F, std::weak_ptr<PrecalculationAnalysis> precalc)
-      : func(F), precalculatioanalysis(std::move(precalc)) {
+  explicit PrecalculationFunctionAnalysis(llvm::Function *F,
+                                          PrecalculationAnalysis *precalc)
+      : func(F), precalculatioanalysis(precalc) {
     // assert(not F->isDeclaration() && "Cannot analyze external function");
 
     is_func_ptr_captured = false;
@@ -75,7 +75,7 @@ public:
   }
   std::set<unsigned int> args_to_use = {};
   llvm::Function *func;
-  std::weak_ptr<PrecalculationAnalysis> precalculatioanalysis;
+  PrecalculationAnalysis *precalculatioanalysis;
   std::set<llvm::GlobalValue *> aliases;
   const std::set<llvm::GlobalValue *> &getAliases() const { return aliases; }
 

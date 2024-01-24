@@ -132,7 +132,7 @@ void PrecalculationAnalysis::analyze_functions() {
   // create
   for (auto &f : M) {
     function_analysis[&f] =
-        std::make_shared<PrecalculationFunctionAnalysis>(&f, weak_from_this());
+        std::make_shared<PrecalculationFunctionAnalysis>(&f, this);
   }
 
   // populate callees and callsites
@@ -301,13 +301,12 @@ void PrecalculationFunctionAnalysis::re_visit_callsites() {
 
   // TODO recursively re visit calls that may lead to this callsite??
 
-  if (auto prec = precalculatioanalysis.lock()) {
-    for (auto *c : callsites) {
+  assert(precalculatioanalysis);
+  for (auto *c : callsites) {
 
-      if (prec->is_tainted(c)) {
-        auto ti = prec->get_taint_info(c);
-        ti->visited = false;
-      }
+    if (precalculatioanalysis->is_tainted(c)) {
+      auto ti = precalculatioanalysis->get_taint_info(c);
+      ti->visited = false;
     }
   }
 }
