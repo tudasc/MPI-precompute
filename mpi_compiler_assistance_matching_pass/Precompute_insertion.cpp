@@ -51,24 +51,27 @@ llvm::Function *get_global_re_init_function(
       assert(global.getType()->isPointerTy());
       auto global_info = precompute_analyis_result.get_taint_info(&global);
 
-      assert(global_info->ptr_info);
-      if (global_info->ptr_info->isWrittenTo()) {
-        if (global.hasInitializer()) {
-          builder.CreateStore(global.getInitializer(), &global);
-        } else {
-          // TODO @_ZSt4cout = external global %"class.std::basic_ostream",
-          // align 8
-          //  can we modify this global to point towards /dev/null?
-          //  this would "resolve" the issue that writing to stdout can have an
-          //  exception
-          // and the user would see the output just to check if an exception is
-          // raised
-          errs() << "Global without initializer:\n";
-          global.dump();
-          assert(is_global_from_std(&global));
-        }
-      } // else no need to do anything as it is not changed (readonly)
-      // at least not by tainted instructions
+      if (not global.isConstant()) {
+
+        assert(global_info->ptr_info);
+        if (global_info->ptr_info->isWrittenTo()) {
+          if (global.hasInitializer()) {
+            builder.CreateStore(global.getInitializer(), &global);
+          } else {
+            // TODO @_ZSt4cout = external global %"class.std::basic_ostream",
+            // align 8
+            //  can we modify this global to point towards /dev/null?
+            //  this would "resolve" the issue that writing to stdout can have
+            //  an exception
+            // and the user would see the output just to check if an exception
+            // is raised
+            errs() << "Global without initializer:\n";
+            global.dump();
+            assert(is_global_from_std(&global));
+          }
+        } // else no need to do anything as it is not changed (readonly)
+        // at least not by tainted instructions
+      }
     }
   }
 
