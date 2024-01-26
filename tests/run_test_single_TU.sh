@@ -27,7 +27,7 @@ fi
 #check if compiler analysis was successfull
 EXPECT_NO_MPIOPT=${EXPECT_NO_MPIOPT:=0}
 
-mpirun -n 2 ./a.out_original | grep "Usage of MPIOPT optimized communication sceme"
+mpirun -n 2 ./a.out_original $ARGS_TO_TEST_EXEC | grep "Usage of MPIOPT optimized communication sceme"
 SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
@@ -46,7 +46,8 @@ if [[ "$NO_MPI_OPT" != 1 ]]; then
   exit 1
 fi
 
-mpirun -n 2 ./a.out | grep "Usage of MPIOPT optimized communication sceme"
+echo "mpirun -n 2 ./a.out $ARGS_TO_TEST_EXEC"
+mpirun -n 2 ./a.out $ARGS_TO_TEST_EXEC | grep "Usage of MPIOPT optimized communication sceme"
 SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}

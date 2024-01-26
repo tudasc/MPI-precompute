@@ -125,18 +125,26 @@ add_test(NAME test25
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+add_test(NAME test26a
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/26
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+add_test(NAME test26b
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/26
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
 add_test(NAME cmake-c
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/cmake-c
-
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_test(NAME cmake-cpp
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/cmake-cpp
-        ENVIRONMENT EXPECT_NO_MPIOPT=1
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+
 
 set_tests_properties(test01 PROPERTIES PROCESSORS 2)
 set_tests_properties(test02 PROPERTIES PROCESSORS 2)
@@ -163,6 +171,8 @@ set_tests_properties(test22 PROPERTIES PROCESSORS 2)
 set_tests_properties(test23 PROPERTIES PROCESSORS 2)
 set_tests_properties(test24 PROPERTIES PROCESSORS 2)
 set_tests_properties(test25 PROPERTIES PROCESSORS 2)
+set_tests_properties(test26a PROPERTIES PROCESSORS 2)
+set_tests_properties(test26b PROPERTIES PROCESSORS 2)
 
 
 # currently not implemented feature: other comm than comm world
@@ -180,3 +190,7 @@ set_tests_properties(test20 PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
 set_tests_properties(cmake-c PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
 set_tests_properties(cmake-cpp PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
 
+set_tests_properties(test26a PROPERTIES ENVIRONMENT ARGS_TO_TEST_EXEC=-t1\ 2\ -t2\ 2)
+
+set_tests_properties(test26b PROPERTIES ENVIRONMENT ARGS_TO_TEST_EXEC=-t1\ 2\ -t2\ 2)
+set_tests_properties(test26b PROPERTIES ENVIRONMENT EXPECT_NO_MPIOPT=1)
