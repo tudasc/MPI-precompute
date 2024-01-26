@@ -42,6 +42,8 @@ llvm::Function *get_global_re_init_function(
   assert(bb->isEntryBlock());
   IRBuilder<> builder(bb);
 
+  std::set<Function *> global_init_funcs_to_call;
+
   for (auto &global : M.globals()) {
     // if Comm World is needed there is no need to initialize it again, it
     // cannot be modified comm World will have no ptr info and therefore is
@@ -54,6 +56,9 @@ llvm::Function *get_global_re_init_function(
       if (not global.isConstant()) {
 
         assert(global_info->ptr_info);
+        // TODO efficiency: one can also check if at leas one of the stores in
+        // questions are actually included in precompute
+        //  but re-initializing again is no fault
         if (global_info->ptr_info->isWrittenTo()) {
           if (global.hasInitializer()) {
             builder.CreateStore(global.getInitializer(), &global);
@@ -69,10 +74,22 @@ llvm::Function *get_global_re_init_function(
             global.dump();
             assert(is_global_from_std(&global));
           }
+          // collect the necessary __cxx_global_var_init function that
+          // initializes this variable
+          for (auto *st : global_info->ptr_info->getStores()) {
+            if (st->getFunction()->getName().starts_with(
+                    "__cxx_global_var_init")) {
+              global_init_funcs_to_call.insert(st->getFunction());
+            }
+          }
         } // else no need to do anything as it is not changed (readonly)
         // at least not by tainted instructions
       }
     }
+  }
+
+  for (auto *F : global_init_funcs_to_call) {
+    builder.CreateCall(F);
   }
 
   builder.CreateRetVoid();
