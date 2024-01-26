@@ -1667,7 +1667,6 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
 
 void PrecalculationAnalysis::print_analysis_result_remarks() {
 
-  /*
   for (const auto &v : tainted_values) {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
       errs() << "need for reason: " << v->getReason() << "\n";
@@ -1676,7 +1675,6 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
     }
   }
   //debug_printings();
-   */
 }
 
 // TODO: move to debug file?
