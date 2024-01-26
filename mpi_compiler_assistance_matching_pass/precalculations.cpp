@@ -1266,8 +1266,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
   assert(not ptr_given_as_arg.empty());
   assert(ptr->ptr_info);
 
-  errs() << "Visit\n";
-  call->dump();
+  // errs() << "Visit\n";
+  // call->dump();
 
   if (not call->isIndirectCall()) {
     if (func == mpi_func->mpi_send || func == mpi_func->mpi_Isend ||
