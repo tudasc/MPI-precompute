@@ -1926,7 +1926,6 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
     llvm::Instruction *inst, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
 
   auto loads = ptr_info->getLoads();
-  std::set<Function *> funcs;
   get_all_transitive_insts(loads);
 
   std::set<Instruction *> stores;
@@ -1935,7 +1934,8 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
 
   for (auto *l : loads) {
     for (auto *s : stores) {
-      if (l->getFunction() == s->getFunction() && l != s) {
+      // TODO include all destructors for debugging only
+      if (l->getFunction() == s->getFunction()) { // && l != s) {
         // if load and store are the same (aka call to func that loads and
         // stores): no need to do something, either the ptr usage is not needed,
         // or it will be loaded afterward (then it is needed)
