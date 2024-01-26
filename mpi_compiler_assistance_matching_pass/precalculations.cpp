@@ -26,6 +26,7 @@
 #include "mpi_functions.h"
 #include "precalculation.h"
 
+#include "llvm/Analysis/CFG.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
@@ -1674,7 +1675,7 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
       inst->dump();
     }
   }
-  //debug_printings();
+  // debug_printings();
 }
 
 // TODO: move to debug file?
@@ -1934,13 +1935,13 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
 
   for (auto *l : loads) {
     for (auto *s : stores) {
-      if (l->getFunction() == s->getFunction()) {
+      if (l->getFunction() == s->getFunction() && l != s) {
+        // if load and store are the same (aka call to func that loads and
+        // stores): no need to do something, either the ptr usage is not needed,
+        // or it will be loaded afterward (then it is needed)
         auto *domtree = analysis_results->getDomTree(*l->getFunction());
-        auto *postdomtree = analysis_results->getPostDomTree(*l->getFunction());
-        // load dominates store: happens before store
-        // or load post-dominates store: load happens after
-        if ((not domtree->dominates(l, s)) || postdomtree->dominates(l, s)) {
-
+        // TODO efficiency: provide LoopInfo?
+        if (llvm::isPotentiallyReachable(s, l, nullptr, domtree, nullptr)) {
           return false;
         }
       }
