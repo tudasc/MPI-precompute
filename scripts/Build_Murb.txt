@@ -1,0 +1,45 @@
+# build
+
+# with debug wrapper
+cmake .. -DCMAKE_CXX_COMPILER=/work/home/tj75qeje/mpi-comp-match/clang_debug_wrapper.sh -DCMAKE_CXX_FLAGS="-O1 -fuse-ld=lld -flto -fwhole-program-vtables -lprecompute" -DENABLE_MURB_MPI=ON -DENABLE_VISU=OFF -DENABLE_MURB_READER=OFF
+
+#local:
+cmake .. -DCMAKE_CXX_COMPILER=/home/tim/mpi-comp-match/build/clang_wrap_cxx -DCMAKE_CXX_FLAGS="-O1 -fuse-ld=lld -flto -fwhole-program-vtables -lprecompute" -DENABLE_MURB_MPI=ON -DENABLE_VISU=OFF -DENABLE_MURB_READER=OFF
+cmake .. -DCMAKE_CXX_COMPILER=$MPICXX -DCMAKE_CXX_FLAGS="-O1 -fno-inline -fuse-ld=lld -flto -fwhole-program-vtables -lprecompute" -DENABLE_MURB_MPI=ON -DENABLE_VISU=OFF -DENABLE_MURB_READER=OFF
+
+# -fno.inline to prevent inlining of std::s internals for easier analysis
+cmake .. -DCMAKE_CXX_COMPILER=/work/home/tj75qeje/mpi-comp-match/build/clang_wrap_cxx -DCMAKE_CXX_FLAGS="-O1 -fno-inline -fuse-ld=lld -flto -fwhole-program-vtables -lprecompute" -DENABLE_MURB_MPI=ON -DENABLE_VISU=OFF -DENABLE_MURB_READER=OFF
+
+make
+
+# with pass for debugging
+export USE_MPI_COMPILER_ASSISTANCE_PASS=true
+cd ../../../mpi-comp-match/build/ && make -j8 && cd - && make clean && make -j8 2> /home/tim/mpi-comp-match/build/IR.txt
+
+#run
+
+mpirun -n 2 ./bin/murb -v --im 100 -n 100 -i 1000
+
+
+
+../../../mpi-comp-match/build/clang_wrap_cxx -O1 -fuse-ld=lld -flto -fwhole-program-vtables -fpass-plugin=/work/home/tj75qeje/mpi-comp-match/build/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so -lprecompute -rdynamic -Wl,-rpath -Wl,/opt/slurm/current/lib -Wl,-rpath -Wl,/usr/lib64 -Wl,-rpath -Wl,/work/home/tj75qeje/mpi-comp-match/build/openmpi-patch/ompi-prefix/lib -Wl,--enable-new-dtags -L/opt/slurm/23.02.3/lib -L/usr/lib64 -L/work/home/tj75qeje/mpi-comp-match/build/openmpi-patch/ompi-prefix/lib -pthread CMakeFiles/murb-bin.dir/src/murb/core/SimulationNBody.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collision/BodiesCollision.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collision/SimulationNBodyCollisionLocal.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collisionless/SimulationNBodyLocal.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collisionless/SimulationNBodyMPI.cpp.o CMakeFiles/murb-bin.dir/src/murb/main.cpp.o CMakeFiles/common-lib.dir/src/common/core/Bodies.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLControl.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLSpheresVisu.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLSpheresVisuGS.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLSpheresVisuInst.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLTools.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/SpheresVisuNo.cpp.o CMakeFiles/common-lib.dir/src/common/utils/ArgumentsReader.cpp.o CMakeFiles/common-lib.dir/src/common/utils/Perf.cpp.o -o bin/murb -lmpi
+
+~/mpi-comp-match/build/clang_wrap_cc -O1 -fno-inline -fuse-ld=lld -flto -fwhole-program-vtables -lprecompute -rdynamic CMakeFiles/murb-bin.dir/src/murb/core/SimulationNBody.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collision/BodiesCollision.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collision/SimulationNBodyCollisionLocal.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collisionless/SimulationNBodyLocal.cpp.o CMakeFiles/murb-bin.dir/src/murb/core/collisionless/SimulationNBodyMPI.cpp.o CMakeFiles/murb-bin.dir/src/murb/main.cpp.o CMakeFiles/common-lib.dir/src/common/core/Bodies.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLControl.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLSpheresVisu.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLSpheresVisuGS.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLSpheresVisuInst.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/OGLTools.cpp.o CMakeFiles/common-lib.dir/src/common/ogl/SpheresVisuNo.cpp.o CMakeFiles/common-lib.dir/src/common/utils/ArgumentsReader.cpp.o CMakeFiles/common-lib.dir/src/common/utils/Perf.cpp.o -o bin/murb -I/home/tim/mpi-comp-match/build/openmpi-patch/ompi-prefix/include -pthread -Wl,-rpath -Wl,/home/tim/mpi-comp-match/build/openmpi-patch/ompi-prefix/lib -Wl,--enable-new-dtags -L/home/tim/mpi-comp-match/build/openmpi-patch/ompi-prefix/lib -lmpi
+
+
+ASAN_OPTIONS=detect_leaks=0
+TODO evaluate if the leaks are from our pass
+
+
+GDB invokation:
+gdb -ex "set env LD_PRELOAD /home/tim/llvm_install/lib/clang/16/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so" --args /home/tim/llvm_install/bin/clang-16 -cc1 -triple x86_64-unknown-linux-gnu -emit-llvm-bc -flto=full -flto-unit -disable-free -clear-ast-before-backend -main-file-name test_case.cpp -mrelocation-model pic -pic-level 2 -pic-is-pie -mframe-pointer=none -fmath-errno -ffp-contract=on -fno-rounding-math -mconstructor-aliases -funwind-tables=2 -target-cpu x86-64 -tune-cpu generic -mllvm -treat-scalable-fixed-error-as-warning -debug-info-kind=constructor -dwarf-version=5 -debugger-tuning=gdb -fcoverage-compilation-dir=/home/tim/mpi-comp-match/build -resource-dir /home/tim/llvm_install/lib/clang/16 -I /home/tim/mpi-comp-match/build/openmpi-patch/ompi-prefix/include -I/home/tim/mpi-comp-match/build/openmpi-patch/ompi-prefix/include -I/home/tim/ucx_install/include -I/home/tim/llvm_install/include -I. -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/x86_64-linux-gnu/c++/9 -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/backward -internal-isystem /home/tim/llvm_install/lib/clang/16/include -internal-isystem /usr/local/include -internal-isystem /usr/lib/gcc/x86_64-linux-gnu/9/../../../../x86_64-linux-gnu/include -internal-externc-isystem /usr/include/x86_64-linux-gnu -internal-externc-isystem /include -internal-externc-isystem /usr/include -O1 -std=c++17 -fdeprecated-macro -fdebug-compilation-dir=/home/tim/mpi-comp-match/build -ferror-limit 19 -pthread -fgnuc-version=4.2.1 -fno-inline -fcxx-exceptions -fexceptions -fcolor-diagnostics -fpass-plugin=/home/tim/mpi-comp-match/build/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so -fwhole-program-vtables -fsplit-lto-unit -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/test_case-9b1185.o -x c++ test_case.cpp
+
+
+
+#define ONLY_MPI_IMPLEMENTATIONS gesetzt, damit nicht die ganzen intrinsics evaluiert werden müssen
+
+# Invokation with lli to directly execute the llvm IR code
+lli --extra-object openmpi-patch/ompi-prefix/lib/libmpi.so --extra-object precompute_lib/libprecompute.so IR_modified.txt_executable
+
+
+
