@@ -1051,6 +1051,15 @@ void PrecalculationAnalysis::include_call_to_std(
         arg_info->ptr_info->setIsWrittenTo(call, this);
         arg_info->ptr_info->setWholePtrIsRelevant(true);
       }
+      // TODO more like a hotfix? probably overestimating the instructions to be
+      // included
+      // TODO check if there is another case than operator[] where this is
+      // important
+      if (call->getType()->isPointerTy()) {
+        // if std derives a ptr (e.g. operator[]) we treat it as aliasing to all
+        // input ptrs
+        call_info->ptr_info->merge_with(arg_info->ptr_info);
+      }
     }
     // need all args to be present for the call
     include_value_in_precompute(arg_info);
