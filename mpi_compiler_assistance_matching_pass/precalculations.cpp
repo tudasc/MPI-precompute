@@ -1944,7 +1944,7 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
   for (auto *l : loads) {
     for (auto *s : stores) {
       // TODO include all destructors for debugging only
-      if (l->getFunction() == s->getFunction()) { // && l != s) {
+      if (l->getFunction() == s->getFunction() && l != s) {
         // if load and store are the same (aka call to func that loads and
         // stores): no need to do something, either the ptr usage is not needed,
         // or it will be loaded afterward (then it is needed)
