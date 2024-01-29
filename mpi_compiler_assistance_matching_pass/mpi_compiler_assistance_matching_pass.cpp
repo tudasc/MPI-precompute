@@ -86,7 +86,7 @@ void run_optimization_passes(llvm::Module &M, ModuleAnalysisManager &AM) {
   auto inliner = llvm::ModuleInlinerPass();
   inliner.run(M, AM);
 
-  M.dump();
+  // M.dump();
 }
 
 namespace {
