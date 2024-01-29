@@ -5,8 +5,6 @@
 #include "map"
 #include "vector"
 
-#define PRINT_REGISTERED_VALUES
-
 #define MEASURE_PRECOMPUTE_TIME
 
 // #define USE_MPI_TO_SPLIT_RANKS
