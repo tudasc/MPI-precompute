@@ -28,7 +28,7 @@
 #define Debug(x)
 #endif
 
-void add_printf_ret_block(llvm::Function *func);
+void add_debug_printfs_to_precalculation(llvm::Function *func);
 
 inline int get_num_undefs(const llvm::Function &F) {
   int num_undef = 0;

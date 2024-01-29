@@ -23,7 +23,7 @@
 
 using namespace llvm;
 
-void add_printf_ret_block(llvm::Function *func) {
+void add_debug_printfs_to_precalculation(llvm::Function *func) {
 
   auto *M = func->getParent();
   auto *ftype = FunctionType::get(Type::getVoidTy(M->getContext()),
