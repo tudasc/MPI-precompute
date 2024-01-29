@@ -42,7 +42,7 @@ llvm::Function *get_global_re_init_function(
   assert(bb->isEntryBlock());
   IRBuilder<> builder(bb);
 
-  std::set<Function *> global_init_funcs_to_call;
+  std::vector<CallBase *> global_init_funcs_to_call;
 
   for (auto &global : M.globals()) {
     // if Comm World is needed there is no need to initialize it again, it
@@ -79,7 +79,13 @@ llvm::Function *get_global_re_init_function(
           for (auto *st : global_info->ptr_info->getStores()) {
             if (st->getFunction()->getName().starts_with(
                     "__cxx_global_var_init")) {
-              global_init_funcs_to_call.insert(st->getFunction());
+              assert(isa<CallBase>(st));
+              if (auto *call = dyn_cast<CallBase>(st)) {
+                // don't register the destructor again
+                if (call->getCalledFunction()->getName() != "__cxa_atexit") {
+                  global_init_funcs_to_call.push_back(call);
+                }
+              }
             }
           }
         } // else no need to do anything as it is not changed (readonly)
@@ -88,8 +94,12 @@ llvm::Function *get_global_re_init_function(
     }
   }
 
-  for (auto *F : global_init_funcs_to_call) {
-    builder.CreateCall(F);
+  for (auto *cc : global_init_funcs_to_call) {
+    std::vector<Value *> args;
+    for (auto &arg : cc->args()) {
+      args.push_back(cast<Value>(&arg));
+    }
+    builder.CreateCall(cc->getCalledFunction(), args);
   }
 
   builder.CreateRetVoid();
