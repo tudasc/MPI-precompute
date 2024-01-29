@@ -83,22 +83,27 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
   while (other->merged_with != nullptr) {
     other = other->merged_with;
   }
-
+#ifndef NDEBUG
   if (not is_valid) {
     errs() << "Invalid: " << shared_from_this().get() << "\n";
   }
+#endif
   assert(is_valid);
   assert(this->merged_with == nullptr);
 
   if (other != shared_from_this()) {
     // if other == shared_from_this(): nothing to do already the same ptr info
+#ifndef NDEBUG
     if (not other->is_valid) {
       errs() << "Invalid: " << other.get() << "\n";
     }
+#endif
     assert(other->is_valid);
     assert(other->merged_with == nullptr);
     other->merged_with = shared_from_this();
+#ifndef NDEBUG
     other->is_valid = false;
+#endif
     assert(this->is_valid);
     auto obj_to_merge_to = shared_from_this();
     // this may go out of scope so we capture the shared ptr early in this
