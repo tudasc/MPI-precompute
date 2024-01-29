@@ -68,6 +68,16 @@ RequiredAnalysisResults *analysis_results;
 struct mpi_functions *mpi_func;
 ImplementationSpecifics *mpi_implementation_specifics;
 
+// removes attribute noinline from every func
+// we previously set it to make analysis easier
+void remove_noinline_from_module(llvm::Module &M) {
+  for (auto &F : M) {
+    if (F.hasFnAttribute(llvm::Attribute::NoInline)) {
+      F.removeFnAttr(llvm::Attribute::NoInline);
+    }
+  }
+}
+
 namespace {
 struct MPICompilerAssistanceMatchingPass
     : public PassInfoMixin<MPICompilerAssistanceMatchingPass> {
@@ -142,12 +152,14 @@ struct MPICompilerAssistanceMatchingPass
     auto *main_func = M.getFunction("main");
     assert(main_func);
 
-    auto precalcuation = std::make_shared<PrecalculationAnalysis>(M, main_func);
-    precalcuation->add_precalculations(combined_init_list);
-
     bool replacement = !combined_init_list.empty();
     // otherwise nothing should be done
     if (replacement) {
+      auto precalcuation =
+          std::make_shared<PrecalculationAnalysis>(M, main_func);
+      precalcuation->add_precalculations(combined_init_list);
+
+      remove_noinline_from_module(M);
 
       for (auto c : combined_init_list) {
         if (c->getCalledFunction() == mpi_func->mpi_recv_init) {
