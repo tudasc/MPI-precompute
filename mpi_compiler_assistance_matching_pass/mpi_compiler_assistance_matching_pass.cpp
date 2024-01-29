@@ -61,6 +61,8 @@
 
 #include <sanitizer/lsan_interface.h>
 
+#include "llvm/Transforms/IPO/ModuleInliner.h"
+
 using namespace llvm;
 
 RequiredAnalysisResults *analysis_results;
@@ -78,6 +80,15 @@ void remove_noinline_from_module(llvm::Module &M) {
   }
 }
 
+void run_optimization_passes(llvm::Module &M, ModuleAnalysisManager &AM) {
+  errs() << "Run inliner Pass\n";
+
+  auto inliner = llvm::ModuleInlinerPass();
+  inliner.run(M, AM);
+
+  M.dump();
+}
+
 namespace {
 struct MPICompilerAssistanceMatchingPass
     : public PassInfoMixin<MPICompilerAssistanceMatchingPass> {
@@ -92,7 +103,7 @@ struct MPICompilerAssistanceMatchingPass
     AU.addRequired<ScalarEvolutionWrapperPass>();
   }
 
-  StringRef getPassName() const { return "MPI Assertion Analysis"; }
+  StringRef getPassName() const { return "mpi-matching"; }
 
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
@@ -198,6 +209,8 @@ struct MPICompilerAssistanceMatchingPass
 #endif
 
     errs() << "Successfully executed the pass\n\n";
+
+    run_optimization_passes(M, AM);
 
     if (replacement) {
       return PreservedAnalyses::none();
