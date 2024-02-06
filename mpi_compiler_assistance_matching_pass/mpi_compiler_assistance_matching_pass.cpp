@@ -59,29 +59,35 @@
 #include "precompute_funcs.h"
 #include "replacement.h"
 
-using namespace llvm;
+#include <sanitizer/lsan_interface.h>
 
-int get_num_undefs(const Module &M) {
-  int num_undef = 0;
-  for (const Function &F : M) {
-    for (const BasicBlock &BB : F) {
-      for (const Instruction &I : BB) {
-        // Check if the instruction has any undef operands.
-        for (const Use &U : I.operands()) {
-          if (U && isa<UndefValue>(U)) {
-            num_undef++;
-          }
-        }
-      }
-    }
-  }
-  return num_undef;
-}
+#include "llvm/Transforms/IPO/ModuleInliner.h"
+
+using namespace llvm;
 
 RequiredAnalysisResults *analysis_results;
 
 struct mpi_functions *mpi_func;
 ImplementationSpecifics *mpi_implementation_specifics;
+
+// removes attribute noinline from every func
+// we previously set it to make analysis easier
+void remove_noinline_from_module(llvm::Module &M) {
+  for (auto &F : M) {
+    if (F.hasFnAttribute(llvm::Attribute::NoInline)) {
+      F.removeFnAttr(llvm::Attribute::NoInline);
+    }
+  }
+}
+
+void run_optimization_passes(llvm::Module &M, ModuleAnalysisManager &AM) {
+  errs() << "Run inliner Pass\n";
+
+  auto inliner = llvm::ModuleInlinerPass();
+  inliner.run(M, AM);
+
+  // M.dump();
+}
 
 namespace {
 struct MPICompilerAssistanceMatchingPass
@@ -97,7 +103,7 @@ struct MPICompilerAssistanceMatchingPass
     AU.addRequired<ScalarEvolutionWrapperPass>();
   }
 
-  StringRef getPassName() const { return "MPI Assertion Analysis"; }
+  StringRef getPassName() const { return "mpi-matching"; }
 
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
@@ -157,12 +163,14 @@ struct MPICompilerAssistanceMatchingPass
     auto *main_func = M.getFunction("main");
     assert(main_func);
 
-    auto precalcuation = Precalculations(M, main_func);
-    precalcuation.add_precalculations(combined_init_list);
-
     bool replacement = !combined_init_list.empty();
     // otherwise nothing should be done
     if (replacement) {
+      auto precalcuation =
+          std::make_shared<PrecalculationAnalysis>(M, main_func);
+      precalcuation->add_precalculations(combined_init_list);
+
+      remove_noinline_from_module(M);
 
       for (auto c : combined_init_list) {
         if (c->getCalledFunction() == mpi_func->mpi_recv_init) {
@@ -193,12 +201,16 @@ struct MPICompilerAssistanceMatchingPass
     // at most: every undef value can be duplicated
     assert(get_num_undefs(M) <= num_undef * 2);
     // but this is probably insecure (e.g. if undef is used to calculate the
-    // tag)// so we go with the stricter assertion that our pass should not use more
-    // undef values
-    assert(get_num_undefs(M) <= num_undef);
+    // tag)// so we go with the stricter assertion that our pass should not use
+    // more undef values
+    // assert(get_num_undefs(M) <= num_undef);
+    // some undefs are actually duplicated in our test programm (some vector
+    // elems are undef)
 #endif
 
     errs() << "Successfully executed the pass\n\n";
+
+    run_optimization_passes(M, AM);
 
     if (replacement) {
       return PreservedAnalyses::none();

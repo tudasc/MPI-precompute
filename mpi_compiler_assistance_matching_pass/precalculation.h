@@ -16,161 +16,359 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MACH_PRECALCULATIONS_H_
 #define MACH_PRECALCULATIONS_H_
 
+#include <numeric>
+#include <regex>
+#include <utility>
+
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Demangle/Demangle.h"
+#include "llvm/IR/GlobalAlias.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+
+#include "VtableManager.h"
+#include "analysis_results.h"
 #include "devirt_analysis.h"
 #include "ptr_info.h"
 #include "taintedValue.h"
-#include <numeric>
-#include <utility>
 
-#include "llvm/IR/Module.h"
-#include "llvm/Transforms/Utils/Cloning.h"
+class PrecalculationAnalysis;
 
-class Precalculations;
-
-class VtableManager {
-  // manages the vtables to use in function copies
+class PrecalculationFunctionAnalysis
+    : public std::enable_shared_from_this<PrecalculationFunctionAnalysis> {
 public:
-  VtableManager(llvm::Module &M) : M(M){};
+  // analysis Part
+  explicit PrecalculationFunctionAnalysis(llvm::Function *F,
+                                          PrecalculationAnalysis *precalc)
+      : func(F), precalculatioanalysis(precalc) {
+    // assert(not F->isDeclaration() && "Cannot analyze external function");
 
-  void register_function_copy(llvm::Function *old_F, llvm::Function *new_F);
-  // once all functions have been registered
-  void perform_vtable_change_in_copies();
+    is_func_ptr_captured = false;
+    aliases.insert(func);
 
-private:
-  llvm::Module &M;
+    for (auto *u : func->users()) {
+      if (auto *alias = llvm::dyn_cast<llvm::GlobalAlias>(u)) {
+        assert(alias->getAliasee() == func);
+        aliases.insert(alias);
 
-  std::map<llvm::Function *, llvm::Function *> old_new_func_map;
-  // just for ease of programming, it is also contained in the map above:
-  std::set<llvm::Function *> new_funcs;
+        if (not alias->user_empty()) {
+          llvm::errs() << "Alias is used\n";
+          for (auto *auu : alias->users()) {
+            auu->dump();
+          }
+          llvm::errs() << "currently not supported\n";
+          assert(false);
+        }
 
-  llvm::GlobalVariable *get_replaced_vtable(llvm::User *vtable_value);
-
-  static llvm::GlobalVariable *
-  get_vtable_from_ptr_user(llvm::User *vtable_value);
-};
-
-
-class FunctionToPrecalculate {
-public:
-  FunctionToPrecalculate(llvm::Function *F) : F_orig(F) {
-    assert(not F->isDeclaration() && "Cannot analyze external function");
+        continue;
+      }
+      if (not llvm::isa<llvm::CallBase>(u)) {
+        is_func_ptr_captured = true;
+      }
+    }
   };
+
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
               std::inserter(args_to_use, args_to_use.begin()));
   }
-
   std::set<unsigned int> args_to_use = {};
-  llvm::Function *F_orig;
-  llvm::Function *F_copy = nullptr;
-  llvm::ValueToValueMapTy old_new_map;
-  std::map<llvm::Value *, llvm::Value *> new_to_old_map;
-  llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we dont need it
+  llvm::Function *func;
+  PrecalculationAnalysis *precalculatioanalysis;
+  std::set<llvm::GlobalValue *> aliases;
+  const std::set<llvm::GlobalValue *> &getAliases() const { return aliases; }
 
-  void initialize_copy();
+  bool include_in_precompute = false;
+
+  // can this function throw an exception where the except case needs to be
+  // handled in precompute? some funcs like malloc or writing to stdout can
+  // except causing the control flow to divert from the precomputation but these
+  // exceptions are so harmful that precompute need to abort anyway, so we don't
+  // actually need to handle it during precompute (and check if the precompute
+  // handle it)
+  bool can_except_in_precompute = true;
+  bool analysis_except_in_precompute =
+      false; // used avoid endless recursion on recursive call chains
+
+  // always include all calls to this func (it must always execute aka contains
+  // the register precompute cals) for other functions, if the writes done by
+  // the func are not important anymore, we can skip calling them
+  bool include_all_callsites = false;
+
+  // used outside of call instructions
+  bool is_func_ptr_captured;
+
+  // all call sites that can call F respecting indirect calls
+  std::set<llvm::CallBase *> callsites;
+  // all possible callees called by F respecting indirect calls
+  std::set<std::weak_ptr<PrecalculationFunctionAnalysis>, std::owner_less<>>
+      callees;
+
+  // set of ptrs possibly written or Read when calling this func
+  // contains direct read and writes
+  std::set<std::shared_ptr<PtrUsageInfo>> ptr_read;
+  std::set<std::shared_ptr<PtrUsageInfo>> ptr_written;
+
+  // includes al callees
+  std::set<std::shared_ptr<PtrUsageInfo>> getPtrRead_recursive() const;
+  std::set<std::shared_ptr<PtrUsageInfo>> getPtrWritten_recursive() const;
+
+private:
+  void getPtrRead_recursive_impl(
+      std::set<std::shared_ptr<PtrUsageInfo>> &result,
+      std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> &visited)
+      const;
+  void getPtrWritten_recursive_impl(
+      std::set<std::shared_ptr<PtrUsageInfo>> &result,
+      std::set<std::shared_ptr<const PrecalculationFunctionAnalysis>> &visited)
+      const;
+
+public:
+  // invalidate the analysis of call sites of this function
+  void re_visit_callsites();
+
+  void add_ptr_read(const std::shared_ptr<PtrUsageInfo> &read) {
+    // assert(read->isReadFrom());
+    // one may insert them before the read/write is analyzed
+    auto pair = ptr_read.insert(read);
+    if (pair.second) { // was inserted
+      re_visit_callsites();
+    }
+  }
+
+  void add_ptr_write(const std::shared_ptr<PtrUsageInfo> &write) {
+    // assert(write->isWrittenTo());
+    // one may insert them before the read/write is analyzed
+    auto pair = ptr_written.insert(write);
+    if (pair.second) { // was inserted
+      re_visit_callsites();
+    }
+  }
+
+  void analyze_can_except_in_precompute(
+      const PrecalculationAnalysis *precompute_analysis);
 };
 
-// TODO different interface
-class Precalculations {
+class PrecalculationAnalysis
+    : std::enable_shared_from_this<PrecalculationAnalysis> {
 public:
-  Precalculations(llvm::Module &M, llvm::Function *entry_point)
+  PrecalculationAnalysis(llvm::Module &M, llvm::Function *entry_point)
       : M(M), entry_point(entry_point), virtual_call_sites(DevirtAnalysis(M)) {
-    find_functions_called_indirect();
+    analyze_functions();
   };
 
   void add_precalculations(const std::vector<llvm::CallBase *> &to_precompute);
 
+private:
+  std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>
+      function_analysis;
+  void analyze_functions();
+
 public:
+  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
+  getFunctionsToInclude() const;
+  llvm::Function *getEntryPoint() const;
+  const std::vector<llvm::CallBase *> &getToReplaceWithEnvelopeRegister() const;
+
+public:
+private:
   llvm::Module &M;
   llvm::Function *entry_point;
 
   DevirtAnalysis virtual_call_sites;
 
   std::vector<llvm::CallBase *> to_replace_with_envelope_register;
-  std::set<std::shared_ptr<FunctionToPrecalculate>> functions_to_include;
   std::set<std::shared_ptr<TaintedValue>> tainted_values;
 
+  void include_value_in_precompute(const std::shared_ptr<TaintedValue> &);
   std::shared_ptr<TaintedValue>
   insert_tainted_value(llvm::Value *v,
-                       std::shared_ptr<TaintedValue> from = nullptr);
+                       const std::shared_ptr<TaintedValue> &from = nullptr,
+                       bool needed_from = true);
 
   std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
                                                      TaintReason reason);
-  void remove_tainted_value(const std::shared_ptr<TaintedValue> &value_info);
 
-  std::shared_ptr<FunctionToPrecalculate>
-  insert_functions_to_include(llvm::Function *func);
+public:
+  std::shared_ptr<TaintedValue> get_taint_info(llvm::Value *v) const {
+    assert(is_tainted(v));
+    return *std::find_if(tainted_values.begin(), tainted_values.end(),
+                         [&v](const auto &vv) { return vv->v == v; });
+  }
+
+  bool is_func_included_in_precompute(llvm::Function *F) const {
+    return function_analysis.at(F)->include_in_precompute;
+  }
+  std::shared_ptr<PrecalculationFunctionAnalysis>
+  get_function_analysis(llvm::Function *F) const {
+    return function_analysis.at(F);
+  }
+
+private:
+  void insert_function_to_include(llvm::Function *func);
 
   // TODO we need some kind of heuristic to check if precalculation of all msg
   // tags seems to be worth it
   //  or if e.g. for some reason a compute heavy loop was included as well
 
-  std::set<llvm::Function *> functions_that_may_be_called_indirect;
+  // std::set<llvm::Function *> functions_that_may_be_called_indirect;
 
   void find_all_tainted_vals();
-  void find_functions_called_indirect();
   // we need a function to re-initialize all globals that may be overwritten
-  llvm::Function *get_global_re_init_function();
 
   void print_analysis_result_remarks();
   void debug_printings();
 
-  void visit_val(std::shared_ptr<TaintedValue> v);
-  void visit_arg(std::shared_ptr<TaintedValue> arg_info);
+  void visit_val(const std::shared_ptr<TaintedValue> &v);
+  void visit_arg(const std::shared_ptr<TaintedValue> &arg_info);
 
   void visit_load(const std::shared_ptr<TaintedValue> &load_info);
   void visit_store(const std::shared_ptr<TaintedValue> &store_info);
-  void visit_store_from_value(const std::shared_ptr<TaintedValue> &store_info);
-  void visit_store_from_ptr(const std::shared_ptr<TaintedValue> &store_info);
   void visit_gep(const std::shared_ptr<TaintedValue> &gep_info);
   void visit_phi(const std::shared_ptr<TaintedValue> &phi_info);
 
-  void visit_call(std::shared_ptr<TaintedValue> call_info);
+  void visit_call(const std::shared_ptr<TaintedValue> &call_info);
   void visit_call_from_ptr(llvm::CallBase *call,
-                           std::shared_ptr<TaintedValue> ptr);
-  void visit_ptr_usages(std::shared_ptr<TaintedValue> ptr);
+                           const std::shared_ptr<TaintedValue> &ptr);
+  void visit_ptr_usages(const std::shared_ptr<TaintedValue> &ptr);
+  void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
+                     llvm::ReturnInst *ret);
 
-  void replace_allocation_call(llvm::CallBase *call);
+  bool is_store_important(llvm::Instruction *inst,
+                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
+  bool is_store_important(llvm::CallBase *call,
+                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
+  bool is_store_important(llvm::StoreInst *store,
+                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
 
-  bool is_tainted(llvm::Value *v) {
+  bool
+  store_happens_after_all_loads(llvm::Instruction *inst,
+                                const std::shared_ptr<PtrUsageInfo> &ptr_info);
+
+  void get_all_transitive_insts(std::set<llvm::Instruction *> &instrs);
+
+  // materialize call
+  void include_call_to_std(const std::shared_ptr<TaintedValue> &call_info);
+
+public:
+  bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) { return vv->v == v; }) !=
            tainted_values.end();
   }
 
-  template <class container> unsigned int get_num_tainted(container vals) {
+public:
+  bool is_included_in_precompute(llvm::Value *v) const {
+    return std::find_if(tainted_values.begin(), tainted_values.end(),
+                        [&v](const auto &vv) {
+                          return (vv->v == v && vv->isIncludeInPrecompute());
+                        }) != tainted_values.end();
+  }
+
+  template <class container>
+  unsigned int get_num_tainted(container vals) const {
     return std::accumulate(
         vals.begin(), vals.end(), (unsigned int)0,
         [this](auto accu, auto v) { return accu + is_tainted(v); });
   };
 
-  template <class container> bool are_all_tainted(container vals) {
+  template <class container> bool are_all_tainted(container vals) const {
     return get_num_tainted(vals) == vals.size();
   }
 
-  template <class container> bool is_none_tainted(container vals) {
+  template <class container> bool is_none_tainted(container vals) const {
     return !std::accumulate(
         vals.begin(), vals.end(), false,
         [this](auto accu, auto v) { return accu || is_tainted(v); });
   };
 
-  bool is_retval_of_call_used(llvm::CallBase *call);
+  bool is_retval_of_call_needed(llvm::CallBase *call) const;
 
-  void taint_all_indirect_call_args(llvm::Function *func, unsigned int argNo,
-                                    std::shared_ptr<TaintedValue> arg_info);
-  void taint_all_indirect_calls(llvm::Function *func);
+  bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke) const;
+  bool is_invoke_exception_case_needed(llvm::InvokeInst *invoke) const;
+  bool can_except_in_precompute(llvm::CallBase *call) const;
 
-  void replace_calls_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
-  void
-  replace_usages_of_func_in_copy(std::shared_ptr<FunctionToPrecalculate> func);
-  void prune_function_copy(const std::shared_ptr<FunctionToPrecalculate> &func);
+private:
+  bool
+  is_ptr_usage_in_std_read(llvm::CallBase *call,
+                           const std::shared_ptr<TaintedValue> &ptr_arg_info);
+  bool
+  is_ptr_usage_in_std_write(llvm::CallBase *call,
+                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
-  bool is_invoke_necessary_for_control_flow(llvm::InvokeInst *invoke);
+public:
+  std::vector<llvm::Function *>
+  get_possible_call_targets(llvm::CallBase *call) const;
 
-  void add_call_to_precalculation_to_main();
-
-  std::vector<llvm::Function *> get_possible_call_targets(llvm::CallBase *call);
+private:
   void insert_necessary_control_flow(llvm::Value *v);
+  void visit_call_for_retval(const std::shared_ptr<TaintedValue> &call_info);
+  void
+  visit_invoke_for_exception(const std::shared_ptr<TaintedValue> &call_info);
+  bool check_if_call_should_be_included(
+      const std::shared_ptr<TaintedValue> &call_info);
 };
+
+inline bool is_allocation(llvm::Function *func) {
+  assert(func);
+  // operator new
+  if (func->getName() == "_Znwm") {
+    return true;
+  }
+  if (func->getName() == "malloc") {
+    return true;
+  }
+  if (func->getName() == "calloc") {
+    return true;
+  }
+  return false;
+}
+
+inline bool is_allocation(llvm::CallBase *call) {
+
+  if (call->isIndirectCall()) {
+    return false;
+  }
+  return is_allocation(call->getCalledFunction());
+}
+
+bool is_func_from_std(llvm::Function *func);
+
+inline bool is_call_to_std(llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    return false;
+  }
+
+  return is_func_from_std(call->getCalledFunction());
+}
+
+// we should not mess around with the globals defined by std::
+inline bool is_global_from_std(llvm::GlobalValue *global) {
+  assert(global);
+  if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
+    return is_func_from_std(f);
+  }
+
+  auto demangled = llvm::demangle(global->getName().str());
+  // startswith std::
+  if (demangled.rfind("std::", 0) == 0) {
+    return true;
+  }
+
+  std::regex regex_pattern_std("^(VTT for )?std::(.+)");
+  if (std::regex_match(demangled, regex_pattern_std)) {
+    return true;
+  }
+
+  if (std::regex_match(demangled, std::regex("^(typeinfo for )?std::(.+)"))) {
+    return true;
+  }
+
+  if (global->getName() == "__dso_handle") {
+    return true;
+  }
+  return false;
+}
 
 #endif // MACH_PRECALCULATIONS_H_

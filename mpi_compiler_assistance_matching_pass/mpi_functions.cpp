@@ -29,7 +29,7 @@ bool is_mpi_call(CallBase *call) {
 
 bool is_mpi_function(llvm::Function *f) {
   if (f) {
-    return f->getName().contains("MPI");
+    return f->getName().starts_with("MPI");
   } else
     return false;
 }

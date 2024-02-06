@@ -16,6 +16,8 @@ export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="$TEST_DIR/plugin_data.json"
 
 cd $TEST_DIR
 
+export USE_MPI_COMPILER_ASSISTANCE_PASS=true
+
 if ls *.cpp 1> /dev/null 2>&1; then
   $RUN_SCRIPT *.cpp
 else
@@ -23,10 +25,9 @@ else
 fi
 
 #check if compiler analysis was successfull
+EXPECT_NO_MPIOPT=${EXPECT_NO_MPIOPT:=0}
 
-EXPECT_MPIOPT=1
-
-mpirun -n 2 ./a.out_original | grep "Usage of MPIOPT optimized communication sceme"
+mpirun -n 2 ./a.out_original $ARGS_TO_TEST_EXEC | grep "Usage of MPIOPT optimized communication sceme"
 SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
@@ -45,7 +46,8 @@ if [[ "$NO_MPI_OPT" != 1 ]]; then
   exit 1
 fi
 
-mpirun -n 2 ./a.out | grep "Usage of MPIOPT optimized communication sceme"
+echo "mpirun -n 2 ./a.out $ARGS_TO_TEST_EXEC"
+mpirun -n 2 ./a.out $ARGS_TO_TEST_EXEC | grep "Usage of MPIOPT optimized communication sceme"
 SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
@@ -57,11 +59,11 @@ if [[ "$MPIRUN_STATUS" != 0 ]]; then
   exit 1
 fi
 
-if [[ "$EXPECT_MPIOPT" == 1 && "$NO_MPI_OPT" != 0 ]]; then
+if [[ "$EXPECT_NO_MPIOPT" == 0 && "$NO_MPI_OPT" != 0 ]]; then
   echo "Expected MPIOPT usage but none found"
   exit 1
 fi
-if [[ "$EXPECT_MPIOPT" == 0 && "$NO_MPI_OPT" != 1 ]]; then
+if [[ "$EXPECT_NO_MPIOPT" == 1 && "$NO_MPI_OPT" != 1 ]]; then
   echo "Expected NO MPIOPT usage but found usage"
   exit 1
 fi

@@ -54,14 +54,10 @@
 #include <set>
 #include <string>
 
-// TODO correct source
 // most code from llvms' WholeProgramDevirtPass
 
 using namespace std;
 using namespace llvm;
-
-using namespace llvm;
-using namespace std;
 
 // A bit vector that keeps track of which bits are used. We use this to
 // pack constant values compactly before and after each virtual table.

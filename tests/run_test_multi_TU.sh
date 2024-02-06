@@ -19,7 +19,7 @@ TEST_DIR_NAME=$(basename "$TEST_DIR")
 mkdir -p $TEST_DIR_NAME
 cd $TEST_DIR_NAME
 
-# without pass enabled to get the original application
+# without pass disabled to get the original application
 export USE_MPI_COMPILER_ASSISTANCE_PASS=false
 export OMPI_CC=clang
 export OMPI_CXX=clang++
@@ -51,7 +51,11 @@ export USE_MPI_COMPILER_ASSISTANCE_PASS=true
 export OMPI_CC="${BINARY_DIR}/clang_wrap_cc"
 export OMPI_CXX="${BINARY_DIR}/clang_wrap_cxx"
 
-cmake -DCMAKE_C_COMPILER="${BINARY_DIR}/clang_wrap_cc" -DCMAKE_C_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" -DCMAKE_CXX_COMPILER="${BINARY_DIR}/clang_wrap_cxx" -DCMAKE_CXX_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" $TEST_DIR
+
+echo $ASAN_OPTIONS
+echo $DEBUG_CLANG_WRAPPER
+
+cmake -DCMAKE_C_COMPILER="${MPICC}" -DCMAKE_C_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" -DCMAKE_CXX_COMPILER="${MPICXX}" -DCMAKE_CXX_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" $TEST_DIR
 
 make
 

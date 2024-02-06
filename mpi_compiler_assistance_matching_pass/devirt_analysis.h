@@ -11,9 +11,9 @@ public:
   DevirtAnalysis(llvm::Module &M);
 
   std::vector<llvm::Function *>
-  get_possible_call_targets(llvm::CallBase *call) {
+  get_possible_call_targets(llvm::CallBase *call) const {
     if (result_map.find(call) != result_map.end()) {
-      return result_map[call];
+      return result_map.at(call);
     }
     else
       return {};

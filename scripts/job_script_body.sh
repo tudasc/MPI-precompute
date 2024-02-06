@@ -1,17 +1,10 @@
 # the modules
 ml purge
-ml gcc/8.3.1
-ml hwloc/2.5.0 clang/11.1.0
-ml openucx/1.12.0
+ml gcc/8.5.0
+ml llvm/16.0.1.RelAssert
+ml cuda/11.8 hwloc/2.9.1
 
-ml openmpi/rendevouz2
-
-#export OMPI_MCA_opal_warn_on_missing_libcuda=0
-#export OMPI_MCA_opal_common_ucx_opal_mem_hooks=1
-export OMPI_MCA_osc=ucx
-export OMPI_MCA_pml=ucx
-export UCX_WARN_UNUSED_ENV_VARS=n
-export UCX_UNIFIED_MODE=y
+source /home/tj75qeje/mpi-comp-match/build/setup_env.sh
 
 
 PARAM=$(awk "NR==$SLURM_ARRAY_TASK_ID" $VARIABLE_PARAM_FILE)

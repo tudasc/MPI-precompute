@@ -19,6 +19,7 @@
 #include "conflict_detection.h"
 #include "devirt_analysis.h"
 #include "mpi_functions.h"
+#include "precalculation.h"
 #include "taintedValue.h"
 #include <cassert>
 
@@ -32,41 +33,92 @@
 
 #include "llvm/IR/Verifier.h"
 
+#include <boost/stacktrace.hpp>
+#include <iostream>
+
 #include "debug.h"
 using namespace llvm;
 
 void PtrUsageInfo::setIsUsedDirectly(
-    bool isUsedDirectly,
-    const std::shared_ptr<PtrUsageInfo> &direct_usage_info) {
-
+    bool isUsedDirectly, std::shared_ptr<PtrUsageInfo> direct_usage_info) {
+  if (merged_with) {
+    merged_with->setIsUsedDirectly(isUsedDirectly, direct_usage_info);
+    return;
+  }
+  assert(is_valid);
+  assert(isUsedDirectly == true);
   if (not is_used_directly) {
     is_used_directly = true;
     propergate_changes();
   }
 
+  // TODO do we need the direct_usage_parent for alias detection
   if (direct_usage_info) {
+    auto info_to_use = direct_usage_info;
+    while (info_to_use->merged_with != nullptr) {
+      info_to_use = info_to_use->merged_with;
+    }
+    assert(info_to_use->is_valid);
+
     if (info_of_direct_usage) {
-      info_of_direct_usage->merge_with(direct_usage_info);
+      info_of_direct_usage->merge_with(info_to_use);
       // merge will propergate changes if any
-    } else
-      info_of_direct_usage = direct_usage_info;
+    } else {
+      info_of_direct_usage = info_to_use;
+    }
   }
 }
 
-void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
+// other MAY NOT be passed as const ref as we might recursively destruct it
+// before we are finish using it
+void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
+  if (merged_with) {
+    merged_with->merge_with(_other);
+    return;
+  }
+
+  assert(_other != nullptr);
+
+  auto other = _other;
+  while (other->merged_with != nullptr) {
+    other = other->merged_with;
+  }
+#ifndef NDEBUG
+  if (not is_valid) {
+    errs() << "Invalid: " << shared_from_this().get() << "\n";
+  }
+#endif
+  assert(is_valid);
+  assert(this->merged_with == nullptr);
+
   if (other != shared_from_this()) {
     // if other == shared_from_this(): nothing to do already the same ptr info
+#ifndef NDEBUG
+    if (not other->is_valid) {
+      errs() << "Invalid: " << other.get() << "\n";
+    }
+#endif
+    assert(other->is_valid);
+    assert(other->merged_with == nullptr);
+    other->merged_with = shared_from_this();
+#ifndef NDEBUG
+    other->is_valid = false;
+#endif
+    assert(this->is_valid);
+    auto obj_to_merge_to = shared_from_this();
+    // this may go out of scope so we capture the shared ptr early in this
+    // function
 
     // merge users
     for (const auto &ptr : other->ptrs_with_this_info) {
-      assert(ptr->ptr_info != shared_from_this());
-      ptr->ptr_info = shared_from_this();
-      ptrs_with_this_info.insert(ptr);
-    }
+      assert(not ptr.expired());
+      // assert(ptr->ptr_info == other);
+      // assert(ptr->ptr_info != shared_from_this());
 
-    if (other->is_used_directly) {
-      this->setIsUsedDirectly(true, other->info_of_direct_usage);
-      // will merge the info_of_direct_usage
+      this->ptrs_with_this_info.insert(ptr);
+      // directly replace references to other instead of dispatching calls to
+      // this
+      ptr.lock()->ptr_info = shared_from_this();
     }
 
     bool changed =
@@ -79,31 +131,46 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> other) {
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
 
-    std::move(other->parents.begin(), other->parents.end(),
-              std::inserter(parents, parents.end()));
-
-    // merge important_members
-    for (auto pos : other->important_members) {
-      if (important_members.find(pos.first) != important_members.end()) {
-        // merge the information
-        important_members[pos.first]->merge_with(pos.second);
-      } else {
-        important_members.insert(pos);
-        changed = true;
-      }
+    for (auto *s : other->stores) {
+      auto pair = stores.insert(s);
+      changed = changed | pair.second; // changed if a new elem was inserted
     }
+    for (auto *s : other->loads) {
+      auto pair = loads.insert(s);
+      changed = changed | pair.second; // changed if a new elem was inserted
+    }
+
     if (changed) {
       propergate_changes();
     }
+
+    if (other->is_used_directly) {
+      this->setIsUsedDirectly(true, other->info_of_direct_usage);
+      // will merge the info_of_direct_usage
+    }
+
+    // this may be invalidated (if gep is result of self)
+    for (const auto &pos : other->important_members) {
+      while (obj_to_merge_to->merged_with != nullptr) {
+        obj_to_merge_to = obj_to_merge_to->merged_with;
+      }
+      // this will propagate changes if applicable
+      obj_to_merge_to->add_important_member(pos.first, pos.second);
+    }
+
+    // we can clean up other, as other is only used to forward to this by now
+    other->ptrs_with_this_info.clear();
+    other->important_members.clear();
+    other->info_of_direct_usage = nullptr;
   }
 }
 
-std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
-  std::vector<unsigned int> idxs;
+std::vector<long> get_gep_idxs(llvm::GetElementPtrInst *gep) {
+  std::vector<long> idxs;
   for (auto &idx : gep->indices()) {
     auto idx_constant = dyn_cast<ConstantInt>(&idx);
     if (idx_constant) {
-      unsigned int idx_v = idx_constant->getZExtValue();
+      long idx_v = idx_constant->getSExtValue();
       idxs.push_back(idx_v);
     } else {
       idxs.push_back(WILDCARD_IDX);
@@ -113,8 +180,8 @@ std::vector<unsigned int> get_gep_idxs(llvm::GetElementPtrInst *gep) {
   return idxs;
 }
 
-bool is_member_matching(const std::vector<unsigned int> &member_idx,
-                        const std::vector<unsigned int> &member_idx_reference) {
+bool is_member_matching(const std::vector<long> &member_idx,
+                        const std::vector<long> &member_idx_reference) {
   if (member_idx.size() > member_idx_reference.size()) {
     // swap args so that we can assume the right one is larger
     return is_member_matching(member_idx_reference, member_idx);
@@ -138,9 +205,39 @@ bool is_member_matching(const std::vector<unsigned int> &member_idx,
 }
 
 void PtrUsageInfo::add_important_member(
-    llvm::GetElementPtrInst *gep, std::shared_ptr<PtrUsageInfo> result_ptr) {
+    llvm::GetElementPtrInst *gep,
+    const std::shared_ptr<PtrUsageInfo> &result_ptr) {
+  if (merged_with) {
+    merged_with->add_important_member(gep, result_ptr);
+    return;
+  }
+  assert(is_valid);
+
+  if (result_ptr == shared_from_this()) {
+    return; // nothing to do
+    // e.g. an iterator where it++ is realized as a GEP instruction
+  }
 
   auto member_idx = get_gep_idxs(gep);
+  add_important_member(member_idx, result_ptr);
+}
+
+void PtrUsageInfo::add_important_member(
+    std::vector<long> member_idx,
+    const std::shared_ptr<PtrUsageInfo> &result_ptr) {
+  assert(is_valid);
+  assert(this->merged_with == nullptr);
+
+  auto to_propergate = shared_from_this();
+  // this can go out of scope so we need to capture a shared ptr to it first
+
+  // auto reference_to_self = shared_from_this();
+
+  // we don't keep track of if the GEP results in ptr again
+  if (result_ptr == shared_from_this()) {
+    return; // nothing to do
+    // e.g. an iterator where it++ is realized as a GEP instruction
+  }
 
   auto existing_info = find_info_for_gep_idx(member_idx);
 
@@ -149,12 +246,14 @@ void PtrUsageInfo::add_important_member(
 
   } else { // info already present
     if (not existing_info.first && member_idx[member_idx.size() - 1]) {
-      // new usage has wildcard but old usage not
+      // new usage has wildcard but old usages may not
       // we need to combine all usages that match this wildcard
 
-      for (auto pair : important_members) {
+      std::set<std::shared_ptr<PtrUsageInfo>> to_merge;
+      // the set removes duplicates
+      for (const auto &pair : important_members) {
         if (is_member_matching(member_idx, pair.first)) {
-          result_ptr->merge_with(pair.second);
+          to_merge.insert(pair.second);
         }
       }
 
@@ -168,31 +267,51 @@ void PtrUsageInfo::add_important_member(
         }
       }
       important_members[member_idx] = result_ptr;
+      // the std:: set still holds references of the shared ptr, so they won't
+      // be destroyed
 
+      // merging may invalidate this
+      for (auto &m : to_merge) {
+        result_ptr->merge_with(m);
+      }
     } else {
       // exact match regarding wildcards
       existing_info.second->merge_with(result_ptr);
     }
   }
+
+  // this may be invalid if it needs to be merged due to an iterator++ being
+  // realized as GEP
+
+  while (to_propergate->merged_with) {
+    to_propergate = to_propergate->merged_with;
+  }
   // TODO if merge does not change anything: nothing to do
   // but propergate "changes" is not wrong in either case
-  propergate_changes();
+  to_propergate->propergate_changes();
 }
 
 void PtrUsageInfo::propergate_changes() {
+  assert(is_valid);
+  assert(merged_with == nullptr);
   // re-visit all users of ptr as something has changed
   for (const auto &tv : ptrs_with_this_info) {
-    tv->visited = false;
+    assert(not tv.expired());
+    tv.lock()->visited = false;
   }
 }
 
 bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
+  if (merged_with) {
+    return merged_with->is_member_relevant(gep);
+  }
+  assert(is_valid);
   return find_info_for_gep_idx(get_gep_idxs(gep)).second != nullptr;
 }
 
 std::pair<bool, std::shared_ptr<PtrUsageInfo>>
-PtrUsageInfo::find_info_for_gep_idx(
-    const std::vector<unsigned int> &member_idx) {
+PtrUsageInfo::find_info_for_gep_idx(const std::vector<long> &member_idx) {
+  assert(is_valid);
   auto pos = std::find_if(important_members.begin(), important_members.end(),
                           [&member_idx](auto pair) {
                             auto idxs = pair.first;
@@ -207,11 +326,31 @@ PtrUsageInfo::find_info_for_gep_idx(
 }
 
 void PtrUsageInfo::dump() {
+  if (merged_with) {
+    merged_with->dump();
+    return;
+  }
+
   errs() << "PtrUsageInfo:\n";
+
+#ifndef NDEBUG
+  if (not is_valid) {
+    errs() << "INVALID\n";
+  }
+#endif
   errs() << "Users:\n";
   for (const auto &u : ptrs_with_this_info) {
     errs() << "\t";
-    u->v->dump();
+    u.lock()->v->dump();
+    errs() << "\t";
+    errs() << "\t";
+    if (auto *inst = dyn_cast<Instruction>(u.lock()->v)) {
+      errs() << "in : " << inst->getFunction()->getName();
+    }
+    if (auto *arg = dyn_cast<Argument>(u.lock()->v)) {
+      errs() << "in : " << arg->getParent()->getName();
+    }
+    errs() << "\n";
   }
   errs() << "Is Read : " << is_read_from << "\n";
   errs() << "Is Written : " << is_written_to << "\n";
@@ -226,6 +365,159 @@ void PtrUsageInfo::dump() {
       errs() << idx << ", ";
     }
     errs() << "\n";
-    pair.second->dump();
+    if (pair.first==std::vector<long>{0,2}){
+     pair.second->dump();}
   }
+}
+const std::set<std::weak_ptr<TaintedValue>,
+               std::owner_less<std::weak_ptr<TaintedValue>>> &
+PtrUsageInfo::getPtrsWithThisInfo() const {
+  return ptrs_with_this_info;
+}
+
+void PtrUsageInfo::setIsWrittenTo(
+    llvm::Instruction *store, const PrecalculationAnalysis *precalc_analysis) {
+  if (merged_with) {
+    merged_with->setIsWrittenTo(store, precalc_analysis);
+    return;
+  }
+  assert(precalc_analysis);
+  assert(is_valid);
+  assert(llvm::isa<llvm::StoreInst>(store) || llvm::isa<llvm::CallBase>(store));
+  is_written_to = true;
+  auto pair = stores.insert(store);
+  if (pair.second) { // if it was inserted
+    propergate_changes();
+
+    // recursively mark all callsites potentially calling the function as stores
+    // as well
+    auto func = precalc_analysis->get_function_analysis(store->getFunction());
+    for (auto *call : func->callsites) {
+      if (call != store) {
+        setIsWrittenTo(call, precalc_analysis);
+      }
+    }
+  }
+}
+
+void PtrUsageInfo::setIsReadFrom(
+    llvm::Instruction *load, const PrecalculationAnalysis *precalc_analysis) {
+  if (merged_with) {
+    merged_with->setIsReadFrom(load, precalc_analysis);
+    return;
+  }
+  assert(precalc_analysis);
+  assert(is_valid);
+  assert(llvm::isa<llvm::LoadInst>(load) || llvm::isa<llvm::CallBase>(load));
+  is_read_from = true;
+  auto pair = loads.insert(load);
+  if (pair.second) { // if it was inserted
+    propergate_changes();
+
+    // recursively mark all callsites potentially calling the function as stores
+    // as well
+    auto func = precalc_analysis->get_function_analysis(load->getFunction());
+    for (auto *call : func->callsites) {
+      if (call != load) {
+        setIsReadFrom(call, precalc_analysis);
+      }
+    }
+  }
+}
+const std::set<llvm::Instruction *> &PtrUsageInfo::getStores() const {
+  return stores;
+}
+
+const std::set<llvm::Instruction *> &PtrUsageInfo::getLoads() const {
+  return loads;
+}
+
+template <>
+bool std::operator==(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() == rr.get();
+}
+
+template <>
+bool std::operator!=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() != rr.get();
+}
+
+template <>
+bool std::operator<(const std::shared_ptr<PtrUsageInfo> &lhs,
+                    const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() < rr.get();
+}
+
+template <>
+bool std::operator>(const std::shared_ptr<PtrUsageInfo> &lhs,
+                    const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() > rr.get();
+}
+
+template <>
+bool std::operator<=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() <= rr.get();
+}
+
+template <>
+bool std::operator>=(const std::shared_ptr<PtrUsageInfo> &lhs,
+                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
+
+  auto ll = lhs;
+  while (ll->merged_with) {
+    ll = ll->merged_with;
+  }
+  auto rr = rhs;
+  while (rr->merged_with) {
+    rr = rr->merged_with;
+  }
+  return ll.get() >= rr.get();
 }

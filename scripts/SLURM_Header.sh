@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# same as -n
-#SBATCH --ntasks 2
+# set during script generation
+#### same as -n
+####SBATCH --ntasks 2
 
 #SBATCH --mem-per-cpu=3800
 #same as -t
@@ -9,5 +10,5 @@
 
 
 #same as -c
-#SBATCH --cpus-per-task 96
+#SBATCH --cpus-per-task 104
 # one node per process

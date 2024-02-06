@@ -127,6 +127,11 @@ LINKAGE_TYPE int progress_recv_request_handshake_begin(MPIOPT_Request *request,
       request->flag = 4;
     } else {
       // payload arrived but no handshake
+#ifndef NDEBUG
+      add_operation_to_trace(
+          request,
+          "Handshake failed: Message arrived, but not handshake, use fallback");
+#endif
       // post the matching receive, blocking as we have probed
       MPI_Recv(request->buf, request->count, request->dtype, request->dest,
                request->tag, request->communicators->original_communicator,

@@ -4,7 +4,7 @@ add_library(precompute MODULE
         precompute.h)
 
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Og")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DPRINT_REGISTERED_VALUES -g -Og")
 # switch off one Warning for release build: some variables are only used for assertions
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -Wno-unused-but-set-variable")
 

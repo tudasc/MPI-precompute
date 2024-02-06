@@ -1,24 +1,42 @@
+#include <cassert>
+#include <fstream>
+#include <iostream>
 #include <mpi.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <string>
+#include <vector>
 
 double *DATA;
 
 MPI_Request comm_requests[4];
 
-void init_communication(int rank, int size, int tag_to_use1, int tag_to_use2) {
+int get_rank() {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  return rank;
+}
+
+int get_size() {
+  int size;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  return size;
+}
+
+void init_communication(int tag_to_use1, int tag_to_use2) {
   int other = MPI_PROC_NULL;
-  if (rank != 0) {
-    other = rank - 1;
+  if (get_rank() != 0) {
+    other = get_rank() - 1;
   }
+  std::cout << "Message Tags to use: " << tag_to_use1 << " and " << tag_to_use2
+            << "\n";
   MPI_Send_init(&DATA[25], 25, MPI_DOUBLE, other, tag_to_use1, MPI_COMM_WORLD,
                 &comm_requests[0]);
   MPI_Recv_init(&DATA[0], 25, MPI_DOUBLE, other, tag_to_use2, MPI_COMM_WORLD,
                 &comm_requests[1]);
 
   other = MPI_PROC_NULL;
-  if (rank != size - 1) {
-    other = rank + 1;
+  if (get_rank() != get_size() - 1) {
+    other = get_rank() + 1;
   }
   MPI_Send_init(&DATA[75], 25, MPI_DOUBLE, other, tag_to_use2, MPI_COMM_WORLD,
                 &comm_requests[2]);
@@ -46,9 +64,7 @@ void end_halo_exchange() {
 void run_iteration() { return; }
 
 void calculate() {
-  char running = 1;
-  int iter = 0;
-  while (running) {
+  for (int iter = 0; iter < 5; ++iter) {
     begin_halo_receive();
 
     run_iteration();
@@ -56,11 +72,6 @@ void calculate() {
     begin_halo_send();
 
     end_halo_exchange();
-
-    iter++;
-    if (iter > 5) {
-      running = 0;
-    }
   }
 }
 
@@ -80,23 +91,20 @@ void free_communication() {
 int main(int argc, char *argv[]) {
   int rank, size;
   MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  DATA = malloc(sizeof(double) * 100);
+  double value_to_use = 1.0;
+
+  DATA = (double *)malloc(sizeof(double) * 100);
   for (int i = 0; i < 100; i++) {
-    DATA[i] = 42.0;
+    DATA[i] = value_to_use;
   }
 
-  FILE *mpiConfig = fopen("config.cfg", "r");
-  int tag1, tag2;
-  fscanf(mpiConfig, "%d", &tag1);
-  fscanf(mpiConfig, "%d", &tag2);
-  fclose(mpiConfig);
-  init_communication(rank, size, tag1, tag2);
+  init_communication(42, 42 + 42);
 
+  std::cout << "Start Calculation on Rank " << get_rank() << "\n";
   calculate();
 
+  std::cout << "End Calculation on Rank " << get_rank() << "\n";
   free_communication();
 
   MPI_Finalize();
