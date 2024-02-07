@@ -74,7 +74,8 @@ ImplementationSpecifics *mpi_implementation_specifics;
 // we previously set it to make analysis easier
 void remove_noinline_from_module(llvm::Module &M) {
   for (auto &F : M) {
-    if (F.hasFnAttribute(llvm::Attribute::NoInline)) {
+    if (F.hasFnAttribute(llvm::Attribute::NoInline) and
+        not F.hasFnAttribute(llvm::Attribute::OptimizeNone)) {
       F.removeFnAttr(llvm::Attribute::NoInline);
     }
   }
