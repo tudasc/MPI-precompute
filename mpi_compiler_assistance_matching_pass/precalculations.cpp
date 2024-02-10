@@ -877,10 +877,13 @@ void PrecalculationAnalysis::insert_function_to_include(llvm::Function *func) {
   }
 }
 
+// TODO: there is the case, where a CALLSITE to user defnied func is in std??
 void PrecalculationAnalysis::visit_arg(
     const std::shared_ptr<TaintedValue> &arg_info) {
   auto *arg = cast<Argument>(arg_info->v);
   arg_info->visited = true;
+
+  assert(not is_func_from_std(arg->getParent()));
 
   auto *func = arg->getParent();
   auto fun_to_precalc = function_analysis.at(func);
@@ -892,6 +895,7 @@ void PrecalculationAnalysis::visit_arg(
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
 
     for (auto *call : fun_to_precalc->callsites) {
+      assert(not is_func_from_std(call->getFunction()));
       auto *operand = call->getArgOperand(arg->getArgNo());
       auto new_val = insert_tainted_value(operand, arg_info);
       new_val->visited =
@@ -1470,11 +1474,25 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       if (is_func_from_std(inst->getFunction())) {
         // inst->getFunction()->dump();
         inst->dump();
+
+        errs() << "In: " << inst->getFunction()->getName() << "\n";
         errs() << "from:";
         from->v->dump();
-        errs() << "In: " << inst->getFunction()->getName() << "\n";
+        if (auto *ii = dyn_cast<Instruction>(from->v)) {
+          errs() << "In: " << ii->getFunction()->getName() << "\n";
+        }
       }
       assert(not is_func_from_std(inst->getFunction()));
+    }
+    if (auto *arg = dyn_cast<Argument>(v)) {
+      if (is_func_from_std(arg->getParent())) {
+        arg->dump();
+
+        errs() << "In: " << arg->getParent()->getName() << "\n";
+        errs() << "from:";
+        from->v->dump();
+      }
+      assert(not is_func_from_std(arg->getParent()));
     }
 
     inserted_elem = std::make_shared<TaintedValue>(v);
