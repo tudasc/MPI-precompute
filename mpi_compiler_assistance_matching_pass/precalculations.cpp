@@ -1825,6 +1825,19 @@ bool is_func_from_std(llvm::Function *func) {
     return true;
   }
 
+  if (func->getName() == "__cxa_throw") {
+    return true;
+  }
+
+  if (func->getName() == "__cxa_allocate_exception") {
+    // TODO is allocator
+    return true;
+  }
+  if (func->getName() == "__cxa_free_exception") {
+    // TODO is free
+    return true;
+  }
+
   // TODO why it is not in TLI info??
   if (func->getName() == "rand") {
     // calling rand in precompute is actually "safe",
