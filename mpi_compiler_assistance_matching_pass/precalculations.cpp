@@ -1349,8 +1349,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
 
     if (is_mpi_function(func)) {
       // TODO is there anything else in MPI we need to handle special??
-      call->dump();
-      errs() << "In: " << call->getFunction()->getName() << "\n";
+      // call->dump();
+      // errs() << "In: " << call->getFunction()->getName() << "\n";
       assert(not is_included_in_precompute(call));
       return;
     }
