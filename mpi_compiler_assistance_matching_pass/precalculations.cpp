@@ -138,13 +138,15 @@ void PrecalculationAnalysis::analyze_functions() {
 
   // populate callees and callsites
   for (auto &f : M.functions()) {
-    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-      if (auto *call = dyn_cast<CallBase>(&*I)) {
-        auto targets = get_possible_call_targets(call);
-        for (auto *target : targets) {
-          function_analysis[target]->callsites.insert(call);
-          function_analysis[call->getFunction()]->callees.insert(
-              function_analysis[target]);
+    if (not is_func_from_std(&f)) { // dont analyze std's internals
+      for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+        if (auto *call = dyn_cast<CallBase>(&*I)) {
+          auto targets = get_possible_call_targets(call);
+          for (auto *target : targets) {
+            function_analysis[target]->callsites.insert(call);
+            function_analysis[call->getFunction()]->callees.insert(
+                function_analysis[target]);
+          }
         }
       }
     }
@@ -261,6 +263,12 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
   if (func->isDeclaration()) {
     // don't know: need to assume it can throw
     // func->dump();
+    assert(can_except_in_precompute);
+    return;
+  }
+
+  if (is_func_from_std(func)) {
+    // we don't analyze std's internals, assume it can throw
     assert(can_except_in_precompute);
     return;
   }
