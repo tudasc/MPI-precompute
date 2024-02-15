@@ -1670,6 +1670,7 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
     possible_targets = virtual_call_sites.get_possible_call_targets(call);
   } else {
     possible_targets.push_back(call->getCalledFunction());
+    return possible_targets;
   }
 
   if (is_func_from_std(call->getFunction())) {
