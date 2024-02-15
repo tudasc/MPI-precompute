@@ -24,5 +24,6 @@ tests 03 to 09 target the implementation of the communication
 24 output to std::cout with multiple chained << commands
 25 multiple calls to MPI get rank wrapper but only one cll is important
 26 ArgsReader Class
+27 inharitance with a std::shared_ptr as a global variable
 cmake-c the pass should process the cmake sample snipped used to determine mpi version
 cmake-cpp

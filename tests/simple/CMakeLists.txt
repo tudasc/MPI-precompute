@@ -130,6 +130,11 @@ add_test(NAME test26
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+add_test(NAME test27
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/27
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
 add_test(NAME cmake-c
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${CMAKE_CURRENT_SOURCE_DIR}/cmake-c
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -167,7 +172,7 @@ set_tests_properties(test23 PROPERTIES PROCESSORS 2)
 set_tests_properties(test24 PROPERTIES PROCESSORS 2)
 set_tests_properties(test25 PROPERTIES PROCESSORS 2)
 set_tests_properties(test26 PROPERTIES PROCESSORS 2)
-
+set_tests_properties(test27 PROPERTIES PROCESSORS 2)
 
 
 # currently not implemented feature: other comm than comm world
