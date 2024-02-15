@@ -740,6 +740,14 @@ void PrecalculationAnalysis::visit_ptr_usages(
   }
 
   for (auto *u : ptr->v->users()) {
+    if (auto *inst = dyn_cast<Instruction>(u)) {
+      if (is_func_from_std(inst->getFunction())) {
+        // user may mark functions as "belong to std"
+        // we dont analyze those usages- as user told so
+        continue;
+      }
+    }
+
     if (auto *store = dyn_cast<StoreInst>(u)) {
 
       // taint the store to analyze if it is important
@@ -891,6 +899,10 @@ void PrecalculationAnalysis::visit_arg(
   auto *arg = cast<Argument>(arg_info->v);
   arg_info->visited = true;
 
+  if (is_func_from_std(arg->getParent())) {
+    return;
+    // user may mark functions to exclude
+  }
   assert(not is_func_from_std(arg->getParent()));
 
   auto *func = arg->getParent();
@@ -1510,6 +1522,7 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       }
       assert(not is_func_from_std(inst->getFunction()));
     }
+    /*
     if (auto *arg = dyn_cast<Argument>(v)) {
       if (is_func_from_std(arg->getParent())) {
         arg->dump();
@@ -1519,7 +1532,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
         from->v->dump();
       }
       assert(not is_func_from_std(arg->getParent()));
-    }
+    }*/
+    // TODO user may mark funcs that are presendt as "same as std"
 
     inserted_elem = std::make_shared<TaintedValue>(v);
     auto pair = tainted_values.insert(inserted_elem);
@@ -1886,6 +1900,10 @@ bool PrecalculationAnalysis::is_func_from_std(llvm::Function *func) const {
     return true;
   }
   if (func->getName() == "__cxa_free_exception") {
+    // TODO is free
+    return true;
+  }
+  if (func->getName() == "__cxa_begin_catch") {
     // TODO is free
     return true;
   }
