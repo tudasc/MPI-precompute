@@ -181,7 +181,10 @@ set_tests_properties(test04 PROPERTIES DISABLED true)
 set_tests_properties(test10 PROPERTIES DISABLED true)
 # currently not implemented feature: reading input data (C-Style)
 set_tests_properties(test11 PROPERTIES DISABLED true)
+# currently not implemented: use uf shared ptr
+set_tests_properties(test27 PROPERTIES DISABLED true)
 #set_tests_properties(test00 PROPERTIES DISABLED true)
+
 
 # These testcases Re-Use an envelope and are therefore expected to NOT use MPIOPT
 # the pass should still produce a running executable though, where precompute finds out that MPIOPT is not applicable
