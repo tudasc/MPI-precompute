@@ -155,6 +155,15 @@ class PrecalculationAnalysis
 public:
   PrecalculationAnalysis(llvm::Module &M, llvm::Function *entry_point)
       : M(M), entry_point(entry_point), virtual_call_sites(DevirtAnalysis(M)) {
+
+    // read settings from environment var
+    if (const char *env_p = std::getenv(
+            "COMPILER_ASSISTED_MATCHING_ALLOW_EXTERNAL_FUNCTIONS")) {
+      auto as_str = std::string(env_p);
+      llvm::errs() << "Allow function namespace " << as_str << "\n";
+      allowed_function_prefixes.push_back(as_str);
+    }
+
     analyze_functions();
   };
 
