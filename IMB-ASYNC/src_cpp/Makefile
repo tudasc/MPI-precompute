@@ -72,11 +72,11 @@ CXX=mpiicpc
 endif
 override CPPFLAGS += -I.
 
-override CFLAGS += -O2 -Wall -Wno-long-long
-override CXXFLAGS += -O2 -Wall -Wextra -pedantic -Wno-long-long -std=c++11
+#override CFLAGS += -O2 -Wall -Wno-long-long
+#override CXXFLAGS += -O2 -Wall -Wextra -pedantic -Wno-long-long -std=c++11
 
-#override CFLAGS += -O0 -g -Wall -Wno-long-long
-#override CXXFLAGS += -O0 -g -Wall -Wextra -pedantic -Wno-long-long -std=c++11
+override CFLAGS += -O1 -g -Wall -Wno-long-long
+override CXXFLAGS += -O1 -g -Wall -Wextra -pedantic -Wno-long-long -std=c++11
 
 override LDFLAGS += -largsparser -lyaml-cpp 
 ifdef WITH_OPENMP
@@ -104,11 +104,17 @@ all: $(BINARY)
 
 IMB_SRC = imb.cpp scope.cpp
 IMB_OBJ = $(IMB_SRC:.cpp=.o)
-IMB_OBJBC = $(IMB_SRC:.cpp=.bc)
+
 
 BECHMARK_SUITE_SRC += benchmark_suites_collection.cpp
 BECHMARK_SUITE_OBJ = $(BECHMARK_SUITE_SRC:.cpp=.o)
-BECHMARK_SUITE_OBJBC = $(BECHMARK_SUITE_SRC:.cpp=.bc)
+
+
+YAML_LIB_OBJ = binary.o emit.o emitterstate.o exp.o node.o null.o parser.o scanscalar.o simplekey.o tag.o convert.o emitfromevents.o emitterutils.o memory.o node_data.o ostream_wrapper.o regex_yaml.o scantag.o singledocparser.o directives.o emitter.o exceptions.o nodebuilder.o nodeevents.o parse.o scanner.o scantoken.o stream.o
+
+ARGPARSER_LIB_OBJS = argsparser.o argsparser_iface.o
+
+ADDITIONAL_OBJ = $(ARGPARSER_LIB_OBJS) $(YAML_LIB_OBJ)
 
 HEADERS += benchmark.h \
 benchmark_suite_base.h \
@@ -121,18 +127,18 @@ announce:
 	@if test "$(ANNOUNCE)" -eq "1"; then echo "NOTE: Building target: $(TARGET), binary name: $(BINARY)"; fi
 	@if test "$(ANNOUNCE)" -eq "1"; then echo "NOTE: Use make TARGET=<DIR_NAME> to select a target suite"; fi
 
-$(BINARY): $(IMB_OBJBC) $(BECHMARK_SUITE_OBJBC) $(ADDITIONAL_OBJ)
-	llvm-link -o all.bc $^
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ all.bc $(LDFLAGS)
+$(BINARY): $(IMB_OBJ) $(BECHMARK_SUITE_OBJ) $(ADDITIONAL_OBJ)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-%.bc: %.cpp
-	$(CXX) $(CPPFLAGS) -c -emit-llvm $(CXXFLAGS) -o $@ $<
+%.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-%.bc: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -emit-llvm -o $@ $<
+%.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
 
 clean: announce
-	rm -f $(IMB_OBJBC) $(BECHMARK_SUITE_OBJBC) $(ADDITIONAL_OBJBC) $(BINARY) all.bc
+	rm -f $(IMB_OBJ) $(BECHMARK_SUITE_OBJ) $(ADDITIONAL_OBJ) $(BINARY) all.bc
 
 
 $(BECHMARK_SUITE_OBJ): $(HEADERS) Makefile
