@@ -85,6 +85,8 @@ struct mpi_functions {
   llvm::Function *mpi_Ibarrier = nullptr;
   llvm::Function *mpi_Iallreduce = nullptr;
 
+  llvm::Function *mpi_wtime = nullptr;
+
   llvm::Function *mpi_start = nullptr;
   llvm::Function *mpi_startall = nullptr;
   llvm::Function *mpi_send_init = nullptr;

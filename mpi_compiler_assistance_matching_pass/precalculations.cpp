@@ -1270,15 +1270,16 @@ void PrecalculationAnalysis::visit_call_for_retval(
     include_call_to_std(call_info);
   } else {
     for (auto *func : get_possible_call_targets(call)) {
-      if (func->isDeclaration()) {
+      if (func->isDeclaration() && not(func == mpi_func->mpi_wtime)) {
         errs() << "\n";
         call->dump();
         func->dump();
         errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
                << func->isIntrinsic() << "\n";
       }
-      assert(not func->isDeclaration() &&
-             "cannot analyze if calling external function for return value "
+      assert(func == mpi_func->mpi_wtime ||
+             not func->isDeclaration() &&
+                 "cannot analyze if calling external function for return value "
              "has "
              "side effects");
       for (auto &bb : *func) {

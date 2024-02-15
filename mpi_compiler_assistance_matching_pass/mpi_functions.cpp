@@ -85,6 +85,8 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
     } else if (f->getName().equals("MPI_Iallreduce")) {
       result->mpi_Iallreduce = f;
 
+    } else if (f->getName().equals("MPI_Wtime")) {
+      result->mpi_wtime = f;
     }
 
     // different sending modes:
