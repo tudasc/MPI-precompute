@@ -159,9 +159,15 @@ public:
     // read settings from environment var
     if (const char *env_p = std::getenv(
             "COMPILER_ASSISTED_MATCHING_ALLOW_EXTERNAL_FUNCTIONS")) {
-      auto as_str = std::string(env_p);
-      llvm::errs() << "Allow function namespace " << as_str << "\n";
-      allowed_function_prefixes.push_back(as_str);
+      std::istringstream iss(env_p);
+      std::string item;
+      std::vector<std::string> elems;
+      while (std::getline(iss, item, ':')) {
+        if (item != "") {
+          llvm::errs() << "Allow function namespace: " << item << "\n";
+          allowed_function_prefixes.push_back(item + "::");
+        }
+      }
     }
 
     analyze_functions();
