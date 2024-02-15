@@ -986,32 +986,6 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
 
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
-  assert(not call->isIndirectCall());
-  assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
-  long arg_no = -1;
-
-  for (unsigned i = 0; i < call->getNumOperands(); ++i) {
-    if (call->getArgOperand(i) == ptr_arg_info->v) {
-      arg_no = i;
-      break;
-    }
-  }
-  assert(arg_no != -1);
-
-  auto *arg = call->getCalledFunction()->getArg(arg_no);
-  if (not arg->hasAttribute(llvm::Attribute::ReadNone)) {
-
-    return true;
-  }
-  return false;
-}
-
-bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
-    llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
-
-  assert(ptr_arg_info->v->getType()->isPointerTy());
-  assert(ptr_arg_info->ptr_info);
-  assert(not call->isIndirectCall());
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
   long arg_no = -1;
 
@@ -1023,9 +997,47 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   }
   assert(arg_no != -1);
 
-  auto *arg = call->getCalledFunction()->getArg(arg_no);
-  if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
-    return true;
+  for (auto *tgt : get_possible_call_targets(call)) {
+
+    if (tgt->isVarArg()) {
+      return true; // assume it is
+    }
+
+    auto *arg = tgt->getArg(arg_no);
+    if (not arg->hasAttribute(llvm::Attribute::ReadNone)) {
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
+    llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
+
+  assert(ptr_arg_info->v->getType()->isPointerTy());
+  assert(ptr_arg_info->ptr_info);
+  assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
+  long arg_no = -1;
+
+  for (unsigned i = 0; i < call->arg_size(); ++i) {
+    if (call->getArgOperand(i) == ptr_arg_info->v) {
+      arg_no = i;
+      break;
+    }
+  }
+  assert(arg_no != -1);
+
+  for (auto *tgt : get_possible_call_targets(call)) {
+    if (tgt->isVarArg()) {
+      return true; // assume it is
+    }
+
+    auto *arg = tgt->getArg(arg_no);
+    if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
+      return true;
+    }
   }
   return false;
 }
@@ -1035,46 +1047,46 @@ void PrecalculationAnalysis::include_call_to_std(
 
   assert(isa<CallBase>(call_info->v));
   auto *call = cast<CallBase>(call_info->v);
-  assert(not call->isIndirectCall());
 
-  auto *func = call->getCalledFunction();
-  assert(
-      (func->isIntrinsic() && should_call_intrinsic(func->getIntrinsicID())) ||
-      is_func_from_std(func));
+  for (auto *func : get_possible_call_targets(call)) {
+    assert((func->isIntrinsic() &&
+            should_call_intrinsic(func->getIntrinsicID())) ||
+           is_func_from_std(func));
 
-  // calling into std is safe, as no side effects will occur (other
-  // than for the given parameters)
-  //  as std is designed to have as fw side effects as possible
-  // TODO implement check for exception std::rand and std::cout/cin
-  // we just need to make shure all parameters are given
+    // calling into std is safe, as no side effects will occur (other
+    // than for the given parameters)
+    //  as std is designed to have as fw side effects as possible
+    // TODO implement check for exception std::rand and std::cout/cin
+    // we just need to make shure all parameters are given
 
-  for (auto &arg : call->args()) {
-    auto arg_info = insert_tainted_value(arg, call_info);
+    for (auto &arg : call->args()) {
+      auto arg_info = insert_tainted_value(arg, call_info);
 
-    // for ptr parameters: we need to respect if the func
-    // reads/writes them
-    if (arg->getType()->isPointerTy()) {
+      // for ptr parameters: we need to respect if the func
+      // reads/writes them
+      if (arg->getType()->isPointerTy()) {
 
-      if (is_ptr_usage_in_std_read(call, arg_info)) {
-        arg_info->ptr_info->setIsReadFrom(call, this);
-        arg_info->ptr_info->setWholePtrIsRelevant(true);
+        if (is_ptr_usage_in_std_read(call, arg_info)) {
+          arg_info->ptr_info->setIsReadFrom(call, this);
+          arg_info->ptr_info->setWholePtrIsRelevant(true);
+        }
+        if (is_ptr_usage_in_std_write(call, arg_info)) {
+          arg_info->ptr_info->setIsWrittenTo(call, this);
+          arg_info->ptr_info->setWholePtrIsRelevant(true);
+        }
+        // TODO more like a hotfix? probably overestimating the instructions to
+        // be included
+        // TODO check if there is another case than operator[] where this is
+        // important
+        if (call->getType()->isPointerTy()) {
+          // if std derives a ptr (e.g. operator[]) we treat it as aliasing to
+          // all input ptrs
+          call_info->ptr_info->merge_with(arg_info->ptr_info);
+        }
       }
-      if (is_ptr_usage_in_std_write(call, arg_info)) {
-        arg_info->ptr_info->setIsWrittenTo(call, this);
-        arg_info->ptr_info->setWholePtrIsRelevant(true);
-      }
-      // TODO more like a hotfix? probably overestimating the instructions to be
-      // included
-      // TODO check if there is another case than operator[] where this is
-      // important
-      if (call->getType()->isPointerTy()) {
-        // if std derives a ptr (e.g. operator[]) we treat it as aliasing to all
-        // input ptrs
-        call_info->ptr_info->merge_with(arg_info->ptr_info);
-      }
+      // need all args to be present for the call
+      include_value_in_precompute(arg_info);
     }
-    // need all args to be present for the call
-    include_value_in_precompute(arg_info);
   }
   include_value_in_precompute(call_info);
 }
@@ -1211,7 +1223,7 @@ void PrecalculationAnalysis::visit_invoke_for_exception(
       for (auto &inst : bb)
         if (auto *cc = dyn_cast<CallBase>(&inst)) {
           if (can_except_in_precompute(cc)) {
-            assert(call_info->isIncludeInPrecompute());
+            // assert(call_info->isIncludeInPrecompute());
             auto new_val =
                 insert_tainted_value(cc, CONTROL_FLOW_EXCEPTION_NEEDED);
             include_value_in_precompute(new_val);
@@ -1282,6 +1294,12 @@ void PrecalculationAnalysis::visit_call_from_ptr(
                                        "argument is currently not supported");
     return;
   }
+
+  // if (not is_store_important(call,ptr->ptr_info)){
+  //  no need to analyze it, if nothing is done with the ptr afterward anyway
+  //  but this func does currently not take into account the GEP members of ptr
+  //    return;
+  //  }
 
   auto *func = call->getCalledFunction();
   assert(not ptr_given_as_arg.empty());
@@ -1675,7 +1693,7 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
 
   if (is_func_from_std(call->getFunction())) {
     // we dont need to analyze the sts::'s internals
-    // if std:: calls a user function indirecttly it will get a ptr to it
+    // if std:: calls a user function indirectly it will get a ptr to it
     // anyway
     return possible_targets;
   }
@@ -1697,8 +1715,17 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
     call->dump();
     errs() << "In: " << call->getFunction()->getName() << "\n";
   }
-
   assert(not possible_targets.empty() && "could not find tgts of call");
+
+  /*
+  for (auto *tgt : possible_targets) {
+    if ( call->isIndirectCall() && is_func_from_std(tgt)) {
+      call->dump();
+      errs() << "In: " << call->getFunction()->getName() << "\n";
+      errs() << "Indirect calls to std are not supported\n";
+      assert(false);
+    }
+  }*/
   return possible_targets;
 }
 
