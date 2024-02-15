@@ -1015,7 +1015,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
   long arg_no = -1;
 
-  for (unsigned i = 0; i < call->getNumOperands(); ++i) {
+  for (unsigned i = 0; i < call->arg_size(); ++i) {
     if (call->getArgOperand(i) == ptr_arg_info->v) {
       arg_no = i;
       break;
