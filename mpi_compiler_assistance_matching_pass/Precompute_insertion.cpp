@@ -72,7 +72,7 @@ llvm::Function *get_global_re_init_function(
             // is raised
             errs() << "Global without initializer:\n";
             global.dump();
-            assert(is_global_from_std(&global));
+            assert(precompute_analyis_result.is_global_from_std(&global));
           }
           // collect the necessary __cxx_global_var_init function that
           // initializes this variable
@@ -109,7 +109,7 @@ llvm::Function *get_global_re_init_function(
 
 void replace_allocation_call(llvm::CallBase *call) {
   assert(call);
-  assert(is_allocation(call));
+  // assert(is_allocation(call));
 
   Value *size;
   IRBuilder<> builder = IRBuilder<>(call);
@@ -320,7 +320,7 @@ void replace_calls_in_copy(
           }
           // end handling calls to MPI
 
-          if (is_allocation(call)) {
+          if (precompute_analyis_result.is_allocation(call)) {
             to_replace.push_back(call);
             continue;
           }
@@ -335,8 +335,8 @@ void replace_calls_in_copy(
                        callee) ||
                    // callee is the original function
                    // which should not be a user function
-                   is_func_from_std(callee) || is_mpi_function(callee) ||
-                   callee->isIntrinsic());
+                   precompute_analyis_result.is_func_from_std(callee) ||
+                   is_mpi_function(callee) || callee->isIntrinsic());
             // it is not used: nothing to do, later pruning step will remove it
           }
         }
@@ -361,7 +361,7 @@ void replace_calls_in_copy(
     }
     // end handling calls to MPI
 
-    if (is_allocation(call)) {
+    if (precompute_analyis_result.is_allocation(call)) {
       replace_allocation_call(call);
       continue;
     }
@@ -388,8 +388,8 @@ void replace_calls_in_copy(
         // callee is the original function
         // which should not be a user function
         // call->dump();
-        assert(is_func_from_std(callee) || is_mpi_function(callee) ||
-               callee->isIntrinsic());
+        assert(precompute_analyis_result.is_func_from_std(callee) ||
+               is_mpi_function(callee) || callee->isIntrinsic());
       }
     }
 

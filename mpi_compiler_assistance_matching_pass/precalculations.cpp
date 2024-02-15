@@ -67,7 +67,7 @@ bool is_interaction_with_cout(llvm::CallBase *call) {
     // call->dump();
 
     if (call->arg_size() >= 2 && call->getArgOperand(0) == cout) {
-      assert(is_func_from_std(call->getCalledFunction()));
+      // assert(is_func_from_std(call->getCalledFunction()));
       // errs() << "TRUE: interaction with cout:\n";
       return true;
     }
@@ -247,7 +247,7 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
     return;
   }
 
-  if (is_allocation(func)      // out of mem is fatal
+  if (precompute_analysis->is_allocation(func) // out of mem is fatal
       || is_mpi_function(func) // mpi cannot throw recoverable exceptions
   ) {
     can_except_in_precompute = false;
@@ -267,7 +267,7 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
     return;
   }
 
-  if (is_func_from_std(func)) {
+  if (precompute_analysis->is_func_from_std(func)) {
     // we don't analyze std's internals, assume it can throw
     assert(can_except_in_precompute);
     return;
@@ -1847,7 +1847,9 @@ std::string get_function_name(const std::string &demangled_name) {
   return no_template;
 }
 
-bool is_func_from_std(llvm::Function *func) {
+// returns true if func is from std or part of the
+// COMPILER_ASSISTED_MATCHING_ALLOW_EXTERNAL_FUNCTIONS environment variable
+bool PrecalculationAnalysis::is_func_from_std(llvm::Function *func) const {
 
   assert(func);
 
@@ -1864,14 +1866,10 @@ bool is_func_from_std(llvm::Function *func) {
   // errs() << "Test if in std:\n" << func->getName() <<demangled_fname <<
   // "\n";
 
-  // startswith std::
-  if (demangled_fname.rfind("std::", 0) == 0) {
-    return true;
-  }
-
-  // internals of gnu implementation
-  if (demangled_fname.rfind("__gnu_cxx::", 0) == 0) {
-    return true;
+  for (auto prefix : allowed_function_prefixes) {
+    if (demangled_fname.rfind(prefix, 0) == 0) {
+      return true;
+    }
   }
 
   // more like a stack ptr than a function call

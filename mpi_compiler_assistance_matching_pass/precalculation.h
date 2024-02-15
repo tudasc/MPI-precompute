@@ -35,59 +35,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 class PrecalculationAnalysis;
 
-inline bool is_allocation(llvm::Function *func) {
-  assert(func);
-  // operator new
-  if (func->getName() == "_Znwm") {
-    return true;
-  }
-  if (func->getName() == "malloc") {
-    return true;
-  }
-  if (func->getName() == "calloc") {
-    return true;
-  }
-  return false;
-}
-
-inline bool is_allocation(llvm::CallBase *call) {
-
-  if (call->isIndirectCall()) {
-    return false;
-  }
-  return is_allocation(call->getCalledFunction());
-}
-
-bool is_func_from_std(llvm::Function *func);
-
-// we should not mess around with the globals defined by std::
-inline bool is_global_from_std(llvm::GlobalValue *global) {
-  assert(global);
-  if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
-    return is_func_from_std(f);
-  }
-
-  auto demangled = llvm::demangle(global->getName().str());
-  // startswith std::
-  if (demangled.rfind("std::", 0) == 0) {
-    return true;
-  }
-
-  std::regex regex_pattern_std("^(VTT for )?std::(.+)");
-  if (std::regex_match(demangled, regex_pattern_std)) {
-    return true;
-  }
-
-  if (std::regex_match(demangled, std::regex("^(typeinfo for )?std::(.+)"))) {
-    return true;
-  }
-
-  if (global->getName() == "__dso_handle") {
-    return true;
-  }
-  return false;
-}
-
 class PrecalculationFunctionAnalysis
     : public std::enable_shared_from_this<PrecalculationFunctionAnalysis> {
 public:
@@ -304,6 +251,12 @@ private:
   // materialize call
   void include_call_to_std(const std::shared_ptr<TaintedValue> &call_info);
 
+  std::vector<std::string> allowed_function_prefixes = {
+      // from std
+      "std::",
+      // internals of gnu implementation
+      "__gnu_cxx::"};
+
 public:
   bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
@@ -362,15 +315,69 @@ private:
   bool check_if_call_should_be_included(
       const std::shared_ptr<TaintedValue> &call_info);
 
+public:
+  inline bool is_allocation(llvm::Function *func) const {
+    assert(func);
+    // operator new
+    if (func->getName() == "_Znwm") {
+      return true;
+    }
+    if (func->getName() == "malloc") {
+      return true;
+    }
+    if (func->getName() == "calloc") {
+      return true;
+    }
+    return false;
+  }
+
+  inline bool is_allocation(llvm::CallBase *call) const {
+
+    if (call->isIndirectCall()) {
+      return false;
+    }
+    return is_allocation(call->getCalledFunction());
+  }
+
+  bool is_func_from_std(llvm::Function *func) const;
+
+  // we should not mess around with the globals defined by std::
+  inline bool is_global_from_std(llvm::GlobalValue *global) const {
+    assert(global);
+    if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
+      return is_func_from_std(f);
+    }
+
+    auto demangled = llvm::demangle(global->getName().str());
+    // startswith std::
+    if (demangled.rfind("std::", 0) == 0) {
+      return true;
+    }
+
+    std::regex regex_pattern_std("^(VTT for )?std::(.+)");
+    if (std::regex_match(demangled, regex_pattern_std)) {
+      return true;
+    }
+
+    if (std::regex_match(demangled, std::regex("^(typeinfo for )?std::(.+)"))) {
+      return true;
+    }
+
+    if (global->getName() == "__dso_handle") {
+      return true;
+    }
+    return false;
+  }
+
   inline bool is_call_to_std(llvm::CallBase *call) const {
     if (call->isIndirectCall()) {
       auto tgts = get_possible_call_targets(call);
-      return std::all_of(tgts.begin(), tgts.end(), is_func_from_std);
+      return std::all_of(tgts.begin(), tgts.end(),
+                         [this](auto t) { return is_func_from_std(t); });
     }
 
     return is_func_from_std(call->getCalledFunction());
   }
 };
-
 
 #endif // MACH_PRECALCULATIONS_H_
