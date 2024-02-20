@@ -200,7 +200,8 @@ struct MPICompilerAssistanceMatchingPass
     auto has_error = verifyModule(M, &errs(), nullptr);
     assert(!has_error);
     // at most: every undef value can be duplicated
-    assert(get_num_undefs(M) <= num_undef * 2);
+    // TODO re-enable assertions for no openmp programs
+    // assert(get_num_undefs(M) <= num_undef * 2);
     // but this is probably insecure (e.g. if undef is used to calculate the
     // tag)// so we go with the stricter assertion that our pass should not use
     // more undef values

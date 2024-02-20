@@ -570,8 +570,16 @@ void PrecalculationAnalysis::visit_phi(
 }
 
 void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
-  // errs() << "Visit\n";
-  // v->v->dump();
+  errs() << "Visit\n";
+  v->v->dump();
+
+  if (auto *inst = dyn_cast<Instruction>(v->v)) {
+    if (inst->getFunction()->getName().contains(".omp_outlined.")) {
+      // TODO ignore openmp for now
+      v->visited = true;
+      return;
+    }
+  }
 
   // TODO clang tidy repeated branch body (the v->visited = true part)
 
@@ -844,6 +852,9 @@ void PrecalculationAnalysis::visit_ptr_usages(
     }
 
     ptr->ptr_info->dump();
+
+    errs() << "constant agg?" << isa<ConstantAggregate>(u) << "\n";
+    errs() << "constant data?" << isa<ConstantData>(u) << "\n";
     errs() << "Support for analyzing this Value is not implemented yet\n";
 
     u->dump();
@@ -1229,8 +1240,10 @@ void PrecalculationAnalysis::visit_invoke_for_exception(
     for (auto &bb : *func) {
       if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
         assert(call_info->isIncludeInPrecompute());
-        auto new_val = insert_tainted_value(res, CONTROL_FLOW);
-        include_value_in_precompute(new_val);
+        if (call_info->isIncludeInPrecompute()) {
+          auto new_val = insert_tainted_value(res, CONTROL_FLOW);
+          include_value_in_precompute(new_val);
+        }
       }
       for (auto &inst : bb)
         if (auto *cc = dyn_cast<CallBase>(&inst)) {
@@ -1280,8 +1293,8 @@ void PrecalculationAnalysis::visit_call_for_retval(
       assert(func == mpi_func->mpi_wtime ||
              not func->isDeclaration() &&
                  "cannot analyze if calling external function for return value "
-             "has "
-             "side effects");
+                 "has "
+                 "side effects");
       for (auto &bb : *func) {
         if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
           insert_tainted_value(ret, call_info);
@@ -1293,6 +1306,12 @@ void PrecalculationAnalysis::visit_call_for_retval(
 
 void PrecalculationAnalysis::visit_call_from_ptr(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
+
+  if (call->getCalledFunction()->getName() == "__kmpc_fork_call") {
+    // TODO IMPLEMENT
+    //  ignore openmp regions for now
+    return;
+  }
 
   std::set<unsigned int> ptr_given_as_arg;
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
@@ -1310,7 +1329,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
 
   // if (not is_store_important(call,ptr->ptr_info)){
   //  no need to analyze it, if nothing is done with the ptr afterward anyway
-  //  but this func does currently not take into account the GEP members of ptr
+  //  but this func does currently not take into account the GEP members of
+  //  ptr
   //    return;
   //  }
 
@@ -1593,7 +1613,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
     }
   }
 
-  // this code is asserting that we will visit the call if the retval is needed
+  // this code is asserting that we will visit the call if the retval is
+  // needed
 #ifndef NDEBUG
   if (auto *cc = dyn_cast<CallBase>(v)) {
     if (is_retval_of_call_needed(cc) && not cc->isIndirectCall()) {
@@ -1624,8 +1645,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
               if (not get_taint_info(ii)->visited ||
                   get_taint_info(ii)->getReason() ==
                       TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
-                // if the other is only tainted for its presence it does not use
-                // the retval
+                // if the other is only tainted for its presence it does not
+                // use the retval
                 all_retval_users_visited = false;
               }
             }
@@ -1673,8 +1694,8 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
                     TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED);
                 // only the normal dest is needed
                 // NOT include_value_in_precompute(new_val);
-                // we dont need the invoke to check if exception is thrown as we
-                // know no meaningful exception can be thrown
+                // we dont need the invoke to check if exception is thrown as
+                // we know no meaningful exception can be thrown
               } else {
                 // can except
                 // include_value_in_precompute(new_val);
@@ -1909,6 +1930,14 @@ bool PrecalculationAnalysis::is_func_from_std(llvm::Function *func) const {
     return true;
   }
 
+  // openmp lib funcs
+  if (func->getName() == "omp_get_max_threads") {
+    return true;
+  }
+  if (func->getName() == "omp_get_thread_num") {
+    return true;
+  }
+
   // TODO why it is not in TLI info??
   if (func->getName() == "rand") {
     // calling rand in precompute is actually "safe",
@@ -1985,8 +2014,8 @@ bool PrecalculationAnalysis::is_store_important(
 }
 
 // TODO better function name
-//  if an instruction in foo is included in the set: the resulting set will also
-//  include all calls to foo
+//  if an instruction in foo is included in the set: the resulting set will
+//  also include all calls to foo
 void PrecalculationAnalysis::get_all_transitive_insts(
     std::set<llvm::Instruction *> &instrs) {
 
@@ -2030,8 +2059,8 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
       // TODO include all destructors for debugging only
       if (l->getFunction() == s->getFunction() && l != s) {
         // if load and store are the same (aka call to func that loads and
-        // stores): no need to do something, either the ptr usage is not needed,
-        // or it will be loaded afterward (then it is needed)
+        // stores): no need to do something, either the ptr usage is not
+        // needed, or it will be loaded afterward (then it is needed)
         auto *domtree = analysis_results->getDomTree(*l->getFunction());
         // TODO efficiency: provide LoopInfo?
         if (llvm::isPotentiallyReachable(s, l, nullptr, domtree, nullptr)) {
