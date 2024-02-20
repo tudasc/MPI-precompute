@@ -5,6 +5,9 @@
 #include "map"
 #include "vector"
 
+// for performance build
+#undef PRINT_REGISTERED_VALUES
+
 #define MEASURE_PRECOMPUTE_TIME
 
 // #define USE_MPI_TO_SPLIT_RANKS
