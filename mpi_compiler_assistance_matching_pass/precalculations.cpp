@@ -796,7 +796,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
              "Constexpr other than GEP for ptr currently not implemented");
       // if gep is relevant
       if (ptr->ptr_info->is_member_relevant(gep)) {
-        insert_tainted_value(gep, ptr, false);
+        insert_tainted_value(constant_exp, ptr, false);
       }
       as_inst->deleteValue(); // don't keep temporary instruction
       continue;
