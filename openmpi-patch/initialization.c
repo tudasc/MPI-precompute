@@ -435,17 +435,16 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
       request->nc_strategy = NC_PACKING;
     }
 
+    int pack_size_as_int; // needed in one switch case
     switch (request->nc_strategy) {
     case NC_PACKING:
       // PACKING
 #ifndef NDEBUG
       printf("using packing strategy\n");
 #endif
-      int pack_size_as_int;
       MPI_Pack_size(count, datatype, comm, &pack_size_as_int);
       request->pack_size = pack_size_as_int;
       request->packed_buf = calloc(request->pack_size, 1);
-
       break;
 
     case NC_DIRECT_SEND:
