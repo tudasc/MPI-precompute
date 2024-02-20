@@ -75,8 +75,10 @@ int check_if_envelope_was_registered(int dest, int tag, bool is_send) {
 
   int my_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+#ifndef NDEBUG
   printf("Rank %d: Check if envelope was registered: (%d,%d)\n", my_rank, tag,
          dest);
+#endif
 
   // check for conflicts
   for (unsigned long i = 0; i < get_num_precomputed_values(dest_category);
@@ -120,17 +122,21 @@ struct communicator_info *find_comm(MPI_Comm comm) {
 LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
 
   struct list_elem *current = request_list_head->next;
+#ifndef NDEBUG
   printf("Request: dest %d, tag %d, sending_type %d, recv_type %d\n",
          request->dest, request->tag, is_sending_type(request),
          is_recv_type(request));
+#endif
 
   while (current != NULL) {
     MPIOPT_Request *other = current->elem;
     assert(other != NULL);
     if (other != request) {
+#ifndef NDEBUG
       printf("Other: dest %d, tag %d, sending_type %d, recv_type %d \n",
              other->dest, other->tag, is_sending_type(other),
              is_recv_type(other));
+#endif
 
       // same communication direction
       if ((is_sending_type(request) && is_sending_type(other)) ||
@@ -139,7 +145,9 @@ LINKAGE_TYPE int check_for_conflicting_request(MPIOPT_Request *request) {
         if (request->dest == other->dest && request->tag == other->tag &&
             request->communicators->original_communicator ==
                 other->communicators->original_communicator) {
+#ifndef NDEBUG
           printf("Sending? %d\n", is_sending_type(request));
+#endif
           assert(false &&
                  "Requests with a matching envelope are not permitted");
           return 1;
@@ -430,9 +438,9 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
     switch (request->nc_strategy) {
     case NC_PACKING:
       // PACKING
-
+#ifndef NDEBUG
       printf("using packing strategy\n");
-
+#endif
       int pack_size_as_int;
       MPI_Pack_size(count, datatype, comm, &pack_size_as_int);
       request->pack_size = pack_size_as_int;
@@ -442,20 +450,26 @@ LINKAGE_TYPE int init_request(const void *buf, int count, MPI_Datatype datatype,
 
     case NC_DIRECT_SEND:
       // DIRECT SEND
+#ifndef NDEBUG
       printf("using direct send strategy\n");
+#endif
       read_internal_opal_dtype(request);
 
       break;
 
     case NC_OPT_PACKING:
+#ifndef NDEBUG
       printf("using optimized packing strategy\n");
+#endif
       read_internal_opal_dtype(request);
       request->packed_buf = malloc(request->pack_size);
       break;
 
     case NC_MIXED:
+#ifndef NDEBUG
       printf("using mixed strategy with threshold %d bytes\n",
              request->threshold);
+#endif
       read_internal_opal_dtype(request);
       request->pack_size = 0;
       for (int i = 0; i < request->num_cont_blocks; i++) {
