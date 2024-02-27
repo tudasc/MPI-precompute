@@ -1,0 +1,34 @@
+\subsection{Time step selection}
+The easier way to determine $\Delta t$ is to select it as a constant for all the simulation iterations.
+For visualization concerns we will sometimes use a constant $\Delta t$ but, for simulation precision interests, it is better to compute a new time step for each iterations depending on the distance between the nearest bodies.
+The following equation describes the variable $\Delta t$ calculation:
+\begin{equation}
+\label{eq:dt1}
+	\|\vec{v_i}(t) . \Delta t + \frac{\vec{a_i}(t)}{2} . \Delta t^2 \| \leq 0.1 \times ||\vec{r_{ij}}||,
+\end{equation}
+with $j$ the nearest body to the body $i$.
+For each body $i$, a time step is calculated and the smallest one is chosen.
+Eq.~\ref{eq:dt1} traduces that the distance between $i(t)$ and $i(t + \Delta t)$ must be below 10\% of the $||\vec{r_{ij}}||$ distance.
+This equation assures that two masses cannot be closest than 20\% between $t$ time and $t + \Delta t$ time.
+However, Eq.~\ref{eq:dt1} is not directly usable: this is a $4^{th}$ degree polynomial equation in $\Delta t$.
+It's why we will use the triangle inequality witch allows us to determine a new condition:
+\begin{equation}
+\label{eq:dt2}
+	\|\vec{v_i}(t)\| . \Delta t + \frac{\|\vec{a_i}(t)\|}{2} . \Delta t^2  \leq 0.1 \times ||\vec{r_{ij}}||.
+\end{equation}
+Eq.~\ref{eq:dt2} is a $2^{nd}$ degree equation: this is more reasonable in term of computational time.
+
+\subsection{Time integration}
+\sout{The integrator used to update the positions and velocities is a leapfrog-Verlet integrator (Verlet 1967) because it is applicable to this problem and is computationally efficient (it has a high ratio of accuracy to computational cost).}
+
+Body $i$ velocity characteristic at the $t + \Delta t$ time depends on the velocity and the acceleration at the $t$ time:
+\begin{equation}
+\label{eq:velocity}
+	\vec{v_i}(t + \Delta t) = \vec{v_{i}}(t) + \vec{a_i}(t) . \Delta t.
+\end{equation}
+At the end, body $i$ position $q_i$ at the $t + \Delta t$ time depends on the position, the velocity and the acceleration at the $t$ time:
+\begin{equation}
+\label{eq:position}
+	q_i(t + \Delta t) = q_{i}(t) + \vec{v_{i}}(t) . \Delta t + \frac{\vec{a_i}(t) . \Delta t^2}{2}.
+\end{equation}
+Thanks to Eq.~\ref{eq:acceleration}, \ref{eq:velocity} and \ref{eq:position}, it is now possible to compute the new position and the new velocity for all bodies at the $t + \Delta t$ time.

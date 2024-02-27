@@ -1,0 +1,14 @@
+\subsection{Algorithmic}
+From an algorithmic point of view, we are calculating each body depending on all the other bodies.
+We can traduce that by 2 overlapping \texttt{for-loops} from $0$ to $n$ bodies. 
+In a \texttt{C-like} language we can express the problem this way:
+\begin{lstlisting}[caption={$n$-body pseudo-code algorithm},label={alg:ncorps}]
+body b1[N]; // array which contains all the bodies (at t time)
+body b2[N]; // empty array
+for(unsigned int iBody = 0; iBody < n; ++iBody)
+	for(unsigned int jBody = 0; jBody < n; ++jBody)
+		if(iBody != jBody)
+			b2[iBody] = compute(b1[jBody]);
+\end{lstlisting}
+Alg. \ref{alg:ncorps} shows an important characteristic of the $n$-body problem class: for $n$ given bodies, the algorithmic complexity in term of computational time is approximatively $O(n^2)$.
+It exists other methods to approximate and to resolve the problem in $O(n \log{n} )$ time but this is not in the range of this lab (see {\sc Barnes-Hut} simulation).

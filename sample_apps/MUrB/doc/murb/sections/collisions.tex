@@ -1,0 +1,192 @@
+In \texttt{MoveUrBody} code there are various implementations: some of them simulate colliding bodies.
+In this section we try to explain what kind of collisions are used if the implementation considers colliding bodies.
+
+\subsection{Collisions detection}
+We choose \textit{a posteriori} method in order to detect collisions: this is a discrete and easy to implement method.
+We detect the collisions after they append. 
+This is less expensive in term of computations than \textit{a priori} method (continuous).
+In \texttt{MoveUrBody} we consider that \textbf{the shape of all the bodies is a sphere}, so two bodies $i$ and $j$ are colliding if:
+\begin{equation}	
+\label{eq:collsDetection}
+	||\vec{r_{ij}}|| - (r_i + r_j) \leq 0,
+\end{equation}
+where $r_i$ and $r_j$ are respectively the radii of body $i$ and body $j$.
+
+\subsection{Elastic collisions}
+Notation: Throughout this section, $m$ is the mass and $v$ is the velocity.
+Be aware that $v = ||\vec{v}||$.
+Subscripts $i$ and $j$ distinguish between the two colliding bodies. 
+An apostrophe after a variable means that the value is taken after the collision (called prime; i.e., $v$' is "$v$ prime").\\
+
+In \texttt{MoveUrBody} we consider that \textbf{all collisions are perfectly elastic}.
+An elastic collision is a collision in which kinetic energy is conserved. 
+That means no energy is lost as heat or sound during the collision. 
+In the real world, there are no perfectly elastic collisions on an everyday scale of size. 
+But you can get the sense of an elastic collision by imagining a perfect pool ball which doesn't waste any energy when it collides. 
+In an elastic collision, both kinetic energy and momentum are conserved (the total before and after the collision remains the same).
+Momentum is the product of mass and velocity: 
+\begin{equation}	
+\label{eq:momentum}
+	\vec{p} = m . \vec{v}.
+\end{equation}
+The kinetic energy of an object is one-half times its mass times the square of its velocity:
+\begin{equation}	
+\label{eq:kinetic}
+	E_k = \frac{1}{2} . m . v^2.
+\end{equation}
+Now it is easy to write the conservation of momentum and kinetic energy as two equations:
+\begin{enumerate}
+	\item Conservation of momentum
+		\begin{equation}	
+		\label{eq:momentumCons}
+			m_i . \vec{v_i} + m_j . \vec{v_j} = m_i . \vec{v'_i} + m_j . \vec{v'_j}
+		\end{equation}
+		
+	\item Conservation of kinetic energy
+		\begin{equation}	
+		\label{eq:kineticCons}
+			\frac{1}{2} . m_i . (v_i)^2 + \frac{1}{2} . m_j . (v_j)^2 = \frac{1}{2} . m_i . (v'_i)^2 + \frac{1}{2} . m_j . (v'_j)^2
+		\end{equation}
+\end{enumerate}
+
+\subsubsection{1-Dimensional elastic collisions}
+Combining the two previous equations (Eq.~\ref{eq:momentumCons} and \ref{eq:kineticCons}) and doing a lot of algebra gives the final (after collision) velocities of body $i$ and $j$:
+\begin{equation}	
+\label{eq:1DelasticSols}
+	v'_i = \frac{v_i(m_i-m_j) + 2.m_j.v_j}{m_i + m_j},~~v'_j = \frac{v_j(m_j-m_i) + 2.m_i.v_i}{m_j + m_i}.
+\end{equation}
+This result allows us to find the velocity of two objects after undergoing a one-dimensional elastic collision. 
+We will use this result later in the 3-dimensional case.
+
+\subsubsection{3-Dimensional elastic collisions}
+In previous sub-section (1D elastic collisions) vectors representation was not very important.
+Now in 3D, we will use the component representation of a vector: $\vec{v} = \left\{ v_x, v_y, v_z \right\}$.\\
+
+We will follow a 7-step process to find the new velocities of two objects after a collision. 
+The basic goal of the process is to project the velocity vectors of the two objects onto the vectors which are normal (perpendicular) and tangent to the plan of the collision. 
+This gives us a normal component and two tangential components (defining a plan) for each velocity. 
+The tangential components of the velocities are not changed by the collision because there is no force along the tangent plan to the collision surface. 
+The normal components of the velocities undergo a one-dimensional collision, which can be computed using the one-dimensional collision formulas presented above.
+Next the unit normal vector is multiplied by the scalar (plain number, not a vector) normal velocity after the collision to get a vector which has a direction normal to the collision surface and a magnitude which is the normal component of the velocity after the collision. 
+The same is done with the unit tangent vectors and the tangential velocity components. 
+Finally the new velocity vectors are found by adding the normal velocity and the two tangential velocity vectors for each object.
+
+\paragraph{Step 1}
+~\\
+Find the unit normal and the two unit tangent vectors.
+The unit normal vector is a vector which has a magnitude of 1 and a direction that is normal (perpendicular) to the surfaces of the objects at the point of collision. 
+The two unit tangent vectors are vectors with a magnitude of 1 which are forming a tangent plan to the circle's surfaces at the point of collision.
+	
+First find a normal vector.
+This is done by taking a vector whose components are the difference between the coordinates of the centers of the spheres. 
+Let $q_i = \left\{q_{ix}, q_{iy}, q_{iz}\right\}$, $q_j = \left\{q_{jx}, q_{jy}, q_{jz}\right\}$ coordinates of the centers of the spheres (it does not matter which spheres is labelled $i$ or $j$; the end result will be the same).
+Then the normal vector $\vec{n}$ is: 
+\begin{equation*}	
+	\vec{n} = \left\{ q_{jx} - q_{ix},~q_{jy} - q_{iy},~q_{jz} - q_{iz}  \right\}.
+\end{equation*}
+Next, we have to find the unit vector of $\vec{n}$, which we will call $\vec{un}$. This is done by dividing by the magnitude of $\vec{n}$:
+\begin{equation*}	
+	\vec{un} = \frac{\vec{n}}{||\vec{n}||} = \frac{\vec{n}}{\sqrt{n_x^2 + n_y^2 + n_z^2}}.
+\end{equation*}
+Once it's done we need to find the two unit tangent vectors which are forming the collision tangent plan.
+Those two unit tangent vectors ($\vec{ut_1}$ and $\vec{ut_2}$) are perpendicular to the unit normal vector $\vec{un}$ and there are also perpendicular between themselves (in order to form a Cartesian coordinate system).
+Before trying to determine two unit tangent vectors $\vec{ut_1}$ and $\vec{ut_2}$ we will try to find a tangent vector $\vec{t_1}$.
+If $\vec{t_1}$ is perpendicular to $\vec{un}$ then the scalar product (alias dot product) of the two should be null:
+\begin{equation*}
+	\vec{t_1} . \vec{un} = 0 \Leftrightarrow	(t_{1x} . un_x) + (t_{1y} . un_y) + (t_{1z} . un_z) = 0.
+\end{equation*}
+The first and easy solution to this previous equation is the null vector $\vec{0}$ but we obviously want to avoid it.
+An idea is to fix one of the three components to 0 and an other to 1 in order to determine a perpendicular vector $\vec{t_1}$ (be aware that there is an infinity of perpendicular vectors to $\vec{un}$ and we just need to find one of them).\\
+If $un_x \neq 0$:
+\begin{equation*}
+	\vec{t_1} = \left\{ -\frac{un_y}{un_x}, 1, 0 \right\}.
+\end{equation*}
+If $un_y \neq 0$:
+\begin{equation*}
+	\vec{t_1} = \left\{ 1, -\frac{un_x}{un_y}, 0 \right\}.
+\end{equation*}
+If $un_z \neq 0$:
+\begin{equation*}
+	\vec{t_1} = \left\{ 1, 0, -\frac{un_x}{un_z} \right\}.
+\end{equation*}
+We have to choose one of the three previous propositions and be sure to avoid to divide by 0.
+Now we have to normalize $\vec{t_1}$ in order to find the unitary $\vec{ut_1}$ vector:
+\begin{equation*}
+	\vec{ut_1} = \frac{\vec{t_1}}{||\vec{t_1}||} = \frac{\vec{t_1}}{\sqrt{t_{1x}^2 + t_{1y}^2 + t_{1z}^2}}.
+\end{equation*}
+It remains to determine the $\vec{ut_2}$ vector, this can be done by computing the cross product (alias vector product) between $\vec{un}$ and $\vec{ut_1}$:
+\begin{equation*}
+	\vec{ut_2} = \vec{un} \wedge \vec{ut_1} = \left\{ (un_y . ut_{1z} - un_z . ut_{1y}), (un_z . ut_{1x} - un_x . ut_{1z}), (un_x . ut_{1y} - un_y . ut_{1x})\right\}.
+\end{equation*}
+
+\paragraph{Step 2}
+~\\
+Create the initial (before the collision) velocity vectors, $\vec{v_i}$ and $\vec{v_j}$. 
+These are just the $x$, $y$ and $z$ components of the velocities put into vectors: $\vec{v_i} = \left\{ v_{ix}, v_{iy} \right\}$ (and similarly for $\vec{v_j}$). 
+Note that this step really isn't necessary if the velocities are already represented as vectors. 
+This step is needed only if the velocities are initially represented as separate $x$, $y$ and $z$ values.
+
+\paragraph{Step 3}
+~\\
+Keep in mind that after the collision the tangential components of the velocities are unchanged and the normal component of the velocities can be found using the one-dimensional collision formulas presented earlier. 
+So we need to resolve the velocity vectors, $\vec{v_i}$ and $\vec{v_j}$, into normal and tangential components. 
+To do this, project the velocity vectors onto the unit normal and unit tangent vectors by computing the dot product. 
+Let $v_{in}$ be the scalar (plain number, not a vector) velocity of body $i$ in the normal direction. 
+Let $v_{it1}$ and $v_{it2}$ be the scalar velocity of body $i$ in the tangential directions. 
+Similarly, let $v_{jn}$, $v_{jt1}$ and $v_{jt2}$ be for body $j$. 
+These values are found by projecting the velocity vectors onto the unit normal and unit tangent vectors, which is done by taking the dot (alias scalar) product:
+\begin{equation*}
+	v_{in} = \vec{v_i}.\vec{un},~~v_{it1} = \vec{v_i}.\vec{ut_1},~~v_{it2} = \vec{v_i}.\vec{ut_2},
+\end{equation*}
+\begin{equation*}
+	v_{jn} = \vec{v_j}.\vec{un},~~v_{jt1} = \vec{v_j}.\vec{ut_1},~~v_{jt2} = \vec{v_j}.\vec{ut_2}.
+\end{equation*}
+
+\paragraph{Step 4}
+~\\
+Find the new tangential velocities (after the collision). 
+This is the simplest step of all. 
+The tangential components of the velocity do not change after the collision because there is no force between the spheres in the tangential direction during the collision. 
+So, the new tangential velocities are simply equal to the old ones:
+\begin{equation*}
+	v'_{it1} = v_{it1},~~v'_{it2} = v_{it2},
+\end{equation*}
+\begin{equation*}
+	v'_{jt1} = v_{jt1},~~v'_{jt2} = v_{jt2}.
+\end{equation*}
+
+\paragraph{Step 5}
+~\\
+Find the new normal velocities. 
+This is where we use the one-dimensional collision formulas (Eq.~\ref{eq:1DelasticSols}).
+The velocities of the two spheres along the normal direction are perpendicular to the surfaces
+of the spheres at the point of collision, so this really is a one-dimensional collision:
+\begin{equation*}
+	v'_{in} = \frac{v_{in}(m_i-m_j) + 2.m_j.v_{jn}}{m_i + m_j},
+\end{equation*}
+\begin{equation*}
+	v'_{jn} = \frac{v_{jn}(m_j-m_i) + 2.m_i.v_{in}}{m_j + m_i}.
+\end{equation*}
+
+\paragraph{Step 6}
+~\\
+Convert the scalar normal and tangential velocities into vectors. 
+This is easy just multiply the unit normal vector by the scalar normal velocity and you get a vector which has a direction that is normal to the surfaces at the point of collision and which has a magnitude equal to the normal component of the velocity. 
+It is similar for the tangential components:
+\begin{equation*}
+	\vec{v'_{in}} = v'_{in} . \vec{un},~~\vec{v'_{it1}} = v'_{it1} . \vec{ut_1},~~\vec{v'_{it2}} = v'_{it2} . \vec{ut_2},
+\end{equation*}
+\begin{equation*}
+	\vec{v'_{jn}} = v'_{jn} . \vec{un},~~\vec{v'_{jt1}} = v'_{jt1} . \vec{ut_1},~~\vec{v'_{jt2}} = v'_{jt2} . \vec{ut_2}.
+\end{equation*}
+
+\paragraph{Step 7}
+~\\
+Find the final velocity vectors by adding the normal and tangential components for each body:
+\begin{equation*}
+	\vec{v'_i} = \vec{v'_{in}} + \vec{v'_{it1}} + \vec{v'_{it2}},
+\end{equation*}
+\begin{equation*}
+	\vec{v'_j} = \vec{v'_{jn}} + \vec{v'_{jt1}} + \vec{v'_{jt2}}.
+\end{equation*}
+Now we have the final (after collision) velocity of each body as a vector.
