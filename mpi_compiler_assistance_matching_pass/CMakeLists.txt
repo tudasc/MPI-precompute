@@ -20,8 +20,8 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         ptr_info.h
         ptr_info.cpp
         CompilerPassConstants.h
-        precompute_funcs.cpp
-        precompute_funcs.h
+        precompute_backend_funcs.cpp
+        precompute_backend_funcs.h
         Precompute_insertion.cpp
         Precompute_insertion.h
         VtableManager.cpp

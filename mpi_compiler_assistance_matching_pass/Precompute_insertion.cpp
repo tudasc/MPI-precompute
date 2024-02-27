@@ -20,7 +20,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
-#include "precompute_funcs.h"
+#include "precompute_backend_funcs.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"

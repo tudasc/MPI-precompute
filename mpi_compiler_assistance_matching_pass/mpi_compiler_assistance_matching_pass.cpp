@@ -43,7 +43,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "debug.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
-#include "precompute_funcs.h"
+#include "precompute_backend_funcs.h"
 #include "replacement.h"
 
 #include "llvm/Transforms/IPO/ModuleInliner.h"
