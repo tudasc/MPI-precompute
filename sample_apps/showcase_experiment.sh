@@ -5,7 +5,7 @@
 #git clone https://github.com/llvm/llvm-project.git
 #git checkout llvmorg-16.0.1
 #mkdir llvm_build && cd llvm_build
-#cmake -DCMAKE_INSTALL_PREFIX=INSTALL_PREFIX -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=On -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;compiler-rt;lld;lldb;openmp;polly;pstl;mlir;flang" ../llvm-project/llvm/
+#cmake -DCMAKE_INSTALL_PREFIX=INSTALL_PREFIX -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=On -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;comiler-rt;lld;lldb;openmp;polly;pstl;mlir;flang" ../llvm-project/llvm/
 
 # open openmpi-patch/Cmakelist.txt and adjust openmpi build settings if necessary
 # execute in build dir

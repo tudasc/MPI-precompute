@@ -1,8 +1,8 @@
-# Compiler Assisted Message Matching for Persistent MPI operations
-This Repository contains our LLVM analysis pass, to reduce the amount of message matching necessary for MPI persistent Operations, as well as three different implementations of possible communication schemes.
+# Compiler based Precomputation of message envelopes for Persistent MPI operations
 
 ## Prerequisites
-For this Project, we used clang/llvm 11, openmpi 4.1.1 openucx 12.0.0 (also refer `setup_env.sh`)
+
+For this Project, we used clang/llvm 16. openmpi 4.1.1 will be downloaded during the cmake build step
 
 ## Compiler analysis pass
 The directory `mpi_compiler_assistance_matching_pass` contains the source code of our pass.
