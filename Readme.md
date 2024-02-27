@@ -1,6 +1,8 @@
 # Compiler-Based Precalculation of MPI Message Envelopes
 
-This Repo contains TODO introduction sentence, what this is about
+This Repository contains the llvm pass that inserts the precalculation of MPI message tags into an
+application [[1]](ref-1), alongside the openmpi patch developed in [[2]](ref-2) and MUrB (
+by [Adrien Cassange](https://largo.lip6.fr/~cassagnea/)) as an example application to showcase the pass.
 
 ## Prerequisites
 
@@ -46,5 +48,20 @@ mpirun -n 2 ./bin/murb -v --im 100 -i 10 -n 100 # to test if it runs
 ```
 
 The file [sample_apps/scripts/showcase_experiment.sh](sample_apps/scripts/showcase_experiment.sh) details all steps
-required to reproduce our measurements
+required to reproduce our measurements from [[1]](ref-1)
+
+#### References
+
+<table style="border:0px">
+<tr>
+    <td valign="top"><a name="ref-1"></a>[1]</td>
+    <td>
+Tim Jammer, Tim Heldmann, Michael Blesel, Michael Kuhn, Christian Bischof, "Compiler-Based Precalculation of MPI Message Envelopes" - currently under review
+      </td>
+</tr>
+<tr>
+    <td valign="top"><a name="ref-2"></a>[2]</td>
+    <td>Tim Jammer and Christian Bischof "Compiler-enabled optimization of persistent MPI Operations" In : 2022 IEEE/ACM International Workshop on Exascale MPI (ExaMPI) https://doi.org/10.1109/ExaMPI56604.2022.00006</td>
+</tr>
+
 
