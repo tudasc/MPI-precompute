@@ -15,27 +15,17 @@
  */
 
 #include "ptr_info.h"
-#include "analysis_results.h"
-#include "devirt_analysis.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
 #include "taintedValue.h"
 #include <cassert>
 
-#include "implementation_specific.h"
-#include "mpi_functions.h"
-
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
-#include "llvm/IR/Verifier.h"
-
-#include <boost/stacktrace.hpp>
 #include <iostream>
 
-#include "debug.h"
 using namespace llvm;
 
 void PtrUsageInfo::setIsUsedDirectly(

@@ -20,6 +20,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Casting.h"
+#include <boost/stacktrace.hpp>
 #include <llvm/IR/Constants.h>
 
 #if DEBUG_MACH_PASS == 1

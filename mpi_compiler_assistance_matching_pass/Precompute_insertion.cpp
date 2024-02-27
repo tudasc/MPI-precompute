@@ -1,19 +1,16 @@
+#include "Precompute_insertion.h"
 #include "CompilerPassConstants.h"
+#include "VtableManager.h"
+#include "debug.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
 #include "precompute_funcs.h"
-#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
-
-#include "Precompute_insertion.h"
-
-#include "debug.h"
-
-#include "VtableManager.h"
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 using namespace llvm;
 

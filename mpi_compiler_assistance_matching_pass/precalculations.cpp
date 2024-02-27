@@ -13,35 +13,32 @@
  See the License for the specific language governing permissions and
  limitations under the License.
  */
-
-#include <boost/stacktrace.hpp>
-
-#include <llvm/IR/Verifier.h>
-#include <random>
 #include <regex>
 
+#include "Precompute_insertion.h"
 #include "devirt_analysis.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
 
 #include "llvm/Analysis/CFG.h"
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Casting.h"
 
-#include "llvm/Demangle/Demangle.h"
-
-#include "Precompute_insertion.h"
-
 #include "debug.h"
-using namespace llvm;
 
 // for more scrutiny under testing:
 // the order of visiting the values should make no difference
 // #define SHUFFLE_VALUES_FOR_TESTING
+#ifdef SHUFFLE_VALUES_FOR_TESTING
+#include <random>
+#endif
+
+using namespace llvm;
 
 // only gets the name of a function if a demangled name contains a return
 // param or template args
