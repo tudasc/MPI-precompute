@@ -9,7 +9,7 @@ openmpi 4.1.1 will be downloaded during the cmake build step
 
 ## Building
 
-Before Building with cmake, one may need to have a look at [openmpi-patch/CmakeList.txt](openmpi-patch/CmakeList.txt)
+Before Building with cmake, one may need to have a look at [openmpi-patch/CMakeLists.txt](openmpi-patch/CMakeLists.txt)
 and change the ``OMPI_CONFIGURE_FLAGS`` variable to fit their system.
 The variable is used to configure openmpi.
 After one had adjusted openmpi configuration, building with cmake is quite straightforward:
@@ -37,7 +37,7 @@ The ``-fno-inline`` will be removed after the analysis, so that inlining does ha
 ## Build of MUrB example application
 
 Before building MUrB be sure to init the submodules (``git submodule update --init --recursive``) to download the
-prerequisite requirements; also refer to the Readme.md in the MUrB directory.
+prerequisite requirements; also refer to the [sample_apps/MUrB/README.md](Readme) in the MUrB directory.
 MUrB can than be built using cmake, we used the following build settings with our Pass:
 
 ```
@@ -45,6 +45,6 @@ cmake .. -DCMAKE_CXX_COMPILER=$MPICXX -DCMAKE_CXX_FLAGS="-fopenmp -O3 -fno-inlin
 mpirun -n 2 ./bin/murb -v --im 100 -i 10 -n 100 # to test if it runs
 ```
 
-The file [sample_apps/scripts/showcase_experiments](sample_apps/scripts/showcase_experiments.sh) detail all steps
+The file [sample_apps/scripts/showcase_experiment.sh](sample_apps/scripts/showcase_experiment.sh) detail all steps
 required to reproduce our measurements
 
