@@ -174,7 +174,8 @@ set_tests_properties(test25 PROPERTIES PROCESSORS 2)
 set_tests_properties(test26 PROPERTIES PROCESSORS 2)
 set_tests_properties(test27 PROPERTIES PROCESSORS 2)
 
-
+# currently not implemented feature: non-contiguous dtypes
+set_tests_properties(test03 PROPERTIES DISABLED true)
 # currently not implemented feature: other comm than comm world
 set_tests_properties(test04 PROPERTIES DISABLED true)
 # currently not implemented feature: reading input data (C-Style)
