@@ -1,20 +1,50 @@
-# Compiler based Precomputation of message envelopes for Persistent MPI operations
+# Compiler-Based Precalculation of MPI Message Envelopes
+
+This Repo contains TODO introduction sentence, what this is about
 
 ## Prerequisites
 
-For this Project, we used clang/llvm 16. openmpi 4.1.1 will be downloaded during the cmake build step
+For this Project, we used clang/llvm 16.0.1
+openmpi 4.1.1 will be downloaded during the cmake build step
 
-## Compiler analysis pass
-The directory `mpi_compiler_assistance_matching_pass` contains the source code of our pass.
-For building our pass please refer to `build.sh` in the main directory
-For Usage of our pass Refer to `run.sh` in the main directory.
+## Building
 
-## Communication schemes
-Implementations of different communication schemes are contained in the openmpi-patch directory.
+Before Building with cmake, one may need to have a look at [openmpi-patch/CmakeList.txt](openmpi-patch/CmakeList.txt)
+and change the ``OMPI_CONFIGURE_FLAGS`` variable to fit their system.
+The variable is used to configure openmpi.
+After one had adjusted openmpi configuration, building with cmake is quite straightforward:
 
-Instructions on how to build openmpi with our communication methods enabled can be found in `openmpi-patch/ompi_build.txt` 
-openmpi-patch contains different Implementations: `openmpi-patch/one-sided-persistent.c` contains the usage of ucx active messages, via a define one can switch between an eager and a rendezvous protocol.
-`openmpi-patch/one-sided-persistent_two_sided_rendezvous.c` contains our proposed two-sided rendezvous protocol.
+```
+mkdir build && cd build
+cmake ..
+make -j
+source setup_env.sh
+ctest # run the tests to check if build was successful
+```
 
-## Performance evaluation
-For a  initial assesment of the performance gain, we included an adapded version of the IMB_ASYNC benchmark (https://github.com/a-v-medvedev/mpi-benchmarks), that also includes a testcase for persistent operations. `IMB_ASYNC/rebuild.sh` illustrates how one can build the Benchmark code with and without our compiler analysis. `visualize/generate_pots.py` contains a script to visualize the performance results.
+## Usage
+
+The build step creates a ``setup_env.sh`` file, that sets teh required environment variables.
+To build an application with the pass, replace the compiler to use with ``clang_wrap_cc`` or ``clang_wrap_cxx``
+respectively.
+The ``setup_env.sh`` automatically sets the compiler to use with ``mpicc`` and ``mpicxx`` to those wrappers.
+In order to activate the pass, one needs to supply the environment
+variable ``export USE_MPI_COMPILER_ASSISTANCE_PASS=true``
+The compile step needs the following command line arguments to work
+correctly ``-fno-inline -flto -fwhole-program-vtables``.
+The ``-fno-inline`` will be removed after the analysis, so that inlining does happen.
+
+## Build of MUrB example application
+
+Before building MUrB be sure to init the submodules (``git submodule update --init --recursive``) to download the
+prerequisite requirements; also refer to the Readme.md in the MUrB directory.
+MUrB can than be built using cmake, we used the following build settings with our Pass:
+
+```
+cmake .. -DCMAKE_CXX_COMPILER=$MPICXX -DCMAKE_CXX_FLAGS="-fopenmp -O3 -fno-inline -fuse-ld=lld -flto -fwhole-program-vtables" -DENABLE_MURB_MPI=ON -DENABLE_VISU=OFF -DENABLE_MURB_READER=OFF
+mpirun -n 2 ./bin/murb -v --im 100 -i 10 -n 100 # to test if it runs
+```
+
+The file [sample_apps/scripts/showcase_experiments](sample_apps/scripts/showcase_experiments.sh) detail all steps
+required to reproduce our measurements
+
