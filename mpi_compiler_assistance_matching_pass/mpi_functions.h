@@ -115,4 +115,8 @@ bool is_send_function(llvm::Function *f);
 
 bool is_recv_function(llvm::Function *f);
 
+llvm::Value *get_tag_value(llvm::CallBase *mpi_call, bool is_send);
+llvm::Value *get_src_value(llvm::CallBase *mpi_call, bool is_send);
+llvm::Value *get_comm_value(llvm::CallBase *mpi_call, bool is_send);
+
 #endif /* MACH_MPI_FUNCTIONS_H_ */

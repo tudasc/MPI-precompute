@@ -3,8 +3,6 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         mpi_compiler_assistance_matching_pass.cpp
         mpi_functions.h
         mpi_functions.cpp
-        conflict_detection.h
-        conflict_detection.cpp
         implementation_specific.h
         implementation_specific.cpp
         debug.h
@@ -14,9 +12,6 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         replacement.h
         replacement.cpp
         nc_settings.h
-        json.hpp
-        frontend_plugin_data.h
-        frontend_plugin_data.cpp
         precalculation.h
         precalculations.cpp
         devirt_analysis.h

@@ -58,33 +58,4 @@ void replace_request_handling_calls(llvm::Module &M);
 
 void replace_init_call(llvm::CallBase *call, llvm::Function *func);
 
-// returns the llvm value that represents is the result of the runtime check
-llvm::Value *insert_runtime_check(llvm::Value *val_a, llvm::Value *val_b);
-
-// returns the llvm value that represents is the result of the runtime check
-// always returns true value as result
-llvm::Value *get_runtime_check_result_true(llvm::CallBase *call);
-// returns the llvm value that represents is the result of the runtime check
-// always returns false value as result
-llvm::Value *get_runtime_check_result_false(llvm::CallBase *call);
-
-llvm::Value *get_runtime_check_result_str(llvm::CallBase *call,
-                                          llvm::Value *check_result);
-
-// returns the llvm value that represents is the result of the runtime check
-// values are combined with or
-// result values may be nullptr - nullptr are considered 0
-// value
-llvm::Value *combine_runtime_checks(llvm::CallBase *call,
-                                    llvm::Value *result_src,
-                                    llvm::Value *result_tag,
-                                    llvm::Value *result_comm);
-
-// returns the llvm value that represents is the result of the runtime check
-// values are combined with or
-// check_results vector may include nullptr - nullptr are considered 0
-llvm::Value *
-combine_runtime_checks(llvm::CallBase *call,
-                       const std::vector<llvm::Value *> &check_results);
-
 #endif /* MACH_REPLACEMENT_H_ */

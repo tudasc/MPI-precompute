@@ -1,6 +1,4 @@
-// TODO clean includes
 #include "CompilerPassConstants.h"
-#include "conflict_detection.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"

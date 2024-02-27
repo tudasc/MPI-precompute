@@ -16,7 +16,6 @@
 
 #include "replacement.h"
 #include "analysis_results.h"
-#include "conflict_detection.h"
 
 #include "implementation_specific.h"
 #include "mpi_functions.h"
@@ -244,93 +243,6 @@ void replace_request_handling_calls(llvm::Module &M) {
       assert(false);
     }
   }
-}
-
-// returns the llvm value that represents is the result of the runtime check
-llvm::Value *insert_runtime_check(llvm::Value *val_a, llvm::Value *val_b) {
-  assert(false && "Not implemented");
-}
-
-// returns the llvm value that represents is the result of the runtime check
-llvm::Value *combine_runtime_checks(llvm::CallBase *call,
-                                    llvm::Value *result_src,
-                                    llvm::Value *result_tag,
-                                    llvm::Value *result_comm) {
-  std::vector<llvm::Value *> results;
-  results.push_back(result_src);
-  results.push_back(result_tag);
-  results.push_back(result_comm);
-
-  return combine_runtime_checks(call, results);
-}
-
-llvm::Value *get_runtime_check_result_true(llvm::CallBase *call) {
-  return ConstantInt::get(IntegerType::getInt8Ty(call->getContext()), 1);
-}
-llvm::Value *get_runtime_check_result_false(llvm::CallBase *call) {
-  return ConstantInt::get(IntegerType::getInt8Ty(call->getContext()), 0);
-}
-
-llvm::Value *get_runtime_check_result_str(llvm::CallBase *call,
-                                          llvm::Value *check_result) {
-  IRBuilder<> builder(call);
-  auto &context = call->getContext();
-  assert(check_result->getType() == Type::getInt8Ty(context));
-
-  // TODO these string constants should only be created once
-
-  if (auto *as_const = dyn_cast<ConstantInt>(check_result)) {
-    if (as_const->isZero()) {
-      return StringConstants::get_instance(call->getModule())
-          ->get_string_ptr("0");
-    } else if (as_const->isOne()) {
-      return StringConstants::get_instance(call->getModule())
-          ->get_string_ptr("1");
-    } else {
-      as_const->dump();
-      assert(false && "ERROR unknown bool const");
-    }
-  }
-
-  auto strings = StringConstants::get_instance(call->getModule());
-  auto zero = strings->get_string_ptr("0");
-  auto one = strings->get_string_ptr("1");
-
-  auto result = builder.CreateSelect(check_result, one, zero);
-
-  // for debug
-  call->getParent()->dump();
-
-  return result;
-}
-
-llvm::Value *
-combine_runtime_checks(llvm::CallBase *call,
-                       const std::vector<llvm::Value *> &check_results) {
-
-  auto &context = call->getContext();
-  IRBuilder<> builder(call);
-
-  std::vector<llvm::Value *> no_null_vec;
-
-  std::copy_if(check_results.begin(), check_results.end(),
-               std::back_inserter(no_null_vec),
-               [](auto *p) { return p != nullptr; });
-
-  if (no_null_vec.empty()) {
-    return ConstantInt::get(IntegerType::getInt8Ty(context), 0);
-  }
-
-  for (auto r : no_null_vec) {
-    assert(r->getType() == Type::getInt8Ty(context));
-  }
-
-  if (no_null_vec.size() == 1) {
-    return no_null_vec[0];
-  }
-
-  // TODO optimization: run constant propagation on this expression
-  return builder.CreateOr(no_null_vec);
 }
 
 std::shared_ptr<StringConstants> StringConstants::instance = nullptr;

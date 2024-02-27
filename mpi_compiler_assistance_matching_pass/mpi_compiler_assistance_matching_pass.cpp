@@ -51,9 +51,7 @@
 #include <vector>
 
 #include "analysis_results.h"
-#include "conflict_detection.h"
 #include "debug.h"
-#include "frontend_plugin_data.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precompute_funcs.h"

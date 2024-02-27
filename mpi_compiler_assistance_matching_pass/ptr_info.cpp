@@ -16,7 +16,6 @@
 
 #include "ptr_info.h"
 #include "analysis_results.h"
-#include "conflict_detection.h"
 #include "devirt_analysis.h"
 #include "mpi_functions.h"
 #include "precalculation.h"

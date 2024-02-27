@@ -20,7 +20,6 @@
 #include <random>
 #include <regex>
 
-#include "conflict_detection.h"
 #include "devirt_analysis.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"

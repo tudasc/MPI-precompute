@@ -366,3 +366,123 @@ bool is_recv_function(llvm::Function *f) {
   return f == mpi_func->mpi_recv || f == mpi_func->mpi_Irecv ||
          f == mpi_func->mpi_Sendrecv || f == mpi_func->mpi_recv_init;
 }
+
+Value *get_communicator_value(CallBase *mpi_call) {
+
+  unsigned int total_num_args = 0;
+  unsigned int communicator_arg_pos = 0;
+
+  if (mpi_call->getCalledFunction() == mpi_func->mpi_send ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Bsend ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Ssend ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Rsend) {
+    total_num_args = 6;
+    communicator_arg_pos = 5;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Isend) {
+    total_num_args = 7;
+    communicator_arg_pos = 5;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_recv ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_Irecv) {
+    total_num_args = 7;
+    communicator_arg_pos = 5;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Sendrecv) {
+    total_num_args = 12;
+    communicator_arg_pos = 10;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+    total_num_args = 7;
+    communicator_arg_pos = 5;
+  } else {
+    errs() << mpi_call->getCalledFunction()->getName()
+           << ": This MPI function is currently not supported\n";
+    assert(false);
+  }
+
+  assert(mpi_call->arg_size() == total_num_args);
+
+  return mpi_call->getArgOperand(communicator_arg_pos);
+}
+
+Value *get_src_value(CallBase *mpi_call, bool is_send) {
+
+  unsigned int total_num_args = 0;
+  unsigned int src_arg_pos = 0;
+
+  if (mpi_call->getCalledFunction() == mpi_func->mpi_send ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Bsend ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Ssend ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Rsend) {
+    assert(is_send);
+    total_num_args = 6;
+    src_arg_pos = 3;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Isend) {
+    assert(is_send);
+    total_num_args = 7;
+    src_arg_pos = 3;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_recv ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_Irecv) {
+    assert(!is_send);
+    total_num_args = 7;
+    src_arg_pos = 3;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Sendrecv) {
+    total_num_args = 12;
+    if (is_send)
+      src_arg_pos = 3;
+    else
+      src_arg_pos = 8;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+    total_num_args = 7;
+    src_arg_pos = 3;
+  } else {
+    errs() << mpi_call->getCalledFunction()->getName()
+           << ": This MPI function is currently not supported\n";
+    assert(false);
+  }
+
+  assert(mpi_call->arg_size() == total_num_args);
+
+  return mpi_call->getArgOperand(src_arg_pos);
+}
+
+Value *get_tag_value(CallBase *mpi_call, bool is_send) {
+
+  unsigned int total_num_args = 0;
+  unsigned int tag_arg_pos = 0;
+
+  if (mpi_call->getCalledFunction() == mpi_func->mpi_send ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Bsend ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Ssend ||
+      mpi_call->getCalledFunction() == mpi_func->mpi_Rsend) {
+    assert(is_send);
+    total_num_args = 6;
+    tag_arg_pos = 4;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Isend) {
+    assert(is_send);
+    total_num_args = 7;
+    tag_arg_pos = 4;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_recv ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_Irecv) {
+    assert(!is_send);
+    total_num_args = 7;
+    tag_arg_pos = 4;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_Sendrecv) {
+    total_num_args = 12;
+    if (is_send)
+      tag_arg_pos = 4;
+    else
+      tag_arg_pos = 9;
+  } else if (mpi_call->getCalledFunction() == mpi_func->mpi_send_init ||
+             mpi_call->getCalledFunction() == mpi_func->mpi_recv_init) {
+    total_num_args = 7;
+    tag_arg_pos = 4;
+  } else {
+    errs() << mpi_call->getCalledFunction()->getName()
+           << ": This MPI function is currently not supported\n";
+    assert(false);
+  }
+
+  assert(mpi_call->arg_size() == total_num_args);
+
+  return mpi_call->getArgOperand(tag_arg_pos);
+}
