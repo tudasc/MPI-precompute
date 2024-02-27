@@ -37,7 +37,7 @@ The ``-fno-inline`` will be removed after the analysis, so that inlining does ha
 ## Build of MUrB example application
 
 Before building MUrB be sure to init the submodules (``git submodule update --init --recursive``) to download the
-prerequisite requirements; also refer to the [sample_apps/MUrB/README.md](Readme) in the MUrB directory.
+prerequisite requirements; also refer to the [Readme](sample_apps/MUrB/README.md) in the MUrB directory.
 MUrB can than be built using cmake, we used the following build settings with our Pass:
 
 ```
