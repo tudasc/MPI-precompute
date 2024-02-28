@@ -1,48 +1,44 @@
 /*
- Copyright 2022 Tim Jammer
+Copyright 2023 Tim Jammer
 
- Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
- http://www.apache.org/licenses/LICENSE-2.0
+     http://www.apache.org/licenses/LICENSE-2.0
 
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
- */
-
-#include <boost/stacktrace.hpp>
-
-#include <llvm/IR/Verifier.h>
-#include <random>
+*/
 #include <regex>
 
-#include "conflict_detection.h"
+#include "Precompute_insertion.h"
 #include "devirt_analysis.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
 
 #include "llvm/Analysis/CFG.h"
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Casting.h"
 
-#include "llvm/Demangle/Demangle.h"
-
-#include "Precompute_insertion.h"
-
 #include "debug.h"
-using namespace llvm;
 
 // for more scrutiny under testing:
 // the order of visiting the values should make no difference
 // #define SHUFFLE_VALUES_FOR_TESTING
+#ifdef SHUFFLE_VALUES_FOR_TESTING
+#include <random>
+#endif
+
+using namespace llvm;
 
 // only gets the name of a function if a demangled name contains a return
 // param or template args
@@ -67,7 +63,7 @@ bool is_interaction_with_cout(llvm::CallBase *call) {
     // call->dump();
 
     if (call->arg_size() >= 2 && call->getArgOperand(0) == cout) {
-      assert(is_func_from_std(call->getCalledFunction()));
+      // assert(is_func_from_std(call->getCalledFunction()));
       // errs() << "TRUE: interaction with cout:\n";
       return true;
     }
@@ -138,13 +134,15 @@ void PrecalculationAnalysis::analyze_functions() {
 
   // populate callees and callsites
   for (auto &f : M.functions()) {
-    for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
-      if (auto *call = dyn_cast<CallBase>(&*I)) {
-        auto targets = get_possible_call_targets(call);
-        for (auto *target : targets) {
-          function_analysis[target]->callsites.insert(call);
-          function_analysis[call->getFunction()]->callees.insert(
-              function_analysis[target]);
+    if (not is_func_from_std(&f)) { // dont analyze std's internals
+      for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
+        if (auto *call = dyn_cast<CallBase>(&*I)) {
+          auto targets = get_possible_call_targets(call);
+          for (auto *target : targets) {
+            function_analysis[target]->callsites.insert(call);
+            function_analysis[call->getFunction()]->callees.insert(
+                function_analysis[target]);
+          }
         }
       }
     }
@@ -245,7 +243,7 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
     return;
   }
 
-  if (is_allocation(func)      // out of mem is fatal
+  if (precompute_analysis->is_allocation(func) // out of mem is fatal
       || is_mpi_function(func) // mpi cannot throw recoverable exceptions
   ) {
     can_except_in_precompute = false;
@@ -261,6 +259,12 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
   if (func->isDeclaration()) {
     // don't know: need to assume it can throw
     // func->dump();
+    assert(can_except_in_precompute);
+    return;
+  }
+
+  if (precompute_analysis->is_func_from_std(func)) {
+    // we don't analyze std's internals, assume it can throw
     assert(can_except_in_precompute);
     return;
   }
@@ -562,8 +566,16 @@ void PrecalculationAnalysis::visit_phi(
 }
 
 void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
-  // errs() << "Visit\n";
-  // v->v->dump();
+  errs() << "Visit\n";
+  v->v->dump();
+
+  if (auto *inst = dyn_cast<Instruction>(v->v)) {
+    if (inst->getFunction()->getName().contains(".omp_outlined.")) {
+      // TODO ignore openmp for now
+      v->visited = true;
+      return;
+    }
+  }
 
   // TODO clang tidy repeated branch body (the v->visited = true part)
 
@@ -732,6 +744,14 @@ void PrecalculationAnalysis::visit_ptr_usages(
   }
 
   for (auto *u : ptr->v->users()) {
+    if (auto *inst = dyn_cast<Instruction>(u)) {
+      if (is_func_from_std(inst->getFunction())) {
+        // user may mark functions as "belong to std"
+        // we dont analyze those usages- as user told so
+        continue;
+      }
+    }
+
     if (auto *store = dyn_cast<StoreInst>(u)) {
 
       // taint the store to analyze if it is important
@@ -780,7 +800,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
              "Constexpr other than GEP for ptr currently not implemented");
       // if gep is relevant
       if (ptr->ptr_info->is_member_relevant(gep)) {
-        insert_tainted_value(gep, ptr, false);
+        insert_tainted_value(constant_exp, ptr, false);
       }
       as_inst->deleteValue(); // don't keep temporary instruction
       continue;
@@ -828,6 +848,9 @@ void PrecalculationAnalysis::visit_ptr_usages(
     }
 
     ptr->ptr_info->dump();
+
+    errs() << "constant agg?" << isa<ConstantAggregate>(u) << "\n";
+    errs() << "constant data?" << isa<ConstantData>(u) << "\n";
     errs() << "Support for analyzing this Value is not implemented yet\n";
 
     u->dump();
@@ -877,10 +900,17 @@ void PrecalculationAnalysis::insert_function_to_include(llvm::Function *func) {
   }
 }
 
+// TODO: there is the case, where a CALLSITE to user defnied func is in std??
 void PrecalculationAnalysis::visit_arg(
     const std::shared_ptr<TaintedValue> &arg_info) {
   auto *arg = cast<Argument>(arg_info->v);
   arg_info->visited = true;
+
+  if (is_func_from_std(arg->getParent())) {
+    return;
+    // user may mark functions to exclude
+  }
+  assert(not is_func_from_std(arg->getParent()));
 
   auto *func = arg->getParent();
   auto fun_to_precalc = function_analysis.at(func);
@@ -892,6 +922,7 @@ void PrecalculationAnalysis::visit_arg(
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
 
     for (auto *call : fun_to_precalc->callsites) {
+      assert(not is_func_from_std(call->getFunction()));
       auto *operand = call->getArgOperand(arg->getArgNo());
       auto new_val = insert_tainted_value(operand, arg_info);
       new_val->visited =
@@ -974,11 +1005,10 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
 
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
-  assert(not call->isIndirectCall());
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
   long arg_no = -1;
 
-  for (unsigned i = 0; i < call->getNumOperands(); ++i) {
+  for (unsigned i = 0; i < call->arg_size(); ++i) {
     if (call->getArgOperand(i) == ptr_arg_info->v) {
       arg_no = i;
       break;
@@ -986,11 +1016,19 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
   }
   assert(arg_no != -1);
 
-  auto *arg = call->getCalledFunction()->getArg(arg_no);
-  if (not arg->hasAttribute(llvm::Attribute::ReadNone)) {
+  for (auto *tgt : get_possible_call_targets(call)) {
 
-    return true;
+    if (tgt->isVarArg()) {
+      return true; // assume it is
+    }
+
+    auto *arg = tgt->getArg(arg_no);
+    if (not arg->hasAttribute(llvm::Attribute::ReadNone)) {
+
+      return true;
+    }
   }
+
   return false;
 }
 
@@ -999,11 +1037,10 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
 
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
-  assert(not call->isIndirectCall());
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
   long arg_no = -1;
 
-  for (unsigned i = 0; i < call->getNumOperands(); ++i) {
+  for (unsigned i = 0; i < call->arg_size(); ++i) {
     if (call->getArgOperand(i) == ptr_arg_info->v) {
       arg_no = i;
       break;
@@ -1011,9 +1048,15 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   }
   assert(arg_no != -1);
 
-  auto *arg = call->getCalledFunction()->getArg(arg_no);
-  if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
-    return true;
+  for (auto *tgt : get_possible_call_targets(call)) {
+    if (tgt->isVarArg()) {
+      return true; // assume it is
+    }
+
+    auto *arg = tgt->getArg(arg_no);
+    if (not arg->hasAttribute(llvm::Attribute::ReadOnly)) {
+      return true;
+    }
   }
   return false;
 }
@@ -1023,46 +1066,46 @@ void PrecalculationAnalysis::include_call_to_std(
 
   assert(isa<CallBase>(call_info->v));
   auto *call = cast<CallBase>(call_info->v);
-  assert(not call->isIndirectCall());
 
-  auto *func = call->getCalledFunction();
-  assert(
-      (func->isIntrinsic() && should_call_intrinsic(func->getIntrinsicID())) ||
-      is_func_from_std(func));
+  for (auto *func : get_possible_call_targets(call)) {
+    assert((func->isIntrinsic() &&
+            should_call_intrinsic(func->getIntrinsicID())) ||
+           is_func_from_std(func));
 
-  // calling into std is safe, as no side effects will occur (other
-  // than for the given parameters)
-  //  as std is designed to have as fw side effects as possible
-  // TODO implement check for exception std::rand and std::cout/cin
-  // we just need to make shure all parameters are given
+    // calling into std is safe, as no side effects will occur (other
+    // than for the given parameters)
+    //  as std is designed to have as fw side effects as possible
+    // TODO implement check for exception std::rand and std::cout/cin
+    // we just need to make shure all parameters are given
 
-  for (auto &arg : call->args()) {
-    auto arg_info = insert_tainted_value(arg, call_info);
+    for (auto &arg : call->args()) {
+      auto arg_info = insert_tainted_value(arg, call_info);
 
-    // for ptr parameters: we need to respect if the func
-    // reads/writes them
-    if (arg->getType()->isPointerTy()) {
+      // for ptr parameters: we need to respect if the func
+      // reads/writes them
+      if (arg->getType()->isPointerTy()) {
 
-      if (is_ptr_usage_in_std_read(call, arg_info)) {
-        arg_info->ptr_info->setIsReadFrom(call, this);
-        arg_info->ptr_info->setWholePtrIsRelevant(true);
+        if (is_ptr_usage_in_std_read(call, arg_info)) {
+          arg_info->ptr_info->setIsReadFrom(call, this);
+          arg_info->ptr_info->setWholePtrIsRelevant(true);
+        }
+        if (is_ptr_usage_in_std_write(call, arg_info)) {
+          arg_info->ptr_info->setIsWrittenTo(call, this);
+          arg_info->ptr_info->setWholePtrIsRelevant(true);
+        }
+        // TODO more like a hotfix? probably overestimating the instructions to
+        // be included
+        // TODO check if there is another case than operator[] where this is
+        // important
+        if (call->getType()->isPointerTy()) {
+          // if std derives a ptr (e.g. operator[]) we treat it as aliasing to
+          // all input ptrs
+          call_info->ptr_info->merge_with(arg_info->ptr_info);
+        }
       }
-      if (is_ptr_usage_in_std_write(call, arg_info)) {
-        arg_info->ptr_info->setIsWrittenTo(call, this);
-        arg_info->ptr_info->setWholePtrIsRelevant(true);
-      }
-      // TODO more like a hotfix? probably overestimating the instructions to be
-      // included
-      // TODO check if there is another case than operator[] where this is
-      // important
-      if (call->getType()->isPointerTy()) {
-        // if std derives a ptr (e.g. operator[]) we treat it as aliasing to all
-        // input ptrs
-        call_info->ptr_info->merge_with(arg_info->ptr_info);
-      }
+      // need all args to be present for the call
+      include_value_in_precompute(arg_info);
     }
-    // need all args to be present for the call
-    include_value_in_precompute(arg_info);
   }
   include_value_in_precompute(call_info);
 }
@@ -1193,13 +1236,15 @@ void PrecalculationAnalysis::visit_invoke_for_exception(
     for (auto &bb : *func) {
       if (auto *res = dyn_cast<ResumeInst>(bb.getTerminator())) {
         assert(call_info->isIncludeInPrecompute());
-        auto new_val = insert_tainted_value(res, CONTROL_FLOW);
-        include_value_in_precompute(new_val);
+        if (call_info->isIncludeInPrecompute()) {
+          auto new_val = insert_tainted_value(res, CONTROL_FLOW);
+          include_value_in_precompute(new_val);
+        }
       }
       for (auto &inst : bb)
         if (auto *cc = dyn_cast<CallBase>(&inst)) {
           if (can_except_in_precompute(cc)) {
-            assert(call_info->isIncludeInPrecompute());
+            // assert(call_info->isIncludeInPrecompute());
             auto new_val =
                 insert_tainted_value(cc, CONTROL_FLOW_EXCEPTION_NEEDED);
             include_value_in_precompute(new_val);
@@ -1234,17 +1279,18 @@ void PrecalculationAnalysis::visit_call_for_retval(
     include_call_to_std(call_info);
   } else {
     for (auto *func : get_possible_call_targets(call)) {
-      if (func->isDeclaration()) {
+      if (func->isDeclaration() && not(func == mpi_func->mpi_wtime)) {
         errs() << "\n";
         call->dump();
         func->dump();
         errs() << "In: " << call->getFunction()->getName() << " intrinsic?"
                << func->isIntrinsic() << "\n";
       }
-      assert(not func->isDeclaration() &&
-             "cannot analyze if calling external function for return value "
-             "has "
-             "side effects");
+      assert(func == mpi_func->mpi_wtime ||
+             not func->isDeclaration() &&
+                 "cannot analyze if calling external function for return value "
+                 "has "
+                 "side effects");
       for (auto &bb : *func) {
         if (auto *ret = dyn_cast<ReturnInst>(bb.getTerminator())) {
           insert_tainted_value(ret, call_info);
@@ -1256,6 +1302,12 @@ void PrecalculationAnalysis::visit_call_for_retval(
 
 void PrecalculationAnalysis::visit_call_from_ptr(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
+
+  if (call->getCalledFunction()->getName() == "__kmpc_fork_call") {
+    // TODO IMPLEMENT
+    //  ignore openmp regions for now
+    return;
+  }
 
   std::set<unsigned int> ptr_given_as_arg;
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
@@ -1270,6 +1322,13 @@ void PrecalculationAnalysis::visit_call_from_ptr(
                                        "argument is currently not supported");
     return;
   }
+
+  // if (not is_store_important(call,ptr->ptr_info)){
+  //  no need to analyze it, if nothing is done with the ptr afterward anyway
+  //  but this func does currently not take into account the GEP members of
+  //  ptr
+  //    return;
+  //  }
 
   auto *func = call->getCalledFunction();
   assert(not ptr_given_as_arg.empty());
@@ -1337,8 +1396,8 @@ void PrecalculationAnalysis::visit_call_from_ptr(
 
     if (is_mpi_function(func)) {
       // TODO is there anything else in MPI we need to handle special??
-      call->dump();
-      errs() << "In: " << call->getFunction()->getName() << "\n";
+      // call->dump();
+      // errs() << "In: " << call->getFunction()->getName() << "\n";
       assert(not is_included_in_precompute(call));
       return;
     }
@@ -1470,12 +1529,28 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       if (is_func_from_std(inst->getFunction())) {
         // inst->getFunction()->dump();
         inst->dump();
+
+        errs() << "In: " << inst->getFunction()->getName() << "\n";
         errs() << "from:";
         from->v->dump();
-        errs() << "In: " << inst->getFunction()->getName() << "\n";
+        if (auto *ii = dyn_cast<Instruction>(from->v)) {
+          errs() << "In: " << ii->getFunction()->getName() << "\n";
+        }
       }
       assert(not is_func_from_std(inst->getFunction()));
     }
+    /*
+    if (auto *arg = dyn_cast<Argument>(v)) {
+      if (is_func_from_std(arg->getParent())) {
+        arg->dump();
+
+        errs() << "In: " << arg->getParent()->getName() << "\n";
+        errs() << "from:";
+        from->v->dump();
+      }
+      assert(not is_func_from_std(arg->getParent()));
+    }*/
+    // TODO user may mark funcs that are presendt as "same as std"
 
     inserted_elem = std::make_shared<TaintedValue>(v);
     auto pair = tainted_values.insert(inserted_elem);
@@ -1534,7 +1609,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
     }
   }
 
-  // this code is asserting that we will visit the call if the retval is needed
+  // this code is asserting that we will visit the call if the retval is
+  // needed
 #ifndef NDEBUG
   if (auto *cc = dyn_cast<CallBase>(v)) {
     if (is_retval_of_call_needed(cc) && not cc->isIndirectCall()) {
@@ -1565,8 +1641,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
               if (not get_taint_info(ii)->visited ||
                   get_taint_info(ii)->getReason() ==
                       TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED) {
-                // if the other is only tainted for its presence it does not use
-                // the retval
+                // if the other is only tainted for its presence it does not
+                // use the retval
                 all_retval_users_visited = false;
               }
             }
@@ -1614,8 +1690,8 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
                     TaintReason::CONTROL_FLOW_ONLY_PRESENCE_NEEDED);
                 // only the normal dest is needed
                 // NOT include_value_in_precompute(new_val);
-                // we dont need the invoke to check if exception is thrown as we
-                // know no meaningful exception can be thrown
+                // we dont need the invoke to check if exception is thrown as
+                // we know no meaningful exception can be thrown
               } else {
                 // can except
                 // include_value_in_precompute(new_val);
@@ -1644,11 +1720,12 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
     possible_targets = virtual_call_sites.get_possible_call_targets(call);
   } else {
     possible_targets.push_back(call->getCalledFunction());
+    return possible_targets;
   }
 
   if (is_func_from_std(call->getFunction())) {
     // we dont need to analyze the sts::'s internals
-    // if std:: calls a user function indirecttly it will get a ptr to it
+    // if std:: calls a user function indirectly it will get a ptr to it
     // anyway
     return possible_targets;
   }
@@ -1670,8 +1747,17 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
     call->dump();
     errs() << "In: " << call->getFunction()->getName() << "\n";
   }
-
   assert(not possible_targets.empty() && "could not find tgts of call");
+
+  /*
+  for (auto *tgt : possible_targets) {
+    if ( call->isIndirectCall() && is_func_from_std(tgt)) {
+      call->dump();
+      errs() << "In: " << call->getFunction()->getName() << "\n";
+      errs() << "Indirect calls to std are not supported\n";
+      assert(false);
+    }
+  }*/
   return possible_targets;
 }
 
@@ -1793,7 +1879,9 @@ std::string get_function_name(const std::string &demangled_name) {
   return no_template;
 }
 
-bool is_func_from_std(llvm::Function *func) {
+// returns true if func is from std or part of the
+// COMPILER_ASSISTED_MATCHING_ALLOW_EXTERNAL_FUNCTIONS environment variable
+bool PrecalculationAnalysis::is_func_from_std(llvm::Function *func) const {
 
   assert(func);
 
@@ -1810,18 +1898,39 @@ bool is_func_from_std(llvm::Function *func) {
   // errs() << "Test if in std:\n" << func->getName() <<demangled_fname <<
   // "\n";
 
-  // startswith std::
-  if (demangled_fname.rfind("std::", 0) == 0) {
-    return true;
-  }
-
-  // internals of gnu implementation
-  if (demangled_fname.rfind("__gnu_cxx::", 0) == 0) {
-    return true;
+  for (auto prefix : allowed_function_prefixes) {
+    if (demangled_fname.rfind(prefix, 0) == 0) {
+      return true;
+    }
   }
 
   // more like a stack ptr than a function call
   if (func->getName() == "__errno_location") {
+    return true;
+  }
+
+  if (func->getName() == "__cxa_throw") {
+    return true;
+  }
+
+  if (func->getName() == "__cxa_allocate_exception") {
+    // TODO is allocator
+    return true;
+  }
+  if (func->getName() == "__cxa_free_exception") {
+    // TODO is free
+    return true;
+  }
+  if (func->getName() == "__cxa_begin_catch") {
+    // TODO is free
+    return true;
+  }
+
+  // openmp lib funcs
+  if (func->getName() == "omp_get_max_threads") {
+    return true;
+  }
+  if (func->getName() == "omp_get_thread_num") {
     return true;
   }
 
@@ -1901,8 +2010,8 @@ bool PrecalculationAnalysis::is_store_important(
 }
 
 // TODO better function name
-//  if an instruction in foo is included in the set: the resulting set will also
-//  include all calls to foo
+//  if an instruction in foo is included in the set: the resulting set will
+//  also include all calls to foo
 void PrecalculationAnalysis::get_all_transitive_insts(
     std::set<llvm::Instruction *> &instrs) {
 
@@ -1946,8 +2055,8 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
       // TODO include all destructors for debugging only
       if (l->getFunction() == s->getFunction() && l != s) {
         // if load and store are the same (aka call to func that loads and
-        // stores): no need to do something, either the ptr usage is not needed,
-        // or it will be loaded afterward (then it is needed)
+        // stores): no need to do something, either the ptr usage is not
+        // needed, or it will be loaded afterward (then it is needed)
         auto *domtree = analysis_results->getDomTree(*l->getFunction());
         // TODO efficiency: provide LoopInfo?
         if (llvm::isPotentiallyReachable(s, l, nullptr, domtree, nullptr)) {

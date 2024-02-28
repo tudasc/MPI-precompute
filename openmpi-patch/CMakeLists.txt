@@ -98,8 +98,3 @@ add_custom_command(
         COMMENT "build one sided persistent implementation"
         DEPENDS ompi-build precompute ${PERSISTENT_IMPLEMENTATION_FILES} ${PRECOMPUTE_H_FILE} ${COMPILER_PASS_CONSTANTS_H_FILE}
         )
-
-if(CMAKE_BUILD_TYPE MATCHES Debug)
-#add example executable for testing the implementation
-add_subdirectory(example)
-endif(CMAKE_BUILD_TYPE MATCHES Debug)

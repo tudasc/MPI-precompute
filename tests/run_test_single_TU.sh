@@ -52,7 +52,7 @@ SAVE_STATUS=( "${PIPESTATUS[@]}" )
 MPIRUN_STATUS=${SAVE_STATUS[0]}
 NO_MPI_OPT=${SAVE_STATUS[1]}
 
-rm a.out
+rm *.out
 
 if [[ "$MPIRUN_STATUS" != 0 ]]; then
   echo "Crash of result application"

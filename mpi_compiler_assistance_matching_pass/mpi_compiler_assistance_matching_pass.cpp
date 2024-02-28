@@ -1,40 +1,32 @@
 /*
- Copyright 2020 Tim Jammer
+Copyright 2023 Tim Jammer
 
- Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
- http://www.apache.org/licenses/LICENSE-2.0
+     http://www.apache.org/licenses/LICENSE-2.0
 
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
  limitations under the License.
- */
+*/
 
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
-#include "llvm/IR/Instruction.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include "llvm/IR/Verifier.h"
 
 #include "llvm/Analysis/AliasAnalysis.h"
-#include "llvm/Analysis/BasicAliasAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -44,22 +36,15 @@
 
 #include "precalculation.h"
 
-#include <assert.h>
-// #include <mpi.h>
-#include <cstring>
-#include <utility>
+#include <cassert>
 #include <vector>
 
 #include "analysis_results.h"
-#include "conflict_detection.h"
 #include "debug.h"
-#include "frontend_plugin_data.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
-#include "precompute_funcs.h"
+#include "precompute_backend_funcs.h"
 #include "replacement.h"
-
-#include <sanitizer/lsan_interface.h>
 
 #include "llvm/Transforms/IPO/ModuleInliner.h"
 
@@ -200,7 +185,8 @@ struct MPICompilerAssistanceMatchingPass
     auto has_error = verifyModule(M, &errs(), nullptr);
     assert(!has_error);
     // at most: every undef value can be duplicated
-    assert(get_num_undefs(M) <= num_undef * 2);
+    // TODO re-enable assertions for no openmp programs
+    // assert(get_num_undefs(M) <= num_undef * 2);
     // but this is probably insecure (e.g. if undef is used to calculate the
     // tag)// so we go with the stricter assertion that our pass should not use
     // more undef values

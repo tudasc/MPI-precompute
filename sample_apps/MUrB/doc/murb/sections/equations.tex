@@ -1,0 +1,45 @@
+The $n$-body problem is a classic one from the \textbf{Newtonian mechanics}: it consists in \textbf{resolving the gravity equations}.
+However, this problem can be generalized (from the algorithmic point of view) and we can often find it in numerical simulation: this is why it is a good real case study.
+
+At the problem beginning (the time $t$), for each body $i$, its position $q_{i}(t)$, its mass $m_i$ and its velocity $\vec{v_i}(t)$ are known.
+The applied force between two bodies $i$ and $j$, at the $t$ time, is defined by:
+\begin{equation}
+\label{eq:force}
+	\vec{f_{ij}}(t) = G.\frac{m_i.m_j}{||\vec{r_{ij}}||^2}.\frac{\vec{r_{ij}}}{||\vec{r_{ij}}||},
+\end{equation}
+with $G$ the gravitational constant ($G = 6,67384\times10^{-11} m^3.kg^{-1}.s^{-2}$) and $\vec{r_{ij}} = q_j(t) - q_i(t)$ the vector from body $i$ to body $j$.
+The resulting force (alias the total force) for a given $i$ body, at the $t$ time, is defined by:
+\begin{equation}
+\label{eq:sumForces}
+	\vec{F_i}(t) = \sum_{j \ne i}^{n} \vec{f_{ij}}(t) = G.m_i.\sum_{j \ne i}^{n}\frac{m_j.\vec{r_{ij}}}{||\vec{r_{ij}}||^3},
+\end{equation}
+with $n$ the number of bodies in space.
+For the time integration, the acceleration is required. For a given body $i$, at the $t$ time, the acceleration characteristic is defined by:
+\begin{equation}
+\label{eq:acceleration}
+	\vec{a_i}(t) = \frac{\vec{F_i}(t)}{m_i} = G.\sum_{j \ne i}^{n}\frac{m_j.\vec{r_{ij}}}{||\vec{r_{ij}}||^3}.
+\end{equation}
+
+\subsection{An approximation of the total force}
+
+The total force $\vec{F_i}$ is given by Eq.~\ref{eq:sumForces}:
+\begin{equation*}
+	\vec{F_i}(t) = G.m_i.\sum_{j \ne i}^{n}\frac{m_j.\vec{r_{ij}}}{||\vec{r_{ij}}||^3}.
+\end{equation*}
+As bodies approach each other, \textbf{the force between them grows without bound}, which is an undesirable situation for numerical integration. 
+In astrophysical simulations, collisions between bodies are generally precluded; this is reasonable if the bodies represent galaxies that may pass right through each other. 
+Therefore, \textbf{a softening factor} $\epsilon^2 > 0$ is added, and the denominator is rewritten as follows:
+\begin{equation}
+\label{eq:sumForcesSoft}
+	\vec{F_i}(t) \approx G.m_i.\sum_{j = 1}^{n}\frac{m_j.\vec{r_{ij}}}{(||\vec{r_{ij}}||^2 + \epsilon^2)^\frac{3}{2}}.
+\end{equation}
+
+Note the condition $j\ne i$ is no longer needed in the sum, because $\vec{f_{ii}} = 0$ when $\epsilon ^2 > 0$.
+The softening factor models the interaction between two Plummer point masses: masses that behave as if they were spherical galaxies.
+In effect, \textbf{the softening factor limits the magnitude of the force between the bodies}, which is desirable for numerical integration of the system state.
+
+As before, we need to compute the acceleration in order to perform the integration over the time:
+\begin{equation}
+\label{eq:accelerationSoft}
+	\vec{a_i}(t) = \frac{\vec{F_i}(t)}{m_i} \approx G.\sum_{j = 1}^{n}\frac{m_j.\vec{r_{ij}}}{(||\vec{r_{ij}}||^2 + \epsilon^2)^\frac{3}{2}}.
+\end{equation}

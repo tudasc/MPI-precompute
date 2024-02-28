@@ -1,0 +1,68 @@
+\subsection{Compile the executable}
+
+For some practical reasons the project use \texttt{cmake} instead of a standard \texttt{Makefile}.
+Don't panic this is not very complicated and this section is made to help you.
+First thing to do is to generate the \texttt{Makefile} with the \texttt{cmake} system:
+\begin{lstlisting}[language=c]
+> cmake .
+\end{lstlisting}
+This command will generate the \texttt{Makefile} file in the current directory.
+But before using the \texttt{Makefile} we will configure the generated \texttt{CMakeCache.txt} file.
+This file is the configuration file for specify our favourite compiling options.
+Here is the recommended configuration:
+\begin{lstlisting}[language=c]
+//Choose the type of build, options are: None(CMAKE_CXX_FLAGS or
+// CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.
+CMAKE_BUILD_TYPE:STRING=Release
+
+//Flags used by the compiler during all build types.
+CMAKE_CXX_FLAGS:STRING=-DNBODY_FLOAT -march=native -fopenmp
+\end{lstlisting}
+Now we can use the \texttt{Makefile} with this command:
+\begin{lstlisting}[language=c]
+> make
+\end{lstlisting}
+After that, the binary file will be generated in \texttt{bin/Release/nbody}.
+Launch the executable like this from the root folder:
+\begin{lstlisting}[language=c]
+> ./bin/Release/nbody
+\end{lstlisting}
+
+\subsection{Run the executable}
+
+There is two ways to launch the initial $n$-body code.
+The first one initializes bodies from an input file:
+\begin{lstlisting}[language=c]
+Usage: ./bin/Release/nbody -f inputFile -i nIte [-h] [-v] [-w outputFiles]
+
+	-f		the bodies input file name to read.
+	-i		the number of iterations to compute.
+	-h		display this help.
+	-v		enable the verbose mode.
+	-w		the base name of the body file(s) to write.
+\end{lstlisting}
+The \texttt{data/in} folder contains some test cases, you can launch them like this:
+\begin{lstlisting}[language=c]
+> ./bin/Release/nbody -f data/in/8bodies.dat -i 200 -w data/out/8bodies
+\end{lstlisting}
+This command will run the 8bodies test case with 200 iterations and will write the solution at each iteration in \texttt{data/out/8bodies.*.dat} files.
+
+There is not big enough test cases to really fill the CPU capacity. 
+This is why there is an other way to launch the $n$-body code based on the number of bodies we want to simulate:
+\begin{lstlisting}[language=c]
+Usage: ./bin/Release/nbody -n nBodies -i nIte [-h] [-v] [-w outputFiles]
+
+	-n		the number of bodies randomly generated.
+	-i		the number of iterations to compute.
+	-h		display this help.
+	-v		enable the verbose mode.
+	-w		the base name of the body file(s) to write.
+\end{lstlisting}
+You can launch the $n$-body code like this:
+\begin{lstlisting}[language=c]
+> ./bin/Release/nbody -n 500 -i 1000 -v
+\end{lstlisting}
+This command will launch the simulation with 500 bodies randomly generated (1000 iterations). Note that the verbose mode is enabled, so it will display some information for each iteration in your shell.
+
+There is a lot of other options you can use with this code: try the \texttt{-h} option to display them.
+If you do not want to run OpenGL rendering you can put the \texttt{-\--nv} (no visualization) in order to disable it.

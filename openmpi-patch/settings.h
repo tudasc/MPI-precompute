@@ -4,11 +4,13 @@
 // config :
 #define RDMA_SPIN_WAIT_THRESHOLD 32
 
+#define NDEBUG // settings for performance mode
+
 // used for the tests to check if the version without matching is actually used
 // (or if the compile time analysis failed for some reason)
 #define PRINT_SUCCESSFUL_HANDSHAKE
 
-#define DUMP_DEBUG_TRACE_EVERY_TIME
+// #define DUMP_DEBUG_TRACE_EVERY_TIME
 // print a summary on the amount of crosstalk at the end
 #define SUMMARY_STATISTIC_PRINTING
 // check the contents of the buffers send around to detect race conditions
@@ -31,7 +33,7 @@
 
 // necessary, if one uses MPI_testsome:
 // adds a small overhead to distinguish active from inactive requests
-#define DISTINGUISH_ACTIVE_REQUESTS
+// #define DISTINGUISH_ACTIVE_REQUESTS
 
 // #define DISTORT_PROCESS_ORDER_ON_CROSSTALK
 

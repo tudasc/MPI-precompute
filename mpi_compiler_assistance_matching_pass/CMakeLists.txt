@@ -3,8 +3,6 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         mpi_compiler_assistance_matching_pass.cpp
         mpi_functions.h
         mpi_functions.cpp
-        conflict_detection.h
-        conflict_detection.cpp
         implementation_specific.h
         implementation_specific.cpp
         debug.h
@@ -14,9 +12,6 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         replacement.h
         replacement.cpp
         nc_settings.h
-        json.hpp
-        frontend_plugin_data.h
-        frontend_plugin_data.cpp
         precalculation.h
         precalculations.cpp
         devirt_analysis.h
@@ -25,8 +20,8 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         ptr_info.h
         ptr_info.cpp
         CompilerPassConstants.h
-        precompute_funcs.cpp
-        precompute_funcs.h
+        precompute_backend_funcs.cpp
+        precompute_backend_funcs.h
         Precompute_insertion.cpp
         Precompute_insertion.h
         VtableManager.cpp
@@ -44,6 +39,9 @@ target_link_libraries(mpi_compiler_assistance_matching_pass ${Boost_LIBRARIES})
 # if one wants to use mpi
 #find_package(MPI REQUIRED)
 #target_link_libraries(mpi_assertion_checker PRIVATE MPI::MPI_C)
+
+
+#TODO document that teh pass only builds with clang
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer -g -Og -DDEBUG_MACH_PASS=1 -gdwarf-4")
 # db on my local platform has some issues with gdwarf 5

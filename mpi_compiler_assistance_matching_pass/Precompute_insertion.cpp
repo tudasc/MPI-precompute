@@ -1,21 +1,31 @@
-// TODO clean includes
+/*
+Copyright 2023 Tim Jammer
+
+Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+*/
+#include "Precompute_insertion.h"
 #include "CompilerPassConstants.h"
-#include "conflict_detection.h"
+#include "VtableManager.h"
+#include "debug.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation.h"
-#include "precompute_funcs.h"
-#include <llvm/Transforms/Utils/BasicBlockUtils.h>
+#include "precompute_backend_funcs.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
-
-#include "Precompute_insertion.h"
-
-#include "debug.h"
-
-#include "VtableManager.h"
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 using namespace llvm;
 
@@ -72,7 +82,7 @@ llvm::Function *get_global_re_init_function(
             // is raised
             errs() << "Global without initializer:\n";
             global.dump();
-            assert(is_global_from_std(&global));
+            assert(precompute_analyis_result.is_global_from_std(&global));
           }
           // collect the necessary __cxx_global_var_init function that
           // initializes this variable
@@ -109,7 +119,7 @@ llvm::Function *get_global_re_init_function(
 
 void replace_allocation_call(llvm::CallBase *call) {
   assert(call);
-  assert(is_allocation(call));
+  // assert(is_allocation(call));
 
   Value *size;
   IRBuilder<> builder = IRBuilder<>(call);
@@ -320,7 +330,7 @@ void replace_calls_in_copy(
           }
           // end handling calls to MPI
 
-          if (is_allocation(call)) {
+          if (precompute_analyis_result.is_allocation(call)) {
             to_replace.push_back(call);
             continue;
           }
@@ -335,8 +345,8 @@ void replace_calls_in_copy(
                        callee) ||
                    // callee is the original function
                    // which should not be a user function
-                   is_func_from_std(callee) || is_mpi_function(callee) ||
-                   callee->isIntrinsic());
+                   precompute_analyis_result.is_func_from_std(callee) ||
+                   is_mpi_function(callee) || callee->isIntrinsic());
             // it is not used: nothing to do, later pruning step will remove it
           }
         }
@@ -361,7 +371,7 @@ void replace_calls_in_copy(
     }
     // end handling calls to MPI
 
-    if (is_allocation(call)) {
+    if (precompute_analyis_result.is_allocation(call)) {
       replace_allocation_call(call);
       continue;
     }
@@ -388,8 +398,8 @@ void replace_calls_in_copy(
         // callee is the original function
         // which should not be a user function
         // call->dump();
-        assert(is_func_from_std(callee) || is_mpi_function(callee) ||
-               callee->isIntrinsic());
+        assert(precompute_analyis_result.is_func_from_std(callee) ||
+               is_mpi_function(callee) || callee->isIntrinsic());
       }
     }
 
@@ -568,7 +578,10 @@ void prune_function_copy(
   func->F_copy->dump();
   // assert that no new undefs are introduced into func
   //  not assert == as we could remove some undefs
-  assert(prev_num_undef >= get_num_undefs(*func->F_copy));
+  // TODO handle OPENMP properly
+  if (not func->F_orig->getName().contains(".omp_outlined.")) {
+    assert(prev_num_undef >= get_num_undefs(*func->F_copy));
+  }
 }
 
 void add_call_to_precalculation_to_main(

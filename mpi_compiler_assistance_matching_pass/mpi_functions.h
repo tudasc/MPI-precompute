@@ -1,19 +1,18 @@
 /*
-  Copyright 2020 Tim Jammer
+Copyright 2023 Tim Jammer
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+     http://www.apache.org/licenses/LICENSE-2.0
 
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
- */
-
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+*/
 #ifndef MACH_MPI_FUNCTIONS_H_
 #define MACH_MPI_FUNCTIONS_H_
 
@@ -85,6 +84,8 @@ struct mpi_functions {
   llvm::Function *mpi_Ibarrier = nullptr;
   llvm::Function *mpi_Iallreduce = nullptr;
 
+  llvm::Function *mpi_wtime = nullptr;
+
   llvm::Function *mpi_start = nullptr;
   llvm::Function *mpi_startall = nullptr;
   llvm::Function *mpi_send_init = nullptr;
@@ -112,5 +113,9 @@ bool is_mpi_function(llvm::Function *f);
 bool is_send_function(llvm::Function *f);
 
 bool is_recv_function(llvm::Function *f);
+
+llvm::Value *get_tag_value(llvm::CallBase *mpi_call, bool is_send);
+llvm::Value *get_src_value(llvm::CallBase *mpi_call, bool is_send);
+llvm::Value *get_comm_value(llvm::CallBase *mpi_call, bool is_send);
 
 #endif /* MACH_MPI_FUNCTIONS_H_ */

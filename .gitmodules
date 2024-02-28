@@ -1,0 +1,3 @@
+[submodule "sample_apps/MUrB/lib/MIPP"]
+	path = sample_apps/MUrB/lib/MIPP
+	url = https://github.com/aff3ct/MIPP.git
