@@ -40,7 +40,7 @@ The ``-fno-inline`` will be removed after the analysis, so that inlining does ha
 
 Before building MUrB be sure to init the submodules (``git submodule update --init --recursive``) to download the
 prerequisite requirements; also refer to the [Readme](sample_apps/MUrB/README.md) in the MUrB directory.
-MUrB can than be built using cmake, we used the following build settings with our Pass:
+MUrB can then be built using cmake, we used the following build settings with our Pass:
 
 ```
 cmake .. -DCMAKE_CXX_COMPILER=$MPICXX -DCMAKE_CXX_FLAGS="-fopenmp -O3 -fno-inline -fuse-ld=lld -flto -fwhole-program-vtables" -DENABLE_MURB_MPI=ON -DENABLE_VISU=OFF -DENABLE_MURB_READER=OFF
