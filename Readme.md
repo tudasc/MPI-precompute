@@ -56,12 +56,12 @@ required to reproduce our measurements from [[1]](ref-1)
 <tr>
     <td valign="top"><a name="ref-1"></a>[1]</td>
     <td>
-XXXXX
+Tim Jammer, Tim Heldmann, Michael Blesel, Michael Kuhn, Christian Bischof, "Compiler-Based Precalculation of MPI Message Envelopes" - currently under review
       </td>
 </tr>
 <tr>
     <td valign="top"><a name="ref-2"></a>[2]</td>
-    <td>XXXXX</td>
+    <td>Tim Jammer and Christian Bischof "Compiler-enabled optimization of persistent MPI Operations" In : 2022 IEEE/ACM International Workshop on Exascale MPI (ExaMPI) https://doi.org/10.1109/ExaMPI56604.2022.00006</td>
 </tr>
 
 
