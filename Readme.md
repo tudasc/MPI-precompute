@@ -56,7 +56,7 @@ required to reproduce our measurements from [[1]](ref-1)
 <tr>
     <td valign="top"><a name="ref-1"></a>[1]</td>
     <td>
-Tim Jammer, Tim Heldmann, Michael Blesel, Michael Kuhn, Christian Bischof, "Compiler-Based Precalculation of MPI Message Envelopes" - currently under review
+Tim Jammer, Tim Heldmann, Michael Blesel, Michael Kuhn, Christian Bischof, "Compiler-Based Precalculation of MPI Message Envelopes" To Appear In: ISC High Performance 2024 International Workshops
       </td>
 </tr>
 <tr>
