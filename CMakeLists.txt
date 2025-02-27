@@ -61,4 +61,4 @@ add_custom_target(clang_wrap_cxx ALL
         DEPENDS clang_wrapper.sh)
 
 enable_testing()
-add_subdirectory(tests)
+add_subdirectory(use-cases/mpi-matching/tests)
