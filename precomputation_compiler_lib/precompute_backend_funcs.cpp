@@ -20,7 +20,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "llvm/IR/Module.h"
 
 #include "llvm/Support/raw_ostream.h"
-#include <mpi.h>
 
 using namespace llvm;
 

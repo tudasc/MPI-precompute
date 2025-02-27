@@ -13,8 +13,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-#include "mpi_functions.h"
-
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/Dominators.h"
@@ -26,9 +24,6 @@ using namespace llvm;
 
 RequiredAnalysisResults::RequiredAnalysisResults(
     llvm::ModuleAnalysisManager &MAM, llvm::Module &M) {
-
-  assert(mpi_func != nullptr &&
-         "The search for MPI functions should be made first");
 
   FAM = &MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
 

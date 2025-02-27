@@ -14,7 +14,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 #include "ptr_info.h"
-#include "mpi_functions.h"
 #include "precalculation.h"
 #include "taintedValue.h"
 #include <cassert>

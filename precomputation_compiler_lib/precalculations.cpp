@@ -18,7 +18,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "Precompute_insertion.h"
 #include "devirt_analysis.h"
 #include "implementation_specific.h"
-#include "mpi_functions.h"
 #include "precalculation.h"
 
 #include "llvm/Analysis/CFG.h"
