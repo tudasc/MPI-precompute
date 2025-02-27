@@ -11,7 +11,8 @@ For this Project, we used clang/`llvm 16.0.1`
 
 ## Building
 
-Before Building with cmake, one may need to have a look at [openmpi-patch/CMakeLists.txt](openmpi-patch/CMakeLists.txt)
+Before Building with cmake, one may need to have a look
+at [openmpi-patch/CMakeLists.txt](use-cases/mpi-matching/openmpi-patch/CMakeLists.txt)
 and change the ``OMPI_CONFIGURE_FLAGS`` variable to fit their system.
 The variable is used to configure openmpi.
 After one had adjusted the openmpi configuration, building with cmake is quite straightforward:
