@@ -36,7 +36,7 @@ ExternalProject_Add(
         ompi
         URL https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.1.tar.gz
         URL_HASH MD5=8239df775478285fb14edf37d02f5bfa
-        PATCH_COMMAND patch <SOURCE_DIR>/ompi/mca/osc/ucx/Makefile.in patches/ompi_makefile.patch && patch <SOURCE_DIR>/ompi/mca/osc/ucx/osc_ucx_component.c patches/ompi_osc_ucx_component.patch
+        PATCH_COMMAND patch <SOURCE_DIR>/ompi/mca/osc/ucx/Makefile.in ${CMAKE_CURRENT_SOURCE_DIR}/patches/ompi_makefile.patch && patch <SOURCE_DIR>/ompi/mca/osc/ucx/osc_ucx_component.c ${CMAKE_CURRENT_SOURCE_DIR}/patches/ompi_osc_ucx_component.patch
         CONFIGURE_COMMAND
         ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${CMAKE_BINARY_DIR}/precompute_lib
         <SOURCE_DIR>/configure --prefix <INSTALL_DIR> CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} ${OMPI_CONFIGURE_FLAGS}
@@ -46,7 +46,7 @@ ExternalProject_Add(
 )
 
 ExternalProject_Add_Step(ompi patch_header
-        COMMAND bash patches/patch_ompi_header.sh interface.h <SOURCE_DIR>/ompi/include/mpi.h.in
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/patches/patch_ompi_header.sh ${CMAKE_CURRENT_SOURCE_DIR}/interface.h <SOURCE_DIR>/ompi/include/mpi.h.in
         DEPENDEES patch
         DEPENDERS configure
        )
@@ -86,15 +86,18 @@ set(persistent_implementation-include -I${BINARY_DIR} -I${BINARY_DIR}/opal/inclu
         -I${CMAKE_SOURCE_DIR}/mpi_compiler_assistance_matching_pass
 )
 
-set(PRECOMPUTE_H_FILE ${CMAKE_SOURCE_DIR}/precompute_lib/precompute.h)
-set(COMPILER_PASS_CONSTANTS_H_FILE ${CMAKE_SOURCE_DIR}/mpi_compiler_assistance_matching_pass/CompilerPassConstants.h)
+set(PRECOMPUTE_H_FILE ${CMAKE_SOURCE_DIR}/precompute_runtime_lib/precompute.h)
+set(COMPILER_PASS_CONSTANTS_H_FILE ${CMAKE_CURRENT_SOURCE_DIR}/../mpi_compiler_assistance_matching_pass/CompilerPassConstants.h)
+set(PRECOMPUTE_H_DIR ${CMAKE_SOURCE_DIR}/precompute_runtime_lib)
+set(COMPILER_PASS_CONSTANTS_H_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../mpi_compiler_assistance_matching_pass)
+
 # depends on the header file not the implementation of the library
 
 set(PERSISTENT_IMPLEMENTATION_FILES debug.c debug.h finalization.c finalization.h globals.c globals.h handshake.c handshake.h initialization.c initialization.h interface.c interface.h mpi-internals.h pack.c pack.h request_type.h settings.h start.c start.h test.c test.h wait.c wait.h)
 
 add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
-        COMMAND ${CMAKE_C_COMPILER} -E ${CFLAGS} ${persistent_implementation-include} -DLINKAGE_TYPE=static one-sided-persistent.h -o ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c
+        COMMAND ${CMAKE_C_COMPILER} -E ${CFLAGS} ${persistent_implementation-include} -DLINKAGE_TYPE=static ${CMAKE_CURRENT_SOURCE_DIR}/one-sided-persistent.h -o ${CMAKE_CURRENT_BINARY_DIR}/one-sided-persistent.c -I${PRECOMPUTE_H_DIR} -I${COMPILER_PASS_CONSTANTS_H_DIR}
         COMMENT "build one sided persistent implementation"
         DEPENDS ompi-build precompute ${PERSISTENT_IMPLEMENTATION_FILES} ${PRECOMPUTE_H_FILE} ${COMPILER_PASS_CONSTANTS_H_FILE}
         )
