@@ -18,28 +18,15 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "precalculation.h"
 #include <llvm/IR/Module.h>
+void replace_MPI_with_precompute(
+    const std::shared_ptr<PrecalculationAnalysis>& precompute_analyis_result,
+    const std::vector<llvm::CallBase *>& init_calls);
 
-void insert_precomputation(
-    llvm::Module &M, const PrecalculationAnalysis &precompute_analyis_result);
+void add_call_to_precalculation_to_main(
+    llvm::Module &M,
+    llvm::CallBase* call_to_init,
+    llvm::Function* entry_function,
+    const std::shared_ptr<PrecalculationAnalysis>& precompute_analyis_result);
 
-class PrecalculationFunctionCopy {
-public:
-  // Replacement Part
-  explicit PrecalculationFunctionCopy(
-      const std::shared_ptr<PrecalculationFunctionAnalysis> &analysis_result)
-      : analysis_result(analysis_result), F_orig(analysis_result->func) {
-    initialize_copy();
-  }
-
-  std::shared_ptr<PrecalculationFunctionAnalysis> analysis_result;
-  llvm::Function *F_orig;
-  llvm::Function *F_copy = nullptr;
-  llvm::ValueToValueMapTy old_new_map;
-  std::map<llvm::Value *, llvm::Value *> new_to_old_map;
-  llvm::ClonedCodeInfo *cloned_code_info = nullptr; // currently we don't use it
-
-private:
-  void initialize_copy();
-};
 
 #endif // MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H

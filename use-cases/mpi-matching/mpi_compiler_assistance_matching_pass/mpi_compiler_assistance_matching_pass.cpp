@@ -14,6 +14,8 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 
+#include "Precompute_insertion.h"
+
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Function.h"
@@ -75,6 +77,34 @@ void run_optimization_passes(llvm::Module &M, ModuleAnalysisManager &AM) {
   // M.dump();
 }
 
+llvm::CallBase *get_mpi_init_call(llvm::Module &M,
+                                  llvm::Function *entry_point) {
+  // search for MPI_init or Init Thread as precalc may only take place after
+  // that
+  CallBase *call_to_init = nullptr;
+  if (mpi_func->mpi_init != nullptr) {
+    for (auto *u : mpi_func->mpi_init->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
+        assert(call_to_init == nullptr && "MPI_Init is only allowed once");
+        call_to_init = call;
+      }
+    }
+  }
+  if (mpi_func->mpi_init_thread != nullptr) {
+    for (auto *u : mpi_func->mpi_init_thread->users()) {
+      if (auto *call = dyn_cast<CallBase>(u)) {
+        assert(call_to_init == nullptr && "MPI_Init is only allowed once");
+        call_to_init = call;
+      }
+    }
+  }
+
+  assert(call_to_init != nullptr && "Did Not Found MPI_Init_Call");
+
+  assert(call_to_init->getFunction() == entry_point &&
+         "MPI_Init is not in main");
+  return call_to_init;
+}
 namespace {
 struct MPICompilerAssistanceMatchingPass
     : public PassInfoMixin<MPICompilerAssistanceMatchingPass> {
@@ -105,7 +135,7 @@ struct MPICompilerAssistanceMatchingPass
     // as this pass is used at LTO it sees the whole program so if no MPI is
     // used: nothing to do
     if (!is_mpi_used(mpi_func)) {
-      // nothing to do for non mpi applicatiopns
+      // nothing to do for non mpi applications
       delete mpi_func;
       return PreservedAnalyses::all();
     }
@@ -152,9 +182,27 @@ struct MPICompilerAssistanceMatchingPass
     bool replacement = !combined_init_list.empty();
     // otherwise nothing should be done
     if (replacement) {
-      auto precalcuation =
-          std::make_shared<PrecalculationAnalysis>(M, main_func);
-      precalcuation->add_precalculations(combined_init_list);
+
+      std::vector<Instruction *> init_calls; // for type conversion, as we need
+                                             // to pass it as Instruction
+      // collect values to be precomputed
+      std::vector<Value *> to_precompute;
+      for (auto *call : combined_init_list) {
+        bool is_send = is_send_function(call->getCalledFunction());
+        to_precompute.push_back(get_tag_value(call, is_send));
+        to_precompute.push_back(get_src_value(call, is_send));
+        init_calls.push_back(call);
+      }
+
+      auto init_call = get_mpi_init_call(M, main_func);
+
+      auto precalcuation = std::make_shared<PrecalculationAnalysis>(
+          M, main_func, to_precompute, init_calls);
+
+      replace_MPI_with_precompute(precalcuation, combined_init_list);
+
+      add_call_to_precalculation_to_main(M, init_call, main_func,
+                                         precalcuation);
 
       remove_noinline_from_module(M);
 

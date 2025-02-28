@@ -199,6 +199,12 @@ public:
     return precomputed_values_map[v];
   }
 
+  llvm::Function* get_precompute_phase_call() {
+    assert(false);
+    //TODO IMPLEMENT
+    return nullptr;
+  }
+
 private:
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>
       function_analysis;

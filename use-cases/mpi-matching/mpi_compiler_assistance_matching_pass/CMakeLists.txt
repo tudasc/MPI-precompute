@@ -19,6 +19,7 @@ find_package(Boost 1.66.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 target_link_libraries(mpi_compiler_assistance_matching_pass ${Boost_LIBRARIES})
 target_link_libraries(mpi_compiler_assistance_matching_pass PRIVATE precomputation_compiler_lib)
+target_include_directories(mpi_compiler_assistance_matching_pass PRIVATE ${CMAKE_SOURCE_DIR}/precomputation_compiler_lib)
 
 # if one wants to use mpi
 #find_package(MPI REQUIRED)
