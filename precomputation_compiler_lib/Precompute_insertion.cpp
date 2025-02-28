@@ -549,7 +549,7 @@ llvm::Function *create_precompute_main(
 
 llvm::Function *
 insert_precomputation(llvm::Module &M,
-                      const PrecalculationAnalysis &precompute_analyis_result) {
+                      PrecalculationAnalysis &precompute_analyis_result) {
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionCopy>>
       functions_copied;
   auto vtm = VtableManager(M);
@@ -575,6 +575,8 @@ insert_precomputation(llvm::Module &M,
     // debug:
     // add_debug_printfs_to_precalculation(pair.second->F_copy);
   }
+
+  precompute_analyis_result.build_precomputed_values_map(functions_copied);
 
   auto *entry_point = precompute_analyis_result.getEntryPoint();
   assert(entry_point);

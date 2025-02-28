@@ -34,6 +34,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "ptr_info.h"
 #include "taintedValue.h"
 
+class PrecalculationFunctionCopy;
 class PrecalculationAnalysis;
 
 class PrecalculationFunctionAnalysis
@@ -199,19 +200,21 @@ public:
     return precomputed_values_map[v];
   }
 
-  llvm::Function* precompute_main;
+  llvm::Function *precompute_main;
 
-  llvm::Function *get_precompute_phase_call() {
-    assert(false);
-    // TODO IMPLEMENT
-    return nullptr;
-  }
+  llvm::Function *get_precompute_phase_main() { return precompute_main; }
 
 private:
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>
       function_analysis;
 
   std::map<llvm::Value *, llvm::Value *> precomputed_values_map;
+public:
+  void build_precomputed_values_map(
+      const std::map<llvm::Function *,
+                     std::shared_ptr<PrecalculationFunctionCopy>>
+          functions_copied);
+private:
 
   void analyze();
 
@@ -229,7 +232,6 @@ public:
 
   const std::vector<llvm::CallBase *> &getToReplaceWithEnvelopeRegister() const;
 
-public:
 private:
   llvm::Module &M;
   llvm::Function *entry_point;
@@ -238,6 +240,7 @@ private:
 
   std::vector<llvm::Value *> to_precompute_value;
   std::vector<llvm::Instruction *> to_precompute_cfg;
+
   // std::vector<llvm::CallBase *> to_replace_with_envelope_register;
   std::set<std::shared_ptr<TaintedValue>> tainted_values;
 

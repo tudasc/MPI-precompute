@@ -21,8 +21,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 llvm::Function *
 insert_precomputation(llvm::Module &M,
-                      const PrecalculationAnalysis &precompute_analyis_result);
-
+                      PrecalculationAnalysis &precompute_analyis_result);
 
 class PrecalculationFunctionCopy {
 public:

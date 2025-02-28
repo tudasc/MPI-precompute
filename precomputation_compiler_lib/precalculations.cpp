@@ -390,7 +390,7 @@ void PrecalculationAnalysis::analyze() {
 
 void PrecalculationAnalysis::generate_slice() {
   // todo refactoring this functionality should be part of *this
-  precompute_main=insert_precomputation(M, *this);
+  precompute_main = insert_precomputation(M, *this);
 }
 
 void PrecalculationAnalysis::find_all_tainted_vals() {
@@ -1220,6 +1220,33 @@ void PrecalculationAnalysis::visit_invoke_for_exception(
         }
     }
   }
+}
+
+void PrecalculationAnalysis::build_precomputed_values_map(
+    const std::map<llvm::Function *,
+                   std::shared_ptr<PrecalculationFunctionCopy>>
+        functions_copied) {
+
+  for (auto *val : to_precompute_value) {
+    if (auto *inst = dyn_cast<Instruction>(val)) {
+      auto *f = inst->getFunction();
+      assert(is_func_included_in_precompute(f));
+      const auto& copy_func = functions_copied.at(f);
+      precomputed_values_map[val] = copy_func->old_new_map[val];
+    } else {
+      // constant or global: same as original vlaue
+      precomputed_values_map[val] = val;
+    }
+  }
+  //todo duplicated code same loop as above but whcihtout the cast
+  for (auto *inst : to_precompute_cfg) {
+      auto *f = inst->getFunction();
+      assert(is_func_included_in_precompute(f));
+      const auto& copy_func = functions_copied.at(f);
+      precomputed_values_map[inst] = copy_func->old_new_map[inst];
+
+  }
+
 }
 
 void PrecalculationAnalysis::visit_call_for_retval(
