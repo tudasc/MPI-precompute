@@ -199,9 +199,11 @@ public:
     return precomputed_values_map[v];
   }
 
-  llvm::Function* get_precompute_phase_call() {
+  llvm::Function* precompute_main;
+
+  llvm::Function *get_precompute_phase_call() {
     assert(false);
-    //TODO IMPLEMENT
+    // TODO IMPLEMENT
     return nullptr;
   }
 
@@ -215,7 +217,7 @@ private:
 
   void analyze_functions();
 
-  void generate_slice() const;
+  void generate_slice();
 
 public:
   std::unique_ptr<struct mpi_functions> mpi_func;

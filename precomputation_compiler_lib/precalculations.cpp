@@ -388,9 +388,9 @@ void PrecalculationAnalysis::analyze() {
 #endif
 }
 
-void PrecalculationAnalysis::generate_slice() const {
+void PrecalculationAnalysis::generate_slice() {
   // todo refactoring this functionality should be part of *this
-  insert_precomputation(M, *this);
+  precompute_main=insert_precomputation(M, *this);
 }
 
 void PrecalculationAnalysis::find_all_tainted_vals() {

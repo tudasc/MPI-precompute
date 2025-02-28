@@ -23,6 +23,7 @@ llvm::Function *
 insert_precomputation(llvm::Module &M,
                       const PrecalculationAnalysis &precompute_analyis_result);
 
+
 class PrecalculationFunctionCopy {
 public:
   // Replacement Part

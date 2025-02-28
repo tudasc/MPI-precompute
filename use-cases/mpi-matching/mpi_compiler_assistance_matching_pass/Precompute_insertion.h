@@ -19,14 +19,12 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "precalculation.h"
 #include <llvm/IR/Module.h>
 void replace_MPI_with_precompute(
-    const std::shared_ptr<PrecalculationAnalysis>& precompute_analyis_result,
-    const std::vector<llvm::CallBase *>& init_calls);
+    const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result,
+    const std::vector<llvm::CallBase *> &init_calls);
 
 void add_call_to_precalculation_to_main(
-    llvm::Module &M,
-    llvm::CallBase* call_to_init,
-    llvm::Function* entry_function,
-    const std::shared_ptr<PrecalculationAnalysis>& precompute_analyis_result);
-
+    llvm::Module &M, llvm::CallBase *call_to_init,
+    llvm::Function *entry_function,
+    const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result);
 
 #endif // MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H

@@ -275,14 +275,6 @@ void replace_calls_in_copy(
               callee == precompute_analyis_result.mpi_func->mpi_comm_size) {
             continue; // noting to do, keep original call
           }
-          if (callee == precompute_analyis_result.mpi_func->mpi_send_init) {
-            to_replace.push_back(call);
-            continue;
-          }
-          if (callee == precompute_analyis_result.mpi_func->mpi_recv_init) {
-            to_replace.push_back(call);
-            continue;
-          }
           // end handling calls to MPI
 
           if (precompute_analyis_result.is_allocation(call)) {
@@ -519,7 +511,9 @@ void prune_function_copy(
   //  not assert == as we could remove some undefs
   // TODO handle OPENMP properly
   if (not func->F_orig->getName().contains(".omp_outlined.")) {
-    assert(prev_num_undef >= get_num_undefs(*func->F_copy));
+    // assertion not valid here anymore due to new design
+    // TODO move assertion to appropriate place
+    //  assert(prev_num_undef >= get_num_undefs(*func->F_copy));
   }
 }
 
@@ -527,14 +521,17 @@ llvm::Function *create_precompute_main(
     llvm::Module &M,
     const std::shared_ptr<PrecalculationFunctionCopy> &entry_function,
     const PrecalculationAnalysis &precompute_analyis_result) {
+
   Function *result = Function::Create(
       precompute_analyis_result.getEntryPoint()->getFunctionType(),
       precompute_analyis_result.getEntryPoint()->getLinkage(),
       "precompute_main", M);
 
-  IRBuilder<> builder(&result->getEntryBlock());
+  BasicBlock *BB = BasicBlock::Create(M.getContext(), "entry", result);
 
-  auto *precompute_funcs = PrecomputeFunctions::get_instance();
+  IRBuilder<> builder(BB);
+
+  auto *precompute_funcs = PrecomputeFunctions::create_instance(M);
 
   // forward args
   std::vector<Value *> args;

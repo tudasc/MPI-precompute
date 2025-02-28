@@ -36,12 +36,14 @@ void replace_MPI_with_precompute(
     auto *old_src = get_src_value(old_call, true);
     auto *precomputed_call =
         precompute_analyis_result->get_precomputed_value(old_call);
+
     auto *precomputed_tag =
         precompute_analyis_result->get_precomputed_value(old_tag);
     auto *precomputed_src =
         precompute_analyis_result->get_precomputed_value(old_src);
+    assert(isa<CallBase>(precomputed_call));
 
-    IRBuilder<> builder = IRBuilder<>(cast<Instruction>(precomputed_call));
+    IRBuilder<> builder = IRBuilder<>(cast<Instruction>(precomputed_call)->getPrevNode());
 
     int precompute_envelope_dest;
     int precompute_envelope_tag;

@@ -203,6 +203,7 @@ struct MPICompilerAssistanceMatchingPass
 
       add_call_to_precalculation_to_main(M, init_call, main_func,
                                          precalcuation);
+      precalcuation->clean_precompute();
 
       remove_noinline_from_module(M);
 
