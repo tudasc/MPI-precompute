@@ -18,6 +18,7 @@ add_library(precomputation_compiler_lib SHARED
         Precompute_insertion.h
         VtableManager.cpp
         VtableManager.h
+        mpi_functions.h
 )
 
 #TODO cmake is complaining about boost

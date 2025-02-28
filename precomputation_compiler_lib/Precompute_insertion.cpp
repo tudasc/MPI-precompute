@@ -63,7 +63,6 @@ llvm::Function *get_global_re_init_function(
       auto global_info = precompute_analyis_result.get_taint_info(&global);
 
       if (not global.isConstant()) {
-
         assert(global_info->ptr_info);
         // TODO efficiency: one can also check if at leas one of the stores in
         // questions are actually included in precompute
@@ -158,7 +157,6 @@ std::shared_ptr<PrecalculationFunctionCopy> is_in_a_precompute_copy_func(
     const std::map<llvm::Function *,
                    std::shared_ptr<PrecalculationFunctionCopy>>
         &functions_copied) {
-
   auto *func = inst->getFunction();
   auto pos = std::find_if(
       functions_copied.begin(), functions_copied.end(),
@@ -210,48 +208,6 @@ void replace_usages_of_func_in_copy(
     bool has_replaced = inst->replaceUsesOfWith(func->F_orig, func->F_copy);
     assert(has_replaced);
   }
-}
-
-CallBase *replace_MPI_with_precompute(
-    const std::shared_ptr<PrecalculationFunctionCopy> &func, CallBase *call) {
-  auto *tag = get_tag_value(call, true);
-  auto *src = get_src_value(call, true);
-  IRBuilder<> builder = IRBuilder<>(call);
-
-  int precompute_envelope_dest;
-  int precompute_envelope_tag;
-  if (call->getCalledFunction() == mpi_func->mpi_send_init) {
-    precompute_envelope_dest = SEND_ENVELOPE_DEST;
-    precompute_envelope_tag = SEND_ENVELOPE_TAG;
-  } else {
-    assert(call->getCalledFunction() == mpi_func->mpi_recv_init);
-    precompute_envelope_dest = RECV_ENVELOPE_DEST;
-    precompute_envelope_tag = RECV_ENVELOPE_TAG;
-  }
-
-  builder.CreateCall(
-      PrecomputeFunctions::get_instance()->register_precomputed_value,
-      {builder.getInt32(precompute_envelope_dest), src});
-
-  auto *new_call = builder.CreateCall(
-      PrecomputeFunctions::get_instance()->register_precomputed_value,
-      {builder.getInt32(precompute_envelope_tag), tag});
-
-  Instruction *invoke_br = nullptr;
-  if (auto *invoke = dyn_cast<InvokeInst>(call)) {
-    // the register precompute call does not throw exceptions so we don't
-    // need an invoke
-    invoke_br = builder.CreateBr(invoke->getNormalDest());
-  }
-  call->replaceAllUsesWith(ImplementationSpecifics::get_instance()->SUCCESS);
-  auto *old_call_v = func->new_to_old_map[call];
-  call->eraseFromParent();
-
-  func->new_to_old_map[new_call] = old_call_v;
-  if (invoke_br) {
-    func->new_to_old_map[invoke_br] = old_call_v;
-  }
-  return call;
 }
 
 // sometimes different member funcs of objects are relevant
@@ -315,15 +271,15 @@ void replace_calls_in_copy(
         } else {
           auto *callee = call->getCalledFunction();
 
-          if (callee == mpi_func->mpi_comm_rank ||
-              callee == mpi_func->mpi_comm_size) {
+          if (callee == precompute_analyis_result.mpi_func->mpi_comm_rank ||
+              callee == precompute_analyis_result.mpi_func->mpi_comm_size) {
             continue; // noting to do, keep original call
           }
-          if (callee == mpi_func->mpi_send_init) {
+          if (callee == precompute_analyis_result.mpi_func->mpi_send_init) {
             to_replace.push_back(call);
             continue;
           }
-          if (callee == mpi_func->mpi_recv_init) {
+          if (callee == precompute_analyis_result.mpi_func->mpi_recv_init) {
             to_replace.push_back(call);
             continue;
           }
@@ -359,16 +315,6 @@ void replace_calls_in_copy(
     assert(orig_call);
 
     auto *callee = call->getCalledFunction();
-    if (callee == mpi_func->mpi_send_init) {
-      call = replace_MPI_with_precompute(func, call);
-      continue;
-    }
-    if (callee == mpi_func->mpi_recv_init) {
-      call = replace_MPI_with_precompute(func, call);
-
-      continue;
-    }
-    // end handling calls to MPI
 
     if (precompute_analyis_result.is_allocation(call)) {
       replace_allocation_call(call);
@@ -421,7 +367,6 @@ void replace_exceptionless_invoke_with_call(
   std::vector<InvokeInst *> ivokes;
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
-
     // either the func cannot except
     // or the exception case is not needed
     if (auto *invoke = dyn_cast<InvokeInst>(&*I)) {
@@ -483,18 +428,15 @@ void prune_function_copy(
   // if we remove stuff
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
-
     Instruction *inst = &*I;
     auto *old_v = func->new_to_old_map[inst];
     if (not precompute_analyis_result.is_included_in_precompute(old_v)) {
       if (auto *call = dyn_cast<CallBase>(inst)) {
         if (PrecomputeFunctions::get_instance()->is_call_to_precompute(call)) {
           // do not remove
-
         } else {
           to_prune.push_back(inst);
         }
-
       } else if (auto *br = dyn_cast<BranchInst>(inst)) {
         // don't remove unconditional br
         // if a block with an unconditional br is not needed its successor is
@@ -511,7 +453,6 @@ void prune_function_copy(
 
   // remove stuff
   for (auto *inst : to_prune) {
-
     if (inst->isTerminator()) {
       // if this terminator was not tainted: we can immediately return from
       // this function
@@ -555,15 +496,14 @@ void prune_function_copy(
   //  a particular path leads to an invalid exception for example)
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
-
     if (auto *phi = dyn_cast<PHINode>(&*I)) {
-
       if (phi->getNumIncomingValues() != pred_size(phi->getParent())) {
         std::vector<unsigned> incoming_vals_to_remove;
         for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i) {
           if (std::find(pred_begin(phi->getParent()),
                         pred_end(phi->getParent()), phi->getIncomingBlock(i)) ==
-              pred_end(phi->getParent())) { // block not existant anmore
+              pred_end(phi->getParent())) {
+            // block not existant anmore
             incoming_vals_to_remove.push_back(i);
           }
         }
@@ -583,58 +523,36 @@ void prune_function_copy(
   }
 }
 
-void add_call_to_precalculation_to_main(
+llvm::Function *create_precompute_main(
     llvm::Module &M,
     const std::shared_ptr<PrecalculationFunctionCopy> &entry_function,
     const PrecalculationAnalysis &precompute_analyis_result) {
-  // TODO code duplication with auto pos=
+  Function *result = Function::Create(
+      precompute_analyis_result.getEntryPoint()->getFunctionType(),
+      precompute_analyis_result.getEntryPoint()->getLinkage(),
+      "precompute_main", M);
 
-  // search for MPI_init or Init Thread as precalc may only take place after
-  // that
-  CallBase *call_to_init = nullptr;
-  if (mpi_func->mpi_init != nullptr) {
-    for (auto *u : mpi_func->mpi_init->users()) {
-      if (auto *call = dyn_cast<CallBase>(u)) {
-        assert(call_to_init == nullptr && "MPI_Init is only allowed once");
-        call_to_init = call;
-      }
-    }
-  }
-  if (mpi_func->mpi_init_thread != nullptr) {
-    for (auto *u : mpi_func->mpi_init_thread->users()) {
-      if (auto *call = dyn_cast<CallBase>(u)) {
-        assert(call_to_init == nullptr && "MPI_Init is only allowed once");
-        call_to_init = call;
-      }
-    }
-  }
-
-  assert(call_to_init != nullptr && "Did Not Found MPI_Init_Call");
-
-  assert(call_to_init->getFunction() == entry_function->F_orig &&
-         "MPI_Init is not in main");
-
-  // insert after init
-  // MPIOPT_Init will later be inserted between this 2 calls
-  IRBuilder<> builder(call_to_init->getNextNode());
+  IRBuilder<> builder(&result->getEntryBlock());
 
   auto *precompute_funcs = PrecomputeFunctions::get_instance();
 
-  // forward args of main
+  // forward args
   std::vector<Value *> args;
-  for (auto &arg : entry_function->F_orig->args()) {
+  for (auto &arg : result->args()) {
     args.push_back(&arg);
   }
   builder.CreateCall(precompute_funcs->init_precompute_lib);
-  builder.CreateCall(entry_function->F_copy, args);
+  auto *real_main = builder.CreateCall(entry_function->F_copy, args);
   builder.CreateCall(precompute_funcs->finish_precomputation);
   auto *re_init_fun = get_global_re_init_function(M, precompute_analyis_result);
   builder.CreateCall(re_init_fun);
+  builder.CreateRet(real_main);
+  return result;
 }
 
-void insert_precomputation(
-    llvm::Module &M, const PrecalculationAnalysis &precompute_analyis_result) {
-
+llvm::Function *
+insert_precomputation(llvm::Module &M,
+                      const PrecalculationAnalysis &precompute_analyis_result) {
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionCopy>>
       functions_copied;
   auto vtm = VtableManager(M);
@@ -666,7 +584,8 @@ void insert_precomputation(
   auto entry_point_copy = functions_copied[entry_point];
   if (entry_point_copy) {
     // otherwise: nothing to do nothing to precalculate was found
-    add_call_to_precalculation_to_main(M, entry_point_copy,
-                                       precompute_analyis_result);
+    return create_precompute_main(M, entry_point_copy,
+                                  precompute_analyis_result);
   }
+  return nullptr;
 }
