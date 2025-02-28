@@ -214,8 +214,8 @@ public:
       const std::map<llvm::Function *,
                      std::shared_ptr<PrecalculationFunctionCopy>>
           functions_copied);
-private:
 
+private:
   void analyze();
 
   void analyze_functions();

@@ -1231,22 +1231,20 @@ void PrecalculationAnalysis::build_precomputed_values_map(
     if (auto *inst = dyn_cast<Instruction>(val)) {
       auto *f = inst->getFunction();
       assert(is_func_included_in_precompute(f));
-      const auto& copy_func = functions_copied.at(f);
+      const auto &copy_func = functions_copied.at(f);
       precomputed_values_map[val] = copy_func->old_new_map[val];
     } else {
       // constant or global: same as original vlaue
       precomputed_values_map[val] = val;
     }
   }
-  //todo duplicated code same loop as above but whcihtout the cast
+  // todo duplicated code same loop as above but whcihtout the cast
   for (auto *inst : to_precompute_cfg) {
-      auto *f = inst->getFunction();
-      assert(is_func_included_in_precompute(f));
-      const auto& copy_func = functions_copied.at(f);
-      precomputed_values_map[inst] = copy_func->old_new_map[inst];
-
+    auto *f = inst->getFunction();
+    assert(is_func_included_in_precompute(f));
+    const auto &copy_func = functions_copied.at(f);
+    precomputed_values_map[inst] = copy_func->old_new_map[inst];
   }
-
 }
 
 void PrecalculationAnalysis::visit_call_for_retval(
@@ -2046,6 +2044,33 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
 }
 
 void PrecalculationAnalysis::clean_precompute() {
-  // TODO implement
-  assert(false);
+
+  // TODO
+  // problem what if the user tels that he want this instruction location to be
+  // reached in precompute and then this instr itself is also relevant for
+  // precompute?
+  for (auto *inst : to_precompute_cfg) {
+    auto *new_inst = cast<Instruction>(get_precomputed_value(inst));
+    if (inst->isTerminator()) {
+      if (auto *ret = dyn_cast<ReturnInst>(inst)) {
+        if (is_tainted(ret->getReturnValue())) {
+          // need to KEEP it
+        } else {
+          IRBuilder<> builder = IRBuilder<>(new_inst);
+          if (inst->getFunction()->getReturnType()->isVoidTy()) {
+            builder.CreateRetVoid();
+          } else {
+            builder.CreateRet(
+                Constant::getNullValue(inst->getFunction()->getReturnType()));
+          }
+          new_inst->eraseFromParent();
+        }
+      } else {
+        IRBuilder<> builder = IRBuilder<>(new_inst);
+        builder.CreateBr(inst->getSuccessor(0));
+      }
+    } else {
+      new_inst->eraseFromParent();
+    }
+  }
 }
