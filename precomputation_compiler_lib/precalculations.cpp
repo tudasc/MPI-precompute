@@ -2017,3 +2017,8 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
   }
   return true;
 }
+
+void PrecalculationAnalysis::clean_precompute() {
+  // TODO implement
+  assert(false);
+}
