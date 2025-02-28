@@ -1,8 +1,10 @@
+# to be used by other parts of the project
+set(PRECOMPUTE_LIB_PATH ${CMAKE_CURRENT_BINARY_DIR} PARENT_SCOPE)
+
 add_library(precompute MODULE
         # List your source files here.
         precompute.cpp
         precompute.h)
-
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DPRINT_REGISTERED_VALUES -g -Og")
 # switch off one Warning for release build: some variables are only used for assertions
@@ -16,4 +18,5 @@ target_compile_features(precompute PRIVATE cxx_std_17)
 set_target_properties(precompute PROPERTIES
         COMPILE_FLAGS "-fno-rtti -Wall -Wextra -Wno-unused-parameter"
 )
+
 

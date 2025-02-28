@@ -1,11 +1,15 @@
 #!/bin/bash
+echo $(pwd)
+# where the wrappers are found
+BINARY_DIR=$1
 
-echo "$(pwd)"
-RUN_SCRIPT=$(pwd)/run.sh
+# the testcase to use
+TEST_DIR=$2
 
-TEST_DIR=$1
+RUN_SCRIPT=$BINARY_DIR/run.sh
 
-source ./setup_env.sh
+
+source $BINARY_DIR/setup_env.sh
 
 if [ ! -d "$TEST_DIR" ]; then
   echo "$TEST_DIR is not a directory"

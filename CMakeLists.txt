@@ -19,9 +19,6 @@ link_directories(${LLVM_LIBRARY_DIRS})
 add_subdirectory(precomputation_compiler_lib)
 add_subdirectory(precompute_runtime_lib)
 
-set(PASS_LIB ${CMAKE_BINARY_DIR}/mpi_compiler_assistance_matching_pass/libmpi_compiler_assistance_matching_pass.so)
-set(PRECOMPUTE_LIB_PATH ${CMAKE_BINARY_DIR}/precompute_lib)
-
 enable_testing()
 
 option(MPI_USE_CASE "Build the mpi usecase (precomputation of MPI message envelopes)" ON)

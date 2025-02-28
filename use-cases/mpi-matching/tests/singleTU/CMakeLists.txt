@@ -3,8 +3,8 @@ set_property(TEST PROPERTY TIMEOUT 60)
 
 function(add_single_tu_testcase TEST_NAME TEST_DIR)
     add_test(NAME ${TEST_NAME}
-            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${TEST_DIR}
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../run_test_single_TU.sh ${USECASE_MPI_BINARY_DIR} ${TEST_DIR}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
     )
     set_tests_properties(${TEST_NAME} PROPERTIES PROCESSORS 2)
 endfunction()
