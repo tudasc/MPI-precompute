@@ -85,5 +85,6 @@ void add_call_to_precalculation_to_main(
   for (auto &arg : entry_function->args()) {
     args.push_back(&arg);
   }
-  builder.CreateCall(precompute_analyis_result->getEntryPoint(), args);
+  builder.CreateCall(precompute_analyis_result->get_precompute_phase_main(),
+                     args);
 }
