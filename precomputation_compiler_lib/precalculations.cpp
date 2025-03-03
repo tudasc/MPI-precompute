@@ -182,7 +182,9 @@ void PrecalculationAnalysisImpl::analyze() {
 
 void PrecalculationAnalysisImpl::generate_slice() {
   // todo refactoring this functionality should be part of *this
-  precompute_main = insert_precomputation(M, *this);
+  auto insertion= new PrecomputeInsertion(M,*this);
+  // constructor performs everything
+  delete insertion;
 }
 
 void PrecalculationAnalysisImpl::find_all_tainted_vals() {

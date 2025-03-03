@@ -20,6 +20,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "implementation_specific.h"
 #include "precalculation_impl.h"
 #include "precompute_backend_funcs.h"
+#include "std_funcs.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
@@ -40,8 +41,7 @@ void PrecalculationFunctionCopy::initialize_copy() {
   }
 }
 
-llvm::Function *get_global_re_init_function(
-    Module &M, const PrecalculationAnalysisImpl &precompute_analyis_result) {
+llvm::Function *PrecomputeInsertion::get_global_re_init_function() {
   auto *implementation_specifics = ImplementationSpecifics::get_instance();
 
   auto *func = Function::Create(
@@ -80,7 +80,7 @@ llvm::Function *get_global_re_init_function(
             // is raised
             errs() << "Global without initializer:\n";
             global.dump();
-            assert(precompute_analyis_result.is_global_from_std(&global));
+            assert(is_global_from_std(&global));
           }
           // collect the necessary __cxx_global_var_init function that
           // initializes this variable
@@ -151,65 +151,6 @@ void replace_allocation_call(llvm::CallBase *call) {
   call->eraseFromParent();
 }
 
-// nullptr otherwise
-std::shared_ptr<PrecalculationFunctionCopy> is_in_a_precompute_copy_func(
-    llvm::Instruction *inst,
-    const std::map<llvm::Function *,
-                   std::shared_ptr<PrecalculationFunctionCopy>>
-        &functions_copied) {
-  auto *func = inst->getFunction();
-  auto pos = std::find_if(
-      functions_copied.begin(), functions_copied.end(),
-      [func](const auto &pair) { return pair.second->F_copy == func; });
-  if (pos != functions_copied.end()) {
-    return pos->second;
-  } else {
-    return nullptr;
-  }
-}
-
-void replace_usages_of_func_in_copy(
-    const std::shared_ptr<PrecalculationFunctionCopy> &func,
-    const std::map<llvm::Function *,
-                   std::shared_ptr<PrecalculationFunctionCopy>>
-        &functions_copied) {
-  std::vector<Instruction *> instructions_to_change;
-  for (auto *u : func->F_orig->users()) {
-    if (auto *inst = dyn_cast<Instruction>(u)) {
-      if (is_in_a_precompute_copy_func(inst, functions_copied)) {
-        if (not isa<CallBase>(inst)) {
-          // calls are replaced by a different function
-          // where we also take care about the arguments
-          instructions_to_change.push_back(inst);
-        }
-      } // else: a use in the original version of a function
-      continue;
-    }
-    if (isa<ConstantAggregate>(u)) {
-      // an array of function ptrs -- aka a vtable for objects
-      // nothing to do, the vtable manager will take care of this
-      continue;
-    }
-    if (isa<GlobalAlias>(u)) {
-      // alias -- can be ignored as analysis will make sure that no-one uses the
-      // alias
-      assert(func->analysis_result->getAliases().find(cast<GlobalAlias>(u)) !=
-             func->analysis_result->getAliases().end());
-      continue;
-    }
-
-    errs() << "This usage is currently not supported:\n";
-    errs() << func->F_orig->getName() << "\n";
-    u->dump();
-    assert(false);
-  }
-
-  for (auto *inst : instructions_to_change) {
-    bool has_replaced = inst->replaceUsesOfWith(func->F_orig, func->F_copy);
-    assert(has_replaced);
-  }
-}
-
 // sometimes different member funcs of objects are relevant
 //  example: Base: foo, bar
 //  for inherited1: foo is relevant, for inherited2 bar is relevant
@@ -248,12 +189,63 @@ void surround_indirect_call_with_nullptr_check(
   unconditionalBR->eraseFromParent();
 }
 
-void replace_calls_in_copy(
-    const std::shared_ptr<PrecalculationFunctionCopy> &func,
-    const PrecalculationAnalysisImpl &precompute_analyis_result,
-    const std::map<llvm::Function *,
-                   std::shared_ptr<PrecalculationFunctionCopy>>
-        &functions_copied) {
+// nullptr otherwise
+std::shared_ptr<PrecalculationFunctionCopy>
+PrecomputeInsertion::is_in_a_precompute_copy_func(llvm::Instruction *inst
+
+) {
+  auto *func = inst->getFunction();
+  auto pos = std::find_if(
+      functions_copied.begin(), functions_copied.end(),
+      [func](const auto &pair) { return pair.second->F_copy == func; });
+  if (pos != functions_copied.end()) {
+    return pos->second;
+  } else {
+    return nullptr;
+  }
+}
+
+void PrecomputeInsertion::replace_usages_of_func_in_copy(
+    const std::shared_ptr<PrecalculationFunctionCopy> &func) {
+  std::vector<Instruction *> instructions_to_change;
+  for (auto *u : func->F_orig->users()) {
+    if (auto *inst = dyn_cast<Instruction>(u)) {
+      if (is_in_a_precompute_copy_func(inst)) {
+        if (not isa<CallBase>(inst)) {
+          // calls are replaced by a different function
+          // where we also take care about the arguments
+          instructions_to_change.push_back(inst);
+        }
+      } // else: a use in the original version of a function
+      continue;
+    }
+    if (isa<ConstantAggregate>(u)) {
+      // an array of function ptrs -- aka a vtable for objects
+      // nothing to do, the vtable manager will take care of this
+      continue;
+    }
+    if (isa<GlobalAlias>(u)) {
+      // alias -- can be ignored as analysis will make sure that no-one uses the
+      // alias
+      assert(func->analysis_result->getAliases().find(cast<GlobalAlias>(u)) !=
+             func->analysis_result->getAliases().end());
+      continue;
+    }
+
+    errs() << "This usage is currently not supported:\n";
+    errs() << func->F_orig->getName() << "\n";
+    u->dump();
+    assert(false);
+  }
+
+  for (auto *inst : instructions_to_change) {
+    bool has_replaced = inst->replaceUsesOfWith(func->F_orig, func->F_copy);
+    assert(has_replaced);
+  }
+}
+
+void PrecomputeInsertion::replace_calls_in_copy(
+    const std::shared_ptr<PrecalculationFunctionCopy> &func) {
   std::vector<CallBase *> to_replace;
 
   // first  gather calls that need replacement so that the iterator does not
@@ -277,7 +269,7 @@ void replace_calls_in_copy(
           }
           // end handling calls to MPI
 
-          if (precompute_analyis_result.is_allocation(call)) {
+          if (is_allocation(call)) {
             to_replace.push_back(call);
             continue;
           }
@@ -292,8 +284,8 @@ void replace_calls_in_copy(
                        callee) ||
                    // callee is the original function
                    // which should not be a user function
-                   precompute_analyis_result.is_func_from_std(callee) ||
-                   is_mpi_function(callee) || callee->isIntrinsic());
+                   is_func_from_std(callee) || is_mpi_function(callee) ||
+                   callee->isIntrinsic());
             // it is not used: nothing to do, later pruning step will remove it
           }
         }
@@ -308,7 +300,7 @@ void replace_calls_in_copy(
 
     auto *callee = call->getCalledFunction();
 
-    if (precompute_analyis_result.is_allocation(call)) {
+    if (is_allocation(call)) {
       replace_allocation_call(call);
       continue;
     }
@@ -335,8 +327,8 @@ void replace_calls_in_copy(
         // callee is the original function
         // which should not be a user function
         // call->dump();
-        assert(precompute_analyis_result.is_func_from_std(callee) ||
-               is_mpi_function(callee) || callee->isIntrinsic());
+        assert(is_func_from_std(callee) || is_mpi_function(callee) ||
+               callee->isIntrinsic());
       }
     }
 
@@ -350,12 +342,11 @@ void replace_calls_in_copy(
     }
   }
 
-  replace_usages_of_func_in_copy(func, functions_copied);
+  replace_usages_of_func_in_copy(func);
 }
 
-void replace_exceptionless_invoke_with_call(
-    const std::shared_ptr<PrecalculationFunctionCopy> &func,
-    const PrecalculationAnalysisImpl &precompute_analyis_result) {
+void PrecomputeInsertion::replace_exceptionless_invoke_with_call(
+    const std::shared_ptr<PrecalculationFunctionCopy> &func) {
   std::vector<InvokeInst *> ivokes;
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
@@ -409,9 +400,8 @@ void replace_exceptionless_invoke_with_call(
 }
 
 // remove all unnecessary instruction
-void prune_function_copy(
-    const std::shared_ptr<PrecalculationFunctionCopy> &func,
-    const PrecalculationAnalysisImpl &precompute_analyis_result) {
+void PrecomputeInsertion::prune_function_copy(
+    const std::shared_ptr<PrecalculationFunctionCopy> &func) {
   std::vector<Instruction *> to_prune;
 
   int prev_num_undef = get_num_undefs(*func->F_copy);
@@ -517,14 +507,12 @@ void prune_function_copy(
   }
 }
 
-llvm::Function *create_precompute_main(
-    llvm::Module &M,
-    const std::shared_ptr<PrecalculationFunctionCopy> &entry_function,
-    const PrecalculationAnalysisImpl &precompute_analyis_result) {
+llvm::Function *PrecomputeInsertion::create_precompute_main(
+    const std::shared_ptr<PrecalculationFunctionCopy> &entry_function) {
 
   Function *result = Function::Create(
-      precompute_analyis_result.getEntryPoint()->getFunctionType(),
-      precompute_analyis_result.getEntryPoint()->getLinkage(),
+      precompute_analyis_result.entry_point->getFunctionType(),
+      precompute_analyis_result.entry_point->getLinkage(),
       "precompute_main", M);
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "entry", result);
@@ -541,17 +529,14 @@ llvm::Function *create_precompute_main(
   builder.CreateCall(precompute_funcs->init_precompute_lib);
   auto *real_main = builder.CreateCall(entry_function->F_copy, args);
   builder.CreateCall(precompute_funcs->finish_precomputation);
-  auto *re_init_fun = get_global_re_init_function(M, precompute_analyis_result);
+  auto *re_init_fun = get_global_re_init_function();
   builder.CreateCall(re_init_fun);
   builder.CreateRet(real_main);
   return result;
 }
 
-llvm::Function *
-insert_precomputation(llvm::Module &M,
-                      PrecalculationAnalysisImpl &precompute_analyis_result) {
-  std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionCopy>>
-      functions_copied;
+void PrecomputeInsertion::insert_precomputation() {
+
   auto vtm = VtableManager(M);
   for (const auto &f : precompute_analyis_result.getFunctionsToInclude()) {
     auto f_copy = std::make_shared<PrecalculationFunctionCopy>(f);
@@ -564,27 +549,25 @@ insert_precomputation(llvm::Module &M,
   // don't fuse this loops! we first need to initialize the copy before changing
   // calls
   for (const auto &pair : functions_copied) {
-    replace_exceptionless_invoke_with_call(pair.second,
-                                           precompute_analyis_result);
-    replace_calls_in_copy(pair.second, precompute_analyis_result,
-                          functions_copied);
+    replace_exceptionless_invoke_with_call(pair.second);
+    replace_calls_in_copy(pair.second);
   }
 
   for (const auto &pair : functions_copied) {
-    prune_function_copy(pair.second, precompute_analyis_result);
+    prune_function_copy(pair.second);
     // debug:
     // add_debug_printfs_to_precalculation(pair.second->F_copy);
   }
 
   precompute_analyis_result.build_precomputed_values_map(functions_copied);
 
-  auto *entry_point = precompute_analyis_result.getEntryPoint();
+  auto *entry_point = precompute_analyis_result.entry_point;
   assert(entry_point);
   auto entry_point_copy = functions_copied[entry_point];
   if (entry_point_copy) {
     // otherwise: nothing to do nothing to precalculate was found
-    return create_precompute_main(M, entry_point_copy,
-                                  precompute_analyis_result);
+    precompute_analyis_result.precompute_main =
+        create_precompute_main(entry_point_copy);
   }
-  return nullptr;
+  precompute_analyis_result.precompute_main = nullptr;
 }

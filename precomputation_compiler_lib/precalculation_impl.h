@@ -16,6 +16,8 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MACH_PRECALCULATIONS_IMPL_H_
 #define MACH_PRECALCULATIONS_IMPL_H_
 
+#include "Precompute_insertion.h"
+
 #include <numeric>
 #include <regex>
 #include <utility>
@@ -33,8 +35,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "mpi_functions.h"
 #include "precalculation.h"
 #include "precalculation_function_analysis.h"
-#include "ptr_info.h"
-#include "taintedValue.h"
 
 class PrecalculationAnalysisImpl
     : public PrecalculationAnalysis,
@@ -78,8 +78,12 @@ public:
     return precompute_main;
   }
 
-  friend PrecalculationFunctionAnalysis;
-  friend PtrUsageInfo;
+  friend class PrecalculationFunctionAnalysis;
+
+  // TODO getter methods instead of friend?
+  friend class PtrUsageInfo;
+  friend class PrecomputeInsertion;
+  friend class PrecalculationFunctionCopy;
 
 private:
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>

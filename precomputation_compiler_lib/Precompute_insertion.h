@@ -16,12 +16,54 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H
 #define MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H
 
+#include <map>
 #include "precalculation_impl.h"
+#include "precalculation_function_analysis.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+
+class PrecalculationAnalysisImpl; // such that include order doesn't matter
+class PrecalculationFunctionAnalysis;
+
+
 #include <llvm/IR/Module.h>
 
-llvm::Function *
-insert_precomputation(llvm::Module &M,
-                      PrecalculationAnalysisImpl &precompute_analyis_result);
+class PrecalculationFunctionCopy;
+
+// doesn't need to be a class, but that way it is easier to friend the
+// PrecalculationAnalysisImpl so that we can reference its internal status
+class PrecomputeInsertion {
+public:
+  PrecomputeInsertion(llvm::Module &M,
+                      PrecalculationAnalysisImpl &precompute_analyis_result)
+      : M(M), precompute_analyis_result(precompute_analyis_result) {
+    insert_precomputation();
+  };
+
+  llvm::Function *get_precompute_main() const { return precompute_main; };
+
+private:
+  llvm::Module &M;
+  PrecalculationAnalysisImpl &precompute_analyis_result;
+  llvm::Function *precompute_main;
+
+  std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionCopy>>
+      functions_copied;
+  llvm::Function *get_global_re_init_function();
+  llvm::Function *create_precompute_main(
+      const std::shared_ptr<PrecalculationFunctionCopy> &entry_function);
+  void insert_precomputation();
+  void
+  prune_function_copy(const std::shared_ptr<PrecalculationFunctionCopy> &func);
+  void replace_exceptionless_invoke_with_call(
+      const std::shared_ptr<PrecalculationFunctionCopy> &func);
+  void replace_calls_in_copy(
+      const std::shared_ptr<PrecalculationFunctionCopy> &func);
+  void replace_usages_of_func_in_copy(
+      const std::shared_ptr<PrecalculationFunctionCopy> &func);
+  // returns nullptr if not
+  std::shared_ptr<PrecalculationFunctionCopy>
+  is_in_a_precompute_copy_func(llvm::Instruction *inst);
+};
 
 class PrecalculationFunctionCopy {
 public:
