@@ -20,6 +20,8 @@ add_library(precomputation_compiler_lib SHARED
         VtableManager.cpp
         VtableManager.h
         mpi_functions.h
+        precalculation_function_analysis.cpp
+        precalculation_function_analysis.h
 )
 
 #TODO cmake is complaining about boost
