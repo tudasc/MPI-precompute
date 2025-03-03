@@ -510,10 +510,10 @@ void PrecomputeInsertion::prune_function_copy(
 llvm::Function *PrecomputeInsertion::create_precompute_main(
     const std::shared_ptr<PrecalculationFunctionCopy> &entry_function) {
 
-  Function *result = Function::Create(
-      precompute_analyis_result.entry_point->getFunctionType(),
-      precompute_analyis_result.entry_point->getLinkage(),
-      "precompute_main", M);
+  Function *result =
+      Function::Create(precompute_analyis_result.entry_point->getFunctionType(),
+                       precompute_analyis_result.entry_point->getLinkage(),
+                       "precompute_main", M);
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "entry", result);
 
@@ -568,6 +568,7 @@ void PrecomputeInsertion::insert_precomputation() {
     // otherwise: nothing to do nothing to precalculate was found
     precompute_analyis_result.precompute_main =
         create_precompute_main(entry_point_copy);
+  } else {
+    precompute_analyis_result.precompute_main = nullptr;
   }
-  precompute_analyis_result.precompute_main = nullptr;
 }
