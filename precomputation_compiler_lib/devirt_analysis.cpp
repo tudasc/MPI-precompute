@@ -71,6 +71,8 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 // most code from llvms' WholeProgramDevirtPass
 
+DevirtAnalysis* DevirtAnalysis::instance = nullptr;
+
 using namespace std;
 using namespace llvm;
 

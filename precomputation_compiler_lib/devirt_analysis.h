@@ -21,17 +21,28 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include <map>
 
 class DevirtAnalysis {
-public:
+protected:
   DevirtAnalysis(llvm::Module &M);
+  static DevirtAnalysis *instance;
 
-  std::vector<llvm::Function *>
-  get_possible_call_targets(llvm::CallBase *call) const {
-    if (result_map.find(call) != result_map.end()) {
-      return result_map.at(call);
+public:
+  static std::vector<llvm::Function *>
+  get_possible_call_targets(llvm::CallBase *call) {
+    if (instance == nullptr) {
+      // populate the result map
+      instance = new DevirtAnalysis(*call->getModule());
     }
-    else
+
+    if (instance->result_map.find(call) != instance->result_map.end()) {
+      return instance->result_map.at(call);
+    } else
       return {};
   }
+
+  // singleton Pattern
+  // (one should never acquire the instance of this class anyway)
+  DevirtAnalysis(DevirtAnalysis &other) = delete;
+  void operator=(const DevirtAnalysis &) = delete;
 
 private:
   std::map<llvm::CallBase *, std::vector<llvm::Function *>> result_map;
