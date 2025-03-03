@@ -14,7 +14,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 #include "ptr_info.h"
-#include "precalculation.h"
+#include "precalculation_impl.h"
 #include "taintedValue.h"
 #include <cassert>
 
@@ -364,7 +364,8 @@ PtrUsageInfo::getPtrsWithThisInfo() const {
 }
 
 void PtrUsageInfo::setIsWrittenTo(
-    llvm::Instruction *store, const PrecalculationAnalysis *precalc_analysis) {
+    llvm::Instruction *store,
+    const PrecalculationAnalysisImpl *precalc_analysis) {
   if (merged_with) {
     merged_with->setIsWrittenTo(store, precalc_analysis);
     return;
@@ -389,7 +390,8 @@ void PtrUsageInfo::setIsWrittenTo(
 }
 
 void PtrUsageInfo::setIsReadFrom(
-    llvm::Instruction *load, const PrecalculationAnalysis *precalc_analysis) {
+    llvm::Instruction *load,
+    const PrecalculationAnalysisImpl *precalc_analysis) {
   if (merged_with) {
     merged_with->setIsReadFrom(load, precalc_analysis);
     return;

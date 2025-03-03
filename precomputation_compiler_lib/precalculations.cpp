@@ -19,7 +19,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "devirt_analysis.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
-#include "precalculation.h"
+#include "precalculation_impl.h"
 
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Demangle/Demangle.h"
@@ -124,7 +124,7 @@ void print_needed_for(const std::shared_ptr<TaintedValue> &child,
   }
 }
 
-void PrecalculationAnalysis::analyze_functions() {
+void PrecalculationAnalysisImpl::analyze_functions() {
   // create
   for (auto &f : M) {
     function_analysis[&f] =
@@ -153,7 +153,7 @@ void PrecalculationAnalysis::analyze_functions() {
   }
 }
 
-bool PrecalculationAnalysis::is_invoke_exception_case_needed(
+bool PrecalculationAnalysisImpl::is_invoke_exception_case_needed(
     llvm::InvokeInst *invoke) const {
   assert(invoke);
 
@@ -187,7 +187,7 @@ bool PrecalculationAnalysis::is_invoke_exception_case_needed(
 // or True if callee can raise an exception and the exception handling code is
 // actually tainted if exception handling is not tainted, we don't need to
 // handle the exception anyway and abortion is fine in this case
-bool PrecalculationAnalysis::is_invoke_necessary_for_control_flow(
+bool PrecalculationAnalysisImpl::is_invoke_necessary_for_control_flow(
     llvm::InvokeInst *invoke) const {
   assert(invoke);
 
@@ -230,7 +230,7 @@ bool is_free(llvm::CallBase *call) {
 }
 
 void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
-    const PrecalculationAnalysis *precompute_analysis) {
+    const PrecalculationAnalysisImpl *precompute_analysis) {
   // the precompute_analysis object is not fully initialized yet, as we are
   // currently analyzing the functions
   assert(not analysis_except_in_precompute);
@@ -367,7 +367,7 @@ PrecalculationFunctionAnalysis::getPtrWritten_recursive() const {
   return result;
 }
 
-void PrecalculationAnalysis::analyze() {
+void PrecalculationAnalysisImpl::analyze() {
   analyze_functions();
 
   for (const auto &val : this->to_precompute_value) {
@@ -399,12 +399,12 @@ void PrecalculationAnalysis::analyze() {
 #endif
 }
 
-void PrecalculationAnalysis::generate_slice() {
+void PrecalculationAnalysisImpl::generate_slice() {
   // todo refactoring this functionality should be part of *this
   precompute_main = insert_precomputation(M, *this);
 }
 
-void PrecalculationAnalysis::find_all_tainted_vals() {
+void PrecalculationAnalysisImpl::find_all_tainted_vals() {
   std::vector<std::shared_ptr<TaintedValue>> to_visit;
 
   do {
@@ -447,7 +447,7 @@ void PrecalculationAnalysis::find_all_tainted_vals() {
   // done removing of MPI init
 }
 
-void PrecalculationAnalysis::visit_load(
+void PrecalculationAnalysisImpl::visit_load(
     const std::shared_ptr<TaintedValue> &load_info) {
   assert(not load_info->visited);
   load_info->visited = true;
@@ -489,7 +489,7 @@ extract_function_without_namespace(const std::string &qualifiedName) {
   }
 }
 
-void PrecalculationAnalysis::visit_store(
+void PrecalculationAnalysisImpl::visit_store(
     const std::shared_ptr<TaintedValue> &store_info) {
   assert(not store_info->visited);
   store_info->visited = true;
@@ -513,7 +513,7 @@ void PrecalculationAnalysis::visit_store(
   }
 }
 
-void PrecalculationAnalysis::visit_gep(
+void PrecalculationAnalysisImpl::visit_gep(
     const std::shared_ptr<TaintedValue> &gep_info) {
   assert(not gep_info->visited);
   gep_info->visited = true;
@@ -531,7 +531,7 @@ void PrecalculationAnalysis::visit_gep(
   }
 }
 
-void PrecalculationAnalysis::visit_phi(
+void PrecalculationAnalysisImpl::visit_phi(
     const std::shared_ptr<TaintedValue> &phi_info) {
   auto *phi = dyn_cast<PHINode>(phi_info->v);
   assert(phi);
@@ -564,7 +564,8 @@ void PrecalculationAnalysis::visit_phi(
   phi_info->visited = true;
 }
 
-void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
+void PrecalculationAnalysisImpl::visit_val(
+    const std::shared_ptr<TaintedValue> &v) {
   errs() << "Visit\n";
   v->v->dump();
 
@@ -693,7 +694,7 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
   }
 }
 
-void PrecalculationAnalysis::visit_ptr_usages(
+void PrecalculationAnalysisImpl::visit_ptr_usages(
     const std::shared_ptr<TaintedValue> &ptr) {
   assert(ptr->is_pointer());
 
@@ -850,7 +851,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
   }
 }
 
-void PrecalculationAnalysis::visit_ptr_ret(
+void PrecalculationAnalysisImpl::visit_ptr_ret(
     const std::shared_ptr<TaintedValue> &ptr, llvm::ReturnInst *ret) {
   assert(ret->getOperand(0) == ptr->v);
   // need to merge ptr info for the resulting ptr
@@ -867,7 +868,8 @@ void PrecalculationAnalysis::visit_ptr_ret(
   }
 }
 
-void PrecalculationAnalysis::insert_function_to_include(llvm::Function *func) {
+void PrecalculationAnalysisImpl::insert_function_to_include(
+    llvm::Function *func) {
   auto fun_to_precalc = function_analysis.at(func);
   if (not fun_to_precalc->include_in_precompute) {
     fun_to_precalc->include_in_precompute = true;
@@ -890,7 +892,7 @@ void PrecalculationAnalysis::insert_function_to_include(llvm::Function *func) {
 }
 
 // TODO: there is the case, where a CALLSITE to user defnied func is in std??
-void PrecalculationAnalysis::visit_arg(
+void PrecalculationAnalysisImpl::visit_arg(
     const std::shared_ptr<TaintedValue> &arg_info) {
   auto *arg = cast<Argument>(arg_info->v);
   arg_info->visited = true;
@@ -922,7 +924,7 @@ void PrecalculationAnalysis::visit_arg(
   }
 }
 
-bool PrecalculationAnalysis::is_retval_of_call_needed(
+bool PrecalculationAnalysisImpl::is_retval_of_call_needed(
     llvm::CallBase *call) const {
   // check if this is tainted as the ret val is used
 
@@ -986,7 +988,7 @@ bool should_call_intrinsic(Intrinsic::ID id) {
       Intrinsic::getName(id).starts_with("llvm.x86.sse"); // NOLINT
 }
 
-bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
+bool PrecalculationAnalysisImpl::is_ptr_usage_in_std_read(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
@@ -1015,7 +1017,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
   return false;
 }
 
-bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
+bool PrecalculationAnalysisImpl::is_ptr_usage_in_std_write(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
@@ -1043,7 +1045,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   return false;
 }
 
-void PrecalculationAnalysis::include_call_to_std(
+void PrecalculationAnalysisImpl::include_call_to_std(
     const std::shared_ptr<TaintedValue> &call_info) {
   assert(isa<CallBase>(call_info->v));
   auto *call = cast<CallBase>(call_info->v);
@@ -1090,7 +1092,7 @@ void PrecalculationAnalysis::include_call_to_std(
   include_value_in_precompute(call_info);
 }
 
-void PrecalculationAnalysis::visit_call(
+void PrecalculationAnalysisImpl::visit_call(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallBase>(call_info->v);
   assert(!call_info->visited);
@@ -1151,7 +1153,7 @@ void PrecalculationAnalysis::visit_call(
   }
 }
 
-bool PrecalculationAnalysis::check_if_call_should_be_included(
+bool PrecalculationAnalysisImpl::check_if_call_should_be_included(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallBase>(call_info->v);
 
@@ -1188,7 +1190,7 @@ bool PrecalculationAnalysis::check_if_call_should_be_included(
   return false;
 }
 
-void PrecalculationAnalysis::visit_invoke_for_exception(
+void PrecalculationAnalysisImpl::visit_invoke_for_exception(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *ivoke = cast<InvokeInst>(call_info->v);
   assert(is_invoke_exception_case_needed(ivoke));
@@ -1235,7 +1237,7 @@ void PrecalculationAnalysis::visit_invoke_for_exception(
   }
 }
 
-void PrecalculationAnalysis::build_precomputed_values_map(
+void PrecalculationAnalysisImpl::build_precomputed_values_map(
     const std::map<llvm::Function *,
                    std::shared_ptr<PrecalculationFunctionCopy>>
         &functions_copied) {
@@ -1265,7 +1267,7 @@ void PrecalculationAnalysis::build_precomputed_values_map(
   }
 }
 
-void PrecalculationAnalysis::visit_call_for_retval(
+void PrecalculationAnalysisImpl::visit_call_for_retval(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallBase>(call_info->v);
   assert(is_retval_of_call_needed(call));
@@ -1310,7 +1312,7 @@ void PrecalculationAnalysis::visit_call_for_retval(
   }
 }
 
-void PrecalculationAnalysis::visit_call_from_ptr(
+void PrecalculationAnalysisImpl::visit_call_from_ptr(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
   if (call->getCalledFunction()->getName() == "__kmpc_fork_call") {
     // TODO IMPLEMENT
@@ -1466,7 +1468,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
   }
 }
 
-void PrecalculationAnalysis::include_value_in_precompute(
+void PrecalculationAnalysisImpl::include_value_in_precompute(
     const std::shared_ptr<TaintedValue> &taint_info) {
   if (not taint_info->isIncludeInPrecompute()) {
     taint_info->setIncludeInPrecompute();
@@ -1498,8 +1500,8 @@ void PrecalculationAnalysis::include_value_in_precompute(
 }
 
 std::shared_ptr<TaintedValue>
-PrecalculationAnalysis::insert_tainted_value(llvm::Value *v,
-                                             TaintReason reason) {
+PrecalculationAnalysisImpl::insert_tainted_value(llvm::Value *v,
+                                                 TaintReason reason) {
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
 
   if (not is_tainted(v)) {
@@ -1521,7 +1523,7 @@ PrecalculationAnalysis::insert_tainted_value(llvm::Value *v,
   return inserted_elem;
 }
 
-std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
+std::shared_ptr<TaintedValue> PrecalculationAnalysisImpl::insert_tainted_value(
     llvm::Value *v, const std::shared_ptr<TaintedValue> &from,
     bool needed_from) {
   std::shared_ptr<TaintedValue> inserted_elem = nullptr;
@@ -1663,7 +1665,7 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
   return inserted_elem;
 }
 
-void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
+void PrecalculationAnalysisImpl::insert_necessary_control_flow(Value *v) {
   if (auto *inst = dyn_cast<Instruction>(v)) {
     auto *bb = inst->getParent();
     if (not bb->isEntryBlock()) {
@@ -1719,7 +1721,8 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
 }
 
 std::vector<llvm::Function *>
-PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
+PrecalculationAnalysisImpl::get_possible_call_targets(
+    llvm::CallBase *call) const {
   std::vector<llvm::Function *> possible_targets;
   if (call->isIndirectCall()) {
     possible_targets = virtual_call_sites.get_possible_call_targets(call);
@@ -1766,7 +1769,7 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
   return possible_targets;
 }
 
-void PrecalculationAnalysis::print_analysis_result_remarks() {
+void PrecalculationAnalysisImpl::print_analysis_result_remarks() {
   for (const auto &v : tainted_values) {
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
       errs() << "need for reason: " << v->getReason() << "\n";
@@ -1778,7 +1781,7 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
 }
 
 // TODO: move to debug file?
-void PrecalculationAnalysis::debug_printings() {
+void PrecalculationAnalysisImpl::debug_printings() {
   errs() << "ADDITIONAL DEBUG PRINTING\n";
 
   std::set<std::shared_ptr<PtrUsageInfo>> dumped;
@@ -1796,7 +1799,7 @@ void PrecalculationAnalysis::debug_printings() {
 }
 
 std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
-PrecalculationAnalysis::getFunctionsToInclude() const {
+PrecalculationAnalysisImpl::getFunctionsToInclude() const {
   std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> result;
   for (const auto &pair : function_analysis) {
     if (pair.second->include_in_precompute) {
@@ -1806,7 +1809,9 @@ PrecalculationAnalysis::getFunctionsToInclude() const {
   return result;
 }
 
-Function *PrecalculationAnalysis::getEntryPoint() const { return entry_point; }
+Function *PrecalculationAnalysisImpl::getEntryPoint() const {
+  return entry_point;
+}
 
 // removes all template args from the given name
 std::string get_name_without_templates(const std::string &demangled_name) {
@@ -1879,7 +1884,7 @@ std::string get_function_name(const std::string &demangled_name) {
 
 // returns true if func is from std or part of the
 // COMPILER_ASSISTED_MATCHING_ALLOW_EXTERNAL_FUNCTIONS environment variable
-bool PrecalculationAnalysis::is_func_from_std(llvm::Function *func) const {
+bool PrecalculationAnalysisImpl::is_func_from_std(llvm::Function *func) const {
   assert(func);
 
   // C API
@@ -1942,7 +1947,7 @@ bool PrecalculationAnalysis::is_func_from_std(llvm::Function *func) const {
   return false;
 }
 
-bool PrecalculationAnalysis::can_except_in_precompute(
+bool PrecalculationAnalysisImpl::can_except_in_precompute(
     llvm::CallBase *call) const {
   if (is_interaction_with_cout(call)) {
     return false;
@@ -1956,7 +1961,7 @@ bool PrecalculationAnalysis::can_except_in_precompute(
   return false;
 }
 
-bool PrecalculationAnalysis::is_store_important(
+bool PrecalculationAnalysisImpl::is_store_important(
     llvm::Instruction *inst, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
   if (isa<StoreInst>(inst)) {
     return is_store_important(cast<StoreInst>(inst), ptr_info);
@@ -1967,7 +1972,7 @@ bool PrecalculationAnalysis::is_store_important(
   assert(false && "Not a store instruction");
 }
 
-bool PrecalculationAnalysis::is_store_important(
+bool PrecalculationAnalysisImpl::is_store_important(
     llvm::StoreInst *store, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
   // the ptr must be used
   assert(std::find_if(ptr_info->getPtrsWithThisInfo().begin(),
@@ -1989,7 +1994,7 @@ bool PrecalculationAnalysis::is_store_important(
   return true;
 }
 
-bool PrecalculationAnalysis::is_store_important(
+bool PrecalculationAnalysisImpl::is_store_important(
     llvm::CallBase *call, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
   // TODO can we add a the ptr must be used assertion?
 
@@ -2006,7 +2011,7 @@ bool PrecalculationAnalysis::is_store_important(
 // TODO better function name
 //  if an instruction in foo is included in the set: the resulting set will
 //  also include all calls to foo
-void PrecalculationAnalysis::get_all_transitive_insts(
+void PrecalculationAnalysisImpl::get_all_transitive_insts(
     std::set<llvm::Instruction *> &instrs) {
   std::set<llvm::Function *> visited;
 
@@ -2034,7 +2039,7 @@ void PrecalculationAnalysis::get_all_transitive_insts(
   }
 }
 
-bool PrecalculationAnalysis::store_happens_after_all_loads(
+bool PrecalculationAnalysisImpl::store_happens_after_all_loads(
     llvm::Instruction *inst, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
   auto loads = ptr_info->getLoads();
   get_all_transitive_insts(loads);
@@ -2061,7 +2066,7 @@ bool PrecalculationAnalysis::store_happens_after_all_loads(
   return true;
 }
 
-void PrecalculationAnalysis::clean_precompute() {
+void PrecalculationAnalysisImpl::clean_precompute() {
 
   // TODO
   // problem what if the user tells that they want this instruction location to
@@ -2098,4 +2103,12 @@ void PrecalculationAnalysis::clean_precompute() {
       new_inst->eraseFromParent();
     }
   }
+}
+
+std::shared_ptr<PrecalculationAnalysis> PrecalculationAnalysisFactroy(
+    llvm::Module &M, llvm::Function *entry_point,
+    std::vector<llvm::Value *> to_precompute_value,
+    std::vector<llvm::Instruction *> to_precompute_cfg) {
+  return std::make_shared<PrecalculationAnalysisImpl>(
+      M, entry_point, to_precompute_value, to_precompute_cfg);
 }

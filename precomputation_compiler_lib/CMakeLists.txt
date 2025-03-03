@@ -5,6 +5,7 @@ add_library(precomputation_compiler_lib SHARED
         analysis_results.h
         analysis_results.cpp
         precalculation.h
+        precalculation_impl.h
         precalculations.cpp
         devirt_analysis.h
         devirt_analysis.cpp

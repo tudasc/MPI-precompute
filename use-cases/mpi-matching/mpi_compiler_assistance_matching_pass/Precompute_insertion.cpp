@@ -30,6 +30,7 @@ using namespace llvm;
 
 void replace_MPI_with_precompute(
     const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result,
+    struct mpi_functions *mpi_func,
     const std::vector<llvm::CallBase *> &init_calls) {
   for (auto *old_call : init_calls) {
     const bool is_send = is_send_function(old_call->getCalledFunction());
@@ -58,13 +59,11 @@ void replace_MPI_with_precompute(
 
     int precompute_envelope_dest;
     int precompute_envelope_tag;
-    if (old_call->getCalledFunction() ==
-        precompute_analyis_result->mpi_func->mpi_send_init) {
+    if (old_call->getCalledFunction() == mpi_func->mpi_send_init) {
       precompute_envelope_dest = SEND_ENVELOPE_DEST;
       precompute_envelope_tag = SEND_ENVELOPE_TAG;
     } else {
-      assert(old_call->getCalledFunction() ==
-             precompute_analyis_result->mpi_func->mpi_recv_init);
+      assert(old_call->getCalledFunction() == mpi_func->mpi_recv_init);
       precompute_envelope_dest = RECV_ENVELOPE_DEST;
       precompute_envelope_tag = RECV_ENVELOPE_TAG;
     }

@@ -18,7 +18,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "VtableManager.h"
 #include "debug.h"
 #include "implementation_specific.h"
-#include "precalculation.h"
+#include "precalculation_impl.h"
 #include "precompute_backend_funcs.h"
 
 #include "llvm/IR/Constants.h"
@@ -41,7 +41,7 @@ void PrecalculationFunctionCopy::initialize_copy() {
 }
 
 llvm::Function *get_global_re_init_function(
-    Module &M, const PrecalculationAnalysis &precompute_analyis_result) {
+    Module &M, const PrecalculationAnalysisImpl &precompute_analyis_result) {
   auto *implementation_specifics = ImplementationSpecifics::get_instance();
 
   auto *func = Function::Create(
@@ -250,7 +250,7 @@ void surround_indirect_call_with_nullptr_check(
 
 void replace_calls_in_copy(
     const std::shared_ptr<PrecalculationFunctionCopy> &func,
-    const PrecalculationAnalysis &precompute_analyis_result,
+    const PrecalculationAnalysisImpl &precompute_analyis_result,
     const std::map<llvm::Function *,
                    std::shared_ptr<PrecalculationFunctionCopy>>
         &functions_copied) {
@@ -355,7 +355,7 @@ void replace_calls_in_copy(
 
 void replace_exceptionless_invoke_with_call(
     const std::shared_ptr<PrecalculationFunctionCopy> &func,
-    const PrecalculationAnalysis &precompute_analyis_result) {
+    const PrecalculationAnalysisImpl &precompute_analyis_result) {
   std::vector<InvokeInst *> ivokes;
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
@@ -411,7 +411,7 @@ void replace_exceptionless_invoke_with_call(
 // remove all unnecessary instruction
 void prune_function_copy(
     const std::shared_ptr<PrecalculationFunctionCopy> &func,
-    const PrecalculationAnalysis &precompute_analyis_result) {
+    const PrecalculationAnalysisImpl &precompute_analyis_result) {
   std::vector<Instruction *> to_prune;
 
   int prev_num_undef = get_num_undefs(*func->F_copy);
@@ -520,7 +520,7 @@ void prune_function_copy(
 llvm::Function *create_precompute_main(
     llvm::Module &M,
     const std::shared_ptr<PrecalculationFunctionCopy> &entry_function,
-    const PrecalculationAnalysis &precompute_analyis_result) {
+    const PrecalculationAnalysisImpl &precompute_analyis_result) {
 
   Function *result = Function::Create(
       precompute_analyis_result.getEntryPoint()->getFunctionType(),
@@ -549,7 +549,7 @@ llvm::Function *create_precompute_main(
 
 llvm::Function *
 insert_precomputation(llvm::Module &M,
-                      PrecalculationAnalysis &precompute_analyis_result) {
+                      PrecalculationAnalysisImpl &precompute_analyis_result) {
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionCopy>>
       functions_copied;
   auto vtm = VtableManager(M);

@@ -16,12 +16,12 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H
 #define MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H
 
-#include "precalculation.h"
+#include "precalculation_impl.h"
 #include <llvm/IR/Module.h>
 
 llvm::Function *
 insert_precomputation(llvm::Module &M,
-                      PrecalculationAnalysis &precompute_analyis_result);
+                      PrecalculationAnalysisImpl &precompute_analyis_result);
 
 class PrecalculationFunctionCopy {
 public:

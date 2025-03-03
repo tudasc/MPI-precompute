@@ -20,6 +20,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include <llvm/IR/Module.h>
 void replace_MPI_with_precompute(
     const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result,
+    struct mpi_functions *mpi_func,
     const std::vector<llvm::CallBase *> &init_calls);
 
 void add_call_to_precalculation_to_main(
