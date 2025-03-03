@@ -1,6 +1,7 @@
 
 #include "precalculation_function_analysis.h"
 #include "precalculation_impl.h"
+#include "std_funcs.h"
 
 using namespace llvm;
 
@@ -96,58 +97,6 @@ std::string get_function_name(const std::string &demangled_name) {
   return no_template;
 }
 
-// an interaction with std::cout can not except during precompute (any exception
-// would be considered fatal anyway) therefore we do not need to analyze the
-// interactions with std::cout
-bool is_interaction_with_cout(llvm::CallBase *call) {
-  if (call->isIndirectCall()) {
-    return false; // may except
-  }
-
-  if (call->getCalledFunction()->getName() == "printf") {
-    return true;
-  }
-
-  auto *cout = call->getModule()->getGlobalVariable("_ZSt4cout");
-  if (cout) {
-    // errs() << "check if interaction with cout:\n";
-    // call->dump();
-
-    if (call->arg_size() >= 2 && call->getArgOperand(0) == cout) {
-      // assert(is_func_from_std(call->getCalledFunction()));
-      // errs() << "TRUE: interaction with cout:\n";
-      return true;
-    }
-    auto name = get_function_name(
-        llvm::demangle(call->getCalledFunction()->getName().str()));
-    if (name.find("operator<<") != std::string::npos) {
-      // if multiple chained usages of operator << operator << will be used on
-      // the result of first application of operator<<
-      assert(call->arg_size() >= 2);
-      if (auto *cc = dyn_cast<CallBase>(call->getArgOperand(0))) {
-        // errs() << "Defer to other call: interaction with cout:\n";
-        return is_interaction_with_cout(cc);
-      }
-      if (auto *phi = dyn_cast<PHINode>(call->getArgOperand(0))) {
-        // std::all_of
-        for (auto &incoming : phi->incoming_values()) {
-          if (auto *cc = dyn_cast<CallBase>(&incoming)) {
-            // errs() << "Defer to other call: interaction with cout:\n";
-            if (not is_interaction_with_cout(cc)) {
-              return false;
-            }
-          } else {
-            return false;
-          }
-        }
-        return true;
-      }
-    }
-  }
-  // errs() << "FALSE: no interaction with cout:\n";
-  return false;
-}
-
 void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
     const PrecalculationAnalysisImpl *precompute_analysis) {
   // the precompute_analysis object is not fully initialized yet, as we are
@@ -160,7 +109,7 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
     return;
   }
 
-  if (precompute_analysis->is_allocation(func) // out of mem is fatal
+  if (is_allocation(func)      // out of mem is fatal
       || is_mpi_function(func) // mpi cannot throw recoverable exceptions
   ) {
     can_except_in_precompute = false;
@@ -180,7 +129,7 @@ void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
     return;
   }
 
-  if (precompute_analysis->is_func_from_std(func)) {
+  if (is_func_from_std(func)) {
     // we don't analyze std's internals, assume it can throw
     assert(can_except_in_precompute);
     return;

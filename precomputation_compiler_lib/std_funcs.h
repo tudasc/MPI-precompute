@@ -1,0 +1,95 @@
+#ifndef STD_FUNCS_H
+#define STD_FUNCS_H
+
+#include "devirt_analysis.h"
+#include "llvm/IR/Function.h"
+
+#include <llvm/Demangle/Demangle.h>
+#include <llvm/IR/InstrTypes.h>
+#include <regex>
+
+inline bool is_free(const llvm::Function *func) {
+  assert(func);
+  // operator delete
+  if (func->getName() == "_ZdlPv") {
+    return true;
+  }
+  if (func->getName() == "free") {
+    return true;
+  }
+  return false;
+}
+
+inline bool is_free(const llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    return false;
+  }
+
+  return is_free(call->getCalledFunction());
+}
+
+bool is_interaction_with_cout(llvm::CallBase *call);
+
+inline bool is_allocation(llvm::Function *func) {
+  assert(func);
+  // operator new
+  if (func->getName() == "_Znwm") {
+    return true;
+  }
+  if (func->getName() == "malloc") {
+    return true;
+  }
+  if (func->getName() == "calloc") {
+    return true;
+  }
+  return false;
+}
+
+inline bool is_allocation(llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    return false;
+  }
+  return is_allocation(call->getCalledFunction());
+}
+
+bool is_func_from_std(llvm::Function *func);
+
+// we should not mess around with the globals defined by std::
+inline bool is_global_from_std(llvm::GlobalValue *global) {
+  assert(global);
+  if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
+    return is_func_from_std(f);
+  }
+
+  auto demangled = llvm::demangle(global->getName().str());
+  // startswith std::
+  if (demangled.rfind("std::", 0) == 0) {
+    return true;
+  }
+
+  std::regex regex_pattern_std("^(VTT for )?std::(.+)");
+  if (std::regex_match(demangled, regex_pattern_std)) {
+    return true;
+  }
+
+  if (std::regex_match(demangled, std::regex("^(typeinfo for )?std::(.+)"))) {
+    return true;
+  }
+
+  if (global->getName() == "__dso_handle") {
+    return true;
+  }
+  return false;
+}
+
+inline bool is_call_to_std(llvm::CallBase *call) {
+  if (call->isIndirectCall()) {
+    auto tgts = DevirtAnalysis::get_possible_call_targets(call);
+    return std::all_of(tgts.begin(), tgts.end(),
+                       [](auto t) { return is_func_from_std(t); });
+  }
+
+  return is_func_from_std(call->getCalledFunction());
+}
+
+#endif // STD_FUNCS_H

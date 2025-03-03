@@ -19,7 +19,9 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "devirt_analysis.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
+#include "precalculation_function_analysis.h"
 #include "precalculation_impl.h"
+#include "std_funcs.h"
 
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Demangle/Demangle.h"
@@ -1438,7 +1440,7 @@ PrecalculationAnalysisImpl::get_possible_call_targets(
     llvm::CallBase *call) const {
   std::vector<llvm::Function *> possible_targets;
   if (call->isIndirectCall()) {
-    possible_targets = virtual_call_sites.get_possible_call_targets(call);
+    possible_targets = DevirtAnalysis::get_possible_call_targets(call);
   } else {
     possible_targets.push_back(call->getCalledFunction());
     return possible_targets;
@@ -1509,86 +1511,6 @@ void PrecalculationAnalysisImpl::debug_printings() {
     }
   }
   // assert(false);
-}
-
-std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
-PrecalculationAnalysisImpl::getFunctionsToInclude() const {
-  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> result;
-  for (const auto &pair : function_analysis) {
-    if (pair.second->include_in_precompute) {
-      result.insert(pair.second);
-    }
-  }
-  return result;
-}
-
-Function *PrecalculationAnalysisImpl::getEntryPoint() const {
-  return entry_point;
-}
-
-// returns true if func is from std or part of the
-// COMPILER_ASSISTED_MATCHING_ALLOW_EXTERNAL_FUNCTIONS environment variable
-bool PrecalculationAnalysisImpl::is_func_from_std(llvm::Function *func) const {
-  assert(func);
-
-  // C API
-  llvm::LibFunc lib_func;
-  bool in_lib = analysis_results->getTLI()->getLibFunc(*func, lib_func);
-  if (in_lib) {
-    return true;
-  }
-
-  auto demangled_fname =
-      get_function_name(llvm::demangle(func->getName().str()));
-
-  // errs() << "Test if in std:\n" << func->getName() <<demangled_fname <<
-  // "\n";
-
-  for (auto prefix : allowed_function_prefixes) {
-    if (demangled_fname.rfind(prefix, 0) == 0) {
-      return true;
-    }
-  }
-
-  // more like a stack ptr than a function call
-  if (func->getName() == "__errno_location") {
-    return true;
-  }
-
-  if (func->getName() == "__cxa_throw") {
-    return true;
-  }
-
-  if (func->getName() == "__cxa_allocate_exception") {
-    // TODO is allocator
-    return true;
-  }
-  if (func->getName() == "__cxa_free_exception") {
-    // TODO is free
-    return true;
-  }
-  if (func->getName() == "__cxa_begin_catch") {
-    // TODO is free
-    return true;
-  }
-
-  // openmp lib funcs
-  if (func->getName() == "omp_get_max_threads") {
-    return true;
-  }
-  if (func->getName() == "omp_get_thread_num") {
-    return true;
-  }
-
-  // TODO why it is not in TLI info??
-  if (func->getName() == "rand") {
-    // calling rand in precompute is actually "safe",
-    // as one should usa a random seed anyway it doesn't matter if we call
-    // it in precompute
-    return true;
-  }
-
-  return false;
 }
 
 bool PrecalculationAnalysisImpl::can_except_in_precompute(

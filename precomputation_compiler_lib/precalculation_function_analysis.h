@@ -131,26 +131,6 @@ public:
       const PrecalculationAnalysisImpl *precompute_analysis);
 };
 
-inline bool is_free(llvm::Function *func) {
-  assert(func);
-  // operator delete
-  if (func->getName() == "_ZdlPv") {
-    return true;
-  }
-  if (func->getName() == "free") {
-    return true;
-  }
-  return false;
-}
-
-inline bool is_free(llvm::CallBase *call) {
-  if (call->isIndirectCall()) {
-    return false;
-  }
-
-  return is_free(call->getCalledFunction());
-}
-
 inline bool should_exclude_function_for_debugging(llvm::Function *func) {
   if (is_mpi_function(func)) {
     return true;
@@ -158,7 +138,6 @@ inline bool should_exclude_function_for_debugging(llvm::Function *func) {
   return false;
 }
 
-bool is_interaction_with_cout(llvm::CallBase *call);
 // only gets the name of a function if a demangled name contains a return
 // param or template args
 std::string get_function_name(const std::string &demangled_name);

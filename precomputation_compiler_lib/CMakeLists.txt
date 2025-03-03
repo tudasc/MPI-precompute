@@ -22,6 +22,8 @@ add_library(precomputation_compiler_lib SHARED
         mpi_functions.h
         precalculation_function_analysis.cpp
         precalculation_function_analysis.h
+        std_funcs.cpp
+        std_funcs.h
 )
 
 #TODO cmake is complaining about boost
