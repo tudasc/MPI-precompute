@@ -91,6 +91,9 @@ private:
 
   std::map<llvm::Value *, llvm::Value *> precomputed_values_map;
 
+  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
+  getFunctionsToInclude() const;
+
   void build_precomputed_values_map(
       const std::map<llvm::Function *,
                      std::shared_ptr<PrecalculationFunctionCopy>>

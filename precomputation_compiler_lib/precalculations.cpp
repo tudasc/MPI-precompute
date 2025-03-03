@@ -180,6 +180,17 @@ void PrecalculationAnalysisImpl::analyze() {
 #endif
 }
 
+std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
+PrecalculationAnalysisImpl::getFunctionsToInclude() const {
+  std::set<std::shared_ptr<PrecalculationFunctionAnalysis>> result;
+  for (const auto &pair : function_analysis) {
+    if (pair.second->include_in_precompute) {
+      result.insert(pair.second);
+    }
+  }
+  return result;
+}
+
 void PrecalculationAnalysisImpl::generate_slice() {
   // todo refactoring this functionality should be part of *this
   auto insertion= new PrecomputeInsertion(M,*this);
