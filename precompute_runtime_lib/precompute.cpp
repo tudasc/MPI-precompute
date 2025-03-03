@@ -21,7 +21,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "vector"
 
 // for performance build
-#undef PRINT_REGISTERED_VALUES
+//#undef PRINT_REGISTERED_VALUES
 
 #define MEASURE_PRECOMPUTE_TIME
 

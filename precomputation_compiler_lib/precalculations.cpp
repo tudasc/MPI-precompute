@@ -373,12 +373,23 @@ void PrecalculationAnalysis::analyze() {
   for (const auto &val : this->to_precompute_value) {
     auto val_info = insert_tainted_value(val, TaintReason::COMPUTE_TAG);
     include_value_in_precompute(val_info);
+    if (auto *inst = dyn_cast<Instruction>(val)) {
+      auto func_info = get_function_analysis(inst->getFunction());
+      func_info->include_all_callsites = true;
+      func_info->re_visit_callsites(); // not strictly necessary here, but
+                                       // whenever something changes, we shuld
+                                       // re-visit the callsites
+    }
   }
   for (const auto &val : this->to_precompute_cfg) {
     auto val_info = insert_tainted_value(val, TaintReason::CONTROL_FLOW);
     include_value_in_precompute(val_info);
     val_info->visited =
         true; // don't need to visit value, it only is used for control flow
+    auto func_info = get_function_analysis(val->getFunction());
+    func_info->include_all_callsites = true;
+    func_info->re_visit_callsites(); // if one of the values tainted for cfg is
+                                     // a call tho this func
   }
   find_all_tainted_vals();
 
@@ -1143,9 +1154,11 @@ void PrecalculationAnalysis::visit_call(
 bool PrecalculationAnalysis::check_if_call_should_be_included(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallBase>(call_info->v);
+
   for (auto *func : get_possible_call_targets(call)) {
     auto func_analysis = get_function_analysis(func);
     if (func_analysis->include_all_callsites) {
+
       // set it on parent
       get_function_analysis(call->getFunction())->include_all_callsites = true;
       return true;
