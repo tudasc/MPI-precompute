@@ -32,16 +32,23 @@ void replace_MPI_with_precompute(
     const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result,
     const std::vector<llvm::CallBase *> &init_calls) {
   for (auto *old_call : init_calls) {
-    auto *old_tag = get_tag_value(old_call, true);
-    auto *old_src = get_src_value(old_call, true);
+    const bool is_send = is_send_function(old_call->getCalledFunction());
+    auto *old_tag = get_tag_value(old_call, is_send);
+    auto *old_src = get_src_value(old_call, is_send);
 
     // TODO this map is currently not build correctly
     auto *precomputed_call =
         precompute_analyis_result->get_precomputed_value(old_call);
+
     auto *precomputed_tag =
         precompute_analyis_result->get_precomputed_value(old_tag);
     auto *precomputed_src =
         precompute_analyis_result->get_precomputed_value(old_src);
+
+    assert(precomputed_tag ==
+           get_tag_value(cast<CallBase>(precomputed_call), is_send));
+    assert(precomputed_src ==
+           get_src_value(cast<CallBase>(precomputed_call), is_send));
 
     assert(precomputed_call != nullptr && precomputed_tag != nullptr &&
            precomputed_src != nullptr);
