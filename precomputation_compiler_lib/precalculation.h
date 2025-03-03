@@ -209,11 +209,12 @@ private:
       function_analysis;
 
   std::map<llvm::Value *, llvm::Value *> precomputed_values_map;
+
 public:
   void build_precomputed_values_map(
       const std::map<llvm::Function *,
                      std::shared_ptr<PrecalculationFunctionCopy>>
-          functions_copied);
+          &functions_copied);
 
 private:
   void analyze();

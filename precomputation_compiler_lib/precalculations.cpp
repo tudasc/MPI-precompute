@@ -1238,11 +1238,16 @@ void PrecalculationAnalysis::visit_invoke_for_exception(
 void PrecalculationAnalysis::build_precomputed_values_map(
     const std::map<llvm::Function *,
                    std::shared_ptr<PrecalculationFunctionCopy>>
-        functions_copied) {
+        &functions_copied) {
 
   for (auto *val : to_precompute_value) {
     if (auto *inst = dyn_cast<Instruction>(val)) {
       auto *f = inst->getFunction();
+      assert(is_func_included_in_precompute(f));
+      const auto &copy_func = functions_copied.at(f);
+      precomputed_values_map[val] = copy_func->old_new_map[val];
+    } else if (auto *arg = dyn_cast<Argument>(val)) {
+      auto *f = arg->getParent();
       assert(is_func_included_in_precompute(f));
       const auto &copy_func = functions_copied.at(f);
       precomputed_values_map[val] = copy_func->old_new_map[val];
@@ -1251,7 +1256,7 @@ void PrecalculationAnalysis::build_precomputed_values_map(
       precomputed_values_map[val] = val;
     }
   }
-  // todo duplicated code same loop as above but whcihtout the cast
+  // same loop as above but without the casts
   for (auto *inst : to_precompute_cfg) {
     auto *f = inst->getFunction();
     assert(is_func_included_in_precompute(f));
