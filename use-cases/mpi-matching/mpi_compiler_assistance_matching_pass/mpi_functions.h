@@ -118,4 +118,8 @@ llvm::Value *get_tag_value(llvm::CallBase *mpi_call, bool is_send);
 llvm::Value *get_src_value(llvm::CallBase *mpi_call, bool is_send);
 llvm::Value *get_comm_value(llvm::CallBase *mpi_call, bool is_send);
 
+inline llvm::GlobalVariable *get_mpi_comm_world(const llvm::Module &M) {
+  return M.getGlobalVariable("ompi_mpi_comm_world");
+}
+
 #endif /* MACH_MPI_FUNCTIONS_H_ */

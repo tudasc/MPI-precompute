@@ -17,7 +17,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "Precompute_insertion.h"
 #include "devirt_analysis.h"
-#include "implementation_specific.h"
 #include "mpi_functions.h"
 #include "precalculation_function_analysis.h"
 #include "precalculation_impl.h"
@@ -193,7 +192,7 @@ PrecalculationAnalysisImpl::getFunctionsToInclude() const {
 
 void PrecalculationAnalysisImpl::generate_slice() {
   // todo refactoring this functionality should be part of *this
-  auto insertion= new PrecomputeInsertion(M,*this);
+  auto insertion = new PrecomputeInsertion(M, *this);
   // constructor performs everything
   delete insertion;
 }
@@ -475,8 +474,7 @@ void PrecalculationAnalysisImpl::visit_ptr_usages(
   }
 
   if (auto *global = dyn_cast<GlobalVariable>(ptr->v)) {
-    auto *implementation_specifics = ImplementationSpecifics::get_instance();
-    if (global == implementation_specifics->COMM_WORLD) {
+    if (global == get_mpi_comm_world(M)) {
       // no need to handle all usages of Comm World as we know it is a static
       // object
       return;

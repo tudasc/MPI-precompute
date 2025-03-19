@@ -17,7 +17,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "CompilerPassConstants.h"
 #include "VtableManager.h"
 #include "debug.h"
-#include "implementation_specific.h"
 #include "precalculation_impl.h"
 #include "precompute_backend_funcs.h"
 #include "std_funcs.h"
@@ -42,7 +41,6 @@ void PrecalculationFunctionCopy::initialize_copy() {
 }
 
 llvm::Function *PrecomputeInsertion::get_global_re_init_function() {
-  auto *implementation_specifics = ImplementationSpecifics::get_instance();
 
   auto *func = Function::Create(
       FunctionType::get(Type::getVoidTy(M.getContext()), false),
@@ -58,7 +56,7 @@ llvm::Function *PrecomputeInsertion::get_global_re_init_function() {
     // cannot be modified comm World will have no ptr info and therefore is
     // Written to check cannot be made
     if (precompute_analyis_result.is_included_in_precompute(&global) &&
-        &global != implementation_specifics->COMM_WORLD) {
+        &global != get_mpi_comm_world(M)) {
       assert(global.getType()->isPointerTy());
       auto global_info = precompute_analyis_result.get_taint_info(&global);
 
