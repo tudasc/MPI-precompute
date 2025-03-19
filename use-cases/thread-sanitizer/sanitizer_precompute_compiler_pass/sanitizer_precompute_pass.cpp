@@ -11,6 +11,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+#include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
+
 #include "llvm/IR/Verifier.h"
 
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -75,6 +77,18 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
+
+    // TODO is there a better solution to that?
+    // TODO make sure that tsan passs is only run once and not again (or check
+    // that it does not instrument everything twice)
+    //  make sure TSAN pass runs
+    auto *FAM =
+        &AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+    auto tsan_pass = ThreadSanitizerPass();
+    for (auto it = M.begin(); it != M.end(); ++it) {
+      Function *f = &*it;
+      tsan_pass.run(*f, *FAM);
+    }
 
     Debug(errs() << "Before Modification:\n"; M.dump();
           errs() << "END MODULE\n";);
