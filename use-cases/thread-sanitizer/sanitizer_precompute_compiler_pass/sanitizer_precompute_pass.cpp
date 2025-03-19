@@ -76,9 +76,6 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
 
-    auto MSI = &AM.getResult<ModuleSummaryIndexAnalysis>(M);
-    errs() << "got analysis result\n";
-
     Debug(errs() << "Before Modification:\n"; M.dump();
           errs() << "END MODULE\n";);
     auto has_error2 = verifyModule(M, &errs(), nullptr);

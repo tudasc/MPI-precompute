@@ -29,7 +29,11 @@ RequiredAnalysisResults::RequiredAnalysisResults(
 
   // first function of M
   TLI = &FAM->getResult<TargetLibraryAnalysis>(*M.begin());
-  MSI = &MAM.getResult<ModuleSummaryIndexAnalysis>(M);
+
+  //TODO: error when getting ModuleSummaryIndexAnalysis with openmp usage!
+  MSI=nullptr;
+    //MSI = &MAM.getResult<ModuleSummaryIndexAnalysis>(M);
+
 }
 
 llvm::AAResults *RequiredAnalysisResults::getAAResults(llvm::Function &f) {
