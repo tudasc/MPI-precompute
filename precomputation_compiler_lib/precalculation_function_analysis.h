@@ -185,6 +185,10 @@ inline bool should_call_intrinsic(llvm::Intrinsic::ID id) {
       id == llvm::Intrinsic::fmuladd || id == llvm::Intrinsic::fma ||
       // exception handling:
       id == llvm::Intrinsic::eh_typeid_for ||
+      // stack reading
+      id == llvm::Intrinsic::returnaddress ||
+      id == llvm::Intrinsic::addressofreturnaddress ||
+      id == llvm::Intrinsic::sponentry || id == llvm::Intrinsic::frameaddress ||
 
       // vector instructions
       llvm::Intrinsic::getName(id).starts_with("llvm.x86.sse"); // NOLINT
