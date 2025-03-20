@@ -1,5 +1,6 @@
 
 #include "precalculation_function_analysis.h"
+#include "openmp_runtime_functions.h"
 #include "precalculation_impl.h"
 #include "std_funcs.h"
 
@@ -96,6 +97,46 @@ std::string get_function_name(const std::string &demangled_name) {
 
   return no_template;
 }
+
+PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
+    llvm::Function *F, PrecalculationAnalysisImpl *precalc)
+    : func(F), precalculatioanalysis(precalc) {
+  // assert(not F->isDeclaration() && "Cannot analyze external function");
+
+  is_func_ptr_captured = false;
+  aliases.insert(func);
+
+  for (auto *u : func->users()) {
+    if (auto *alias = llvm::dyn_cast<llvm::GlobalAlias>(u)) {
+      assert(alias->getAliasee() == func);
+      aliases.insert(alias);
+
+      if (not alias->user_empty()) {
+        llvm::errs() << "Alias is used\n";
+        for (auto *auu : alias->users()) {
+          auu->dump();
+        }
+        llvm::errs() << "currently not supported\n";
+        assert(false);
+      }
+
+      continue;
+    }
+    if (auto call = llvm::dyn_cast<llvm::CallBase>(u)) {
+      if (call->getCalledFunction() != func) {
+        if (call->getCalledFunction() &&
+            call->getCalledFunction() ==
+                get_omp_functions(*func->getParent())->kmpc_fork_call) {
+          //  call to openmp
+        } else
+          is_func_ptr_captured = true;
+      }
+      // else call instruction to function
+    } else {
+      is_func_ptr_captured = true;
+    }
+  }
+};
 
 void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
     const PrecalculationAnalysisImpl *precompute_analysis) {

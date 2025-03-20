@@ -31,6 +31,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "llvm/Support/Casting.h"
 
 #include "debug.h"
+#include "openmp_runtime_functions.h"
 
 // for more scrutiny under testing:
 // the order of visiting the values should make no difference
@@ -69,6 +70,7 @@ void print_needed_for(const std::shared_ptr<TaintedValue> &child,
   }
 }
 
+// TODO move code?
 void PrecalculationAnalysisImpl::analyze_functions() {
   // create
   for (auto &f : M) {
@@ -84,9 +86,15 @@ void PrecalculationAnalysisImpl::analyze_functions() {
         if (auto *call = dyn_cast<CallBase>(&*I)) {
           auto targets = get_possible_call_targets(call);
           for (auto *target : targets) {
-            function_analysis[target]->callsites.insert(call);
-            function_analysis[call->getFunction()]->callees.insert(
-                function_analysis[target]);
+            if (target == get_omp_functions(M)->kmpc_fork_call) {
+
+              // TODO handle Openmp
+              assert(0);
+            } else {
+              function_analysis[target]->callsites.insert(call);
+              function_analysis[call->getFunction()]->callees.insert(
+                  function_analysis[target]);
+            }
           }
         }
       }

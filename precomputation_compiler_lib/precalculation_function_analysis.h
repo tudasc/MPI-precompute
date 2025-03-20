@@ -16,34 +16,7 @@ class PrecalculationFunctionAnalysis
 public:
   // analysis Part
   explicit PrecalculationFunctionAnalysis(llvm::Function *F,
-                                          PrecalculationAnalysisImpl *precalc)
-      : func(F), precalculatioanalysis(precalc) {
-    // assert(not F->isDeclaration() && "Cannot analyze external function");
-
-    is_func_ptr_captured = false;
-    aliases.insert(func);
-
-    for (auto *u : func->users()) {
-      if (auto *alias = llvm::dyn_cast<llvm::GlobalAlias>(u)) {
-        assert(alias->getAliasee() == func);
-        aliases.insert(alias);
-
-        if (not alias->user_empty()) {
-          llvm::errs() << "Alias is used\n";
-          for (auto *auu : alias->users()) {
-            auu->dump();
-          }
-          llvm::errs() << "currently not supported\n";
-          assert(false);
-        }
-
-        continue;
-      }
-      if (not llvm::isa<llvm::CallBase>(u)) {
-        is_func_ptr_captured = true;
-      }
-    }
-  };
+                                          PrecalculationAnalysisImpl *precalc);
 
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
