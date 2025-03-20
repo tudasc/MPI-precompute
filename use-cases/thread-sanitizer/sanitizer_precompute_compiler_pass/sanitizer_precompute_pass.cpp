@@ -96,23 +96,43 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     assert(!has_error2);
 
     PrecomputeFunctions::create_instance(M);
-    errs() << "created PrecomputeFunctions\n";
     analysis_results = new RequiredAnalysisResults(AM, M);
-    errs() << "created Required Analysis\n";
 
     auto num_undef = get_num_undefs(M);
 
     auto *main_func = M.getFunction("main");
     assert(main_func);
 
-    /*
-          auto precalcuation = PrecalculationAnalysisFactroy(
-              M, main_func, to_precompute, init_calls);
-          precalcuation->generate_slice();
+    std::vector<Value *> to_precompute;
+    std::vector<Instruction *> precompute_locations;
+    for (auto it_f = M.begin(); it_f != M.end(); ++it_f) {
+      Function *f = &*it_f;
+      for (auto it_bb = f->begin(); it_bb != f->end(); ++it_bb) {
+        BasicBlock *bb = &*it_bb;
+        for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
+          Instruction *inst = &*it_i;
+          if (auto *call = dyn_cast<CallBase>(inst)) {
+            if (!call->isIndirectCall() &&
+                call->getCalledFunction()->getName().startswith("__tsan")) {
+              // no invoke to tsan just plain call
+              assert(dyn_cast<CallInst>(call));
+              for (auto it_arg = call->arg_begin(); it_arg != call->arg_end();
+                   ++it_arg) {
+                to_precompute.push_back(it_arg->get());
+              }
+              precompute_locations.push_back(call);
+            }
+          }
+        }
+      }
+    }
 
+    auto precalcuation = PrecalculationAnalysisFactroy(
+        M, main_func, to_precompute, precompute_locations);
+    precalcuation->generate_slice();
 
-          precalcuation->clean_precompute();
-    */
+    // do NOT call clean_precompute() as we want the tsan calls to stick around
+
     remove_noinline_from_module(M);
 
     delete analysis_results;
