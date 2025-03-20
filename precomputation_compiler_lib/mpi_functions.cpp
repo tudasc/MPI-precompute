@@ -14,24 +14,12 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 #include "mpi_functions.h"
-#include "implementation_specific.h"
 #include <assert.h>
 
 #include "llvm/IR/InstrTypes.h"
 #include <llvm/Support/raw_ostream.h>
 
 using namespace llvm;
-
-bool is_mpi_call(CallBase *call) {
-  return is_mpi_function(call->getCalledFunction());
-}
-
-bool is_mpi_function(llvm::Function *f) {
-  if (f) {
-    return f->getName().starts_with("MPI");
-  } else
-    return false;
-}
 
 std::vector<CallBase *> gather_all_calls(Function *f) {
   std::vector<CallBase *> result;
@@ -163,187 +151,11 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
     }
   }
 
-  auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
-
-  if (result->mpi_info_create == nullptr) {
-    auto fntype = FunctionType::get(
-        Type::getInt32Ty(M.getContext()),
-        {mpi_implementation_specifics->mpi_info->getPointerTo()}, false);
-
-    result->mpi_info_create =
-        cast<Function>(M.getOrInsertFunction("MPI_Info_create", fntype)
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-  if (result->mpi_info_free == nullptr) {
-    auto fntype = FunctionType::get(
-        Type::getInt32Ty(M.getContext()),
-        {mpi_implementation_specifics->mpi_info->getPointerTo()}, false);
-
-    result->mpi_info_free =
-        cast<Function>(M.getOrInsertFunction("MPI_Info_free", fntype)
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-  if (result->mpi_info_set == nullptr) {
-    auto fntype = FunctionType::get(Type::getInt32Ty(M.getContext()),
-                                    {mpi_implementation_specifics->mpi_info,
-                                     Type::getInt8PtrTy(M.getContext()),
-                                     Type::getInt8PtrTy(M.getContext())},
-                                    false);
-
-    result->mpi_info_set =
-        cast<Function>(M.getOrInsertFunction("MPI_Info_set", fntype)
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-
-  // construct the optimized version of functions, if original functions where
-  // used:
-
-  if (result->mpi_wait) {
-    result->optimized.mpi_wait =
-        cast<Function>(M.getOrInsertFunction(
-                            "MPIOPT_Wait", result->mpi_wait->getFunctionType())
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-  if (result->mpi_waitall) {
-    result->optimized.mpi_waitall = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Waitall",
-                              result->mpi_waitall->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_waitany) {
-    result->optimized.mpi_waitany = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Waitany",
-                              result->mpi_waitany->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_waitsome) {
-    result->optimized.mpi_waitsome = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Waitsome",
-                              result->mpi_waitsome->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_test) {
-    result->optimized.mpi_test =
-        cast<Function>(M.getOrInsertFunction(
-                            "MPIOPT_Test", result->mpi_test->getFunctionType())
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-  if (result->mpi_testall) {
-    result->optimized.mpi_testall = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Testall",
-                              result->mpi_testall->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_testany) {
-    result->optimized.mpi_testany = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Testany",
-                              result->mpi_testany->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_testsome) {
-    result->optimized.mpi_testsome = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Testsome",
-                              result->mpi_testsome->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_start) {
-    result->optimized.mpi_start = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Start",
-                              result->mpi_start->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_startall) {
-    result->optimized.mpi_startall = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Startall",
-                              result->mpi_startall->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_send_init) {
-    result->optimized.mpi_send_init = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Send_init",
-                              result->mpi_send_init->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-
-  if (result->mpi_recv_init) {
-    result->optimized.mpi_recv_init = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Recv_init",
-                              result->mpi_recv_init->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-  if (result->mpi_request_free) {
-    result->optimized.mpi_request_free = cast<Function>(
-        M.getOrInsertFunction("MPIOPT_Request_free",
-                              result->mpi_request_free->getFunctionType())
-            .getCallee()
-            ->stripPointerCasts());
-  }
-
-  if (result->mpi_send_init) {
-
-    auto orig_fn_type = result->mpi_send_init->getFunctionType();
-    std::vector<Type *> params;
-    std::copy(orig_fn_type->param_begin(), orig_fn_type->param_end(),
-              std::back_inserter(params));
-    params.push_back(mpi_implementation_specifics->mpi_info);
-
-    auto new_fntype =
-        FunctionType::get(orig_fn_type->getReturnType(), params, false);
-    result->optimized.mpi_send_init_info =
-        cast<Function>(M.getOrInsertFunction("MPIOPT_Send_init_x", new_fntype)
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-  if (result->mpi_recv_init) {
-
-    auto orig_fn_type = result->mpi_recv_init->getFunctionType();
-    std::vector<Type *> params;
-    std::copy(orig_fn_type->param_begin(), orig_fn_type->param_end(),
-              std::back_inserter(params));
-    params.push_back(mpi_implementation_specifics->mpi_info);
-
-    auto new_fntype =
-        FunctionType::get(orig_fn_type->getReturnType(), params, false);
-    result->optimized.mpi_recv_init_info =
-        cast<Function>(M.getOrInsertFunction("MPIOPT_Recv_init_x", new_fntype)
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-
-  // construct the init and finish functions, if necessary:
-  if (result->mpi_init || result->mpi_init_thread || result->mpi_finalize) {
-    // void funcs that do not have params
-    auto *ftype = FunctionType::get(Type::getVoidTy(M.getContext()), false);
-    result->optimized.init =
-        cast<Function>(M.getOrInsertFunction("MPIOPT_INIT", ftype, {})
-                           .getCallee()
-                           ->stripPointerCasts());
-    result->optimized.finalize =
-        cast<Function>(M.getOrInsertFunction("MPIOPT_FINALIZE", ftype, {})
-                           .getCallee()
-                           ->stripPointerCasts());
-  }
-
   return result;
 }
 
-bool is_mpi_used(struct mpi_functions *mpi_func) {
-
+bool is_mpi_initialized() {
+  //TODO this does not work correctly if init:thread is used, or no init but other mpi calls are present
   if (mpi_func->mpi_init != nullptr) {
     return mpi_func->mpi_init->getNumUses() > 0;
   } else {

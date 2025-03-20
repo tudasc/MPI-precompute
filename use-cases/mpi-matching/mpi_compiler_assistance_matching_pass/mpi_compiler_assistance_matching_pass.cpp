@@ -45,6 +45,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "debug.h"
 #include "implementation_specific.h"
 #include "mpi_functions.h"
+#include "mpiopt_functions.h"
 #include "precompute_backend_funcs.h"
 #include "replacement.h"
 
@@ -57,6 +58,7 @@ using namespace llvm;
 RequiredAnalysisResults *analysis_results;
 
 struct mpi_functions *mpi_func;
+struct mpiopt_functions *mpiopt_functions;
 ImplementationSpecifics *mpi_implementation_specifics;
 
 // removes attribute noinline from every func
@@ -133,10 +135,12 @@ struct MPICompilerAssistanceMatchingPass
     PrecomputeFunctions::create_instance(M);
 
     mpi_func = get_used_mpi_functions(M);
+    add_mpi_info_functions(M);
+    mpiopt_functions = get_mpiopt_functions(M);
 
     // as this pass is used at LTO it sees the whole program so if no MPI is
     // used: nothing to do
-    if (!is_mpi_used(mpi_func)) {
+    if (!is_mpi_initialized()) {
       // nothing to do for non mpi applications
       delete mpi_func;
       return PreservedAnalyses::all();
@@ -213,9 +217,9 @@ struct MPICompilerAssistanceMatchingPass
 
       for (auto c : combined_init_list) {
         if (c->getCalledFunction() == mpi_func->mpi_recv_init) {
-          replace_init_call(c, mpi_func->optimized.mpi_recv_init_info);
+          replace_init_call(c, mpiopt_functions->mpi_recv_init_info);
         } else if (c->getCalledFunction() == mpi_func->mpi_send_init) {
-          replace_init_call(c, mpi_func->optimized.mpi_send_init_info);
+          replace_init_call(c, mpiopt_functions->mpi_send_init_info);
         }
       }
 
@@ -225,6 +229,7 @@ struct MPICompilerAssistanceMatchingPass
     }
 
     delete mpi_func;
+    delete mpiopt_functions;
     ImplementationSpecifics::delete_instance();
     PrecomputeFunctions::delete_instance();
     // FrontendPluginData::delete_instance();

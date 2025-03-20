@@ -20,6 +20,7 @@ add_library(precomputation_compiler_lib SHARED
         VtableManager.cpp
         VtableManager.h
         mpi_functions.h
+        mpi_functions.cpp
         precalculation_function_analysis.cpp
         precalculation_function_analysis.h
         std_funcs.cpp

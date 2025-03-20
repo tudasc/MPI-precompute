@@ -1,8 +1,8 @@
 add_library(mpi_compiler_assistance_matching_pass MODULE
         # List your source files here.
         mpi_compiler_assistance_matching_pass.cpp
-        mpi_functions.h
-        mpi_functions.cpp
+        mpiopt_functions.h
+        mpiopt_functions.cpp
         implementation_specific.h
         implementation_specific.cpp
         replacement.h

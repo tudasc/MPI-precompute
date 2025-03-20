@@ -18,6 +18,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "implementation_specific.h"
 #include "mpi_functions.h"
+#include "mpiopt_functions.h"
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -31,7 +32,7 @@ bool add_init(llvm::Module &M) {
 
   bool result = false;
   if (mpi_func->mpi_init) {
-    assert(mpi_func->optimized.init);
+    assert(mpiopt_functions->init);
     for (auto *u : mpi_func->mpi_init->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
 
@@ -41,14 +42,14 @@ bool add_init(llvm::Module &M) {
         }
 
         IRBuilder<> builder(insert_pt);
-        builder.CreateCall(mpi_func->optimized.init);
+        builder.CreateCall(mpiopt_functions->init);
         result = true;
       }
     }
   }
 
   if (mpi_func->mpi_init_thread) {
-    assert(mpi_func->optimized.init);
+    assert(mpiopt_functions->init);
     for (auto *u : mpi_func->mpi_init_thread->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
 
@@ -58,7 +59,7 @@ bool add_init(llvm::Module &M) {
         }
 
         IRBuilder<> builder(insert_pt);
-        builder.CreateCall(mpi_func->optimized.init);
+        builder.CreateCall(mpiopt_functions->init);
         result = true;
       }
     }
@@ -69,11 +70,11 @@ bool add_init(llvm::Module &M) {
 bool add_finalize(llvm::Module &M) {
   bool result = false;
   if (mpi_func->mpi_finalize) {
-    assert(mpi_func->optimized.finalize);
+    assert(mpiopt_functions->finalize);
     for (auto *u : mpi_func->mpi_finalize->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         IRBuilder<> builder(call);
-        builder.CreateCall(mpi_func->optimized.finalize);
+        builder.CreateCall(mpiopt_functions->finalize);
         result = true;
       }
     }
@@ -209,30 +210,30 @@ void replace_request_handling_calls(llvm::Module &M) {
   // do the actual replacement
   for (auto *call : calls_to_replace) {
     if (call->getCalledFunction() == mpi_func->mpi_wait) {
-      replace_call(call, mpi_func->optimized.mpi_wait);
+      replace_call(call, mpiopt_functions->mpi_wait);
     } else if (call->getCalledFunction() == mpi_func->mpi_waitall) {
-      replace_call(call, mpi_func->optimized.mpi_waitall);
+      replace_call(call, mpiopt_functions->mpi_waitall);
     } else if (call->getCalledFunction() == mpi_func->mpi_waitany) {
-      replace_call(call, mpi_func->optimized.mpi_waitany);
+      replace_call(call, mpiopt_functions->mpi_waitany);
     } else if (call->getCalledFunction() == mpi_func->mpi_waitsome) {
-      replace_call(call, mpi_func->optimized.mpi_waitsome);
+      replace_call(call, mpiopt_functions->mpi_waitsome);
 
     } else if (call->getCalledFunction() == mpi_func->mpi_test) {
-      replace_call(call, mpi_func->optimized.mpi_test);
+      replace_call(call, mpiopt_functions->mpi_test);
     } else if (call->getCalledFunction() == mpi_func->mpi_testall) {
-      replace_call(call, mpi_func->optimized.mpi_testall);
+      replace_call(call, mpiopt_functions->mpi_testall);
     } else if (call->getCalledFunction() == mpi_func->mpi_testany) {
-      replace_call(call, mpi_func->optimized.mpi_testany);
+      replace_call(call, mpiopt_functions->mpi_testany);
     } else if (call->getCalledFunction() == mpi_func->mpi_testsome) {
-      replace_call(call, mpi_func->optimized.mpi_testsome);
+      replace_call(call, mpiopt_functions->mpi_testsome);
 
     } else if (call->getCalledFunction() == mpi_func->mpi_start) {
-      replace_call(call, mpi_func->optimized.mpi_start);
+      replace_call(call, mpiopt_functions->mpi_start);
     } else if (call->getCalledFunction() == mpi_func->mpi_startall) {
-      replace_call(call, mpi_func->optimized.mpi_startall);
+      replace_call(call, mpiopt_functions->mpi_startall);
 
     } else if (call->getCalledFunction() == mpi_func->mpi_request_free) {
-      replace_call(call, mpi_func->optimized.mpi_request_free);
+      replace_call(call, mpiopt_functions->mpi_request_free);
 
     } else {
 
