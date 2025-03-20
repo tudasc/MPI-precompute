@@ -1179,11 +1179,16 @@ void PrecalculationAnalysisImpl::visit_call_from_ptr(
         // first ptr lvl is only read
       }
       if (func->isDeclaration()) {
-        errs() << "Can not analyze usage of external function:\n";
-        ptr->v->dump();
-        call->dump();
-        errs() << "In: " << call->getFunction()->getName() << "\n";
-        assert(false);
+        if (std::find(to_precompute_cfg.begin(), to_precompute_cfg.end(),
+                      call) == to_precompute_cfg.end()) {
+          // else: user told us to keep that call as they want to precompute it
+          // this means user need to handle this call
+          errs() << "Can not analyze usage of external function:\n";
+          ptr->v->dump();
+          call->dump();
+          errs() << "In: " << call->getFunction()->getName() << "\n";
+          assert(false);
+        }
       } else {
         auto call_info = insert_tainted_value(call, ptr, false);
         auto new_val = insert_tainted_value(arg, ptr, false);
