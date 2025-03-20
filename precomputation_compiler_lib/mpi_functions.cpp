@@ -154,6 +154,15 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
   return result;
 }
 
+struct mpi_functions *mpi_func = nullptr;
+
+struct mpi_functions *get_mpi_functions(llvm::Module &M) {
+  if (!mpi_func) {
+    mpi_func = get_used_mpi_functions(M);
+  }
+  return mpi_func;
+}
+
 bool is_mpi_initialized() {
   if (mpi_func->mpi_init != nullptr) {
     return mpi_func->mpi_init->getNumUses() > 0;

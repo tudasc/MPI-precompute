@@ -57,8 +57,6 @@ using namespace llvm;
 
 RequiredAnalysisResults *analysis_results;
 
-struct mpi_functions *mpi_func;
-struct mpiopt_functions *mpiopt_functions;
 ImplementationSpecifics *mpi_implementation_specifics;
 
 // removes attribute noinline from every func
@@ -86,16 +84,16 @@ llvm::CallBase *get_mpi_init_call(llvm::Module &M,
   // search for MPI_init or Init Thread as precalc may only take place after
   // that
   CallBase *call_to_init = nullptr;
-  if (mpi_func->mpi_init != nullptr) {
-    for (auto *u : mpi_func->mpi_init->users()) {
+  if (get_mpi_functions(M)->mpi_init != nullptr) {
+    for (auto *u : get_mpi_functions(M)->mpi_init->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         assert(call_to_init == nullptr && "MPI_Init is only allowed once");
         call_to_init = call;
       }
     }
   }
-  if (mpi_func->mpi_init_thread != nullptr) {
-    for (auto *u : mpi_func->mpi_init_thread->users()) {
+  if (get_mpi_functions(M)->mpi_init_thread != nullptr) {
+    for (auto *u : get_mpi_functions(M)->mpi_init_thread->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         assert(call_to_init == nullptr && "MPI_Init is only allowed once");
         call_to_init = call;
@@ -134,15 +132,12 @@ struct MPICompilerAssistanceMatchingPass
     ImplementationSpecifics::create_instance(M);
     PrecomputeFunctions::create_instance(M);
 
-    mpi_func = get_used_mpi_functions(M);
     add_mpi_info_functions(M);
-    mpiopt_functions = get_mpiopt_functions(M);
 
     // as this pass is used at LTO it sees the whole program so if no MPI is
     // used: nothing to do
     if (!is_mpi_initialized()) {
       // nothing to do for non mpi applications
-      delete mpi_func;
       return PreservedAnalyses::all();
     }
 
@@ -157,10 +152,11 @@ struct MPICompilerAssistanceMatchingPass
     // std::vector<std::shared_ptr<PersistentMPIInitCall>> recv_init_list;
     std::vector<CallBase *> combined_init_list;
 
-    if (mpi_func->mpi_send_init) {
-      for (auto *u : mpi_func->mpi_send_init->users()) {
+    if (get_mpi_functions(M)->mpi_send_init) {
+      for (auto *u : get_mpi_functions(M)->mpi_send_init->users()) {
         if (auto *call = dyn_cast<CallBase>(u)) {
-          if (call->getCalledFunction() == mpi_func->mpi_send_init) {
+          if (call->getCalledFunction() ==
+              get_mpi_functions(M)->mpi_send_init) {
             // not that I think anyone will pass a ptr to MPI func into another
             // func, but better save than sorry
             // send_init_list.push_back(
@@ -170,10 +166,11 @@ struct MPICompilerAssistanceMatchingPass
         }
       }
     }
-    if (mpi_func->mpi_recv_init) {
-      for (auto *u : mpi_func->mpi_recv_init->users()) {
+    if (get_mpi_functions(M)->mpi_recv_init) {
+      for (auto *u : get_mpi_functions(M)->mpi_recv_init->users()) {
         if (auto *call = dyn_cast<CallBase>(u)) {
-          if (call->getCalledFunction() == mpi_func->mpi_recv_init) {
+          if (call->getCalledFunction() ==
+              get_mpi_functions(M)->mpi_recv_init) {
             // recv_init_list.push_back(
             //     PersistentMPIInitCall::get_PersistentMPIInitCall(call));
             combined_init_list.push_back(call);
@@ -206,7 +203,7 @@ struct MPICompilerAssistanceMatchingPass
           M, main_func, to_precompute, init_calls);
       precalcuation->generate_slice();
 
-      replace_MPI_with_precompute(precalcuation, get_used_mpi_functions(M),
+      replace_MPI_with_precompute(precalcuation, get_mpi_functions(M),
                                   combined_init_list);
 
       add_call_to_precalculation_to_main(M, init_call, main_func,
@@ -216,10 +213,11 @@ struct MPICompilerAssistanceMatchingPass
       remove_noinline_from_module(M);
 
       for (auto c : combined_init_list) {
-        if (c->getCalledFunction() == mpi_func->mpi_recv_init) {
-          replace_init_call(c, mpiopt_functions->mpi_recv_init_info);
-        } else if (c->getCalledFunction() == mpi_func->mpi_send_init) {
-          replace_init_call(c, mpiopt_functions->mpi_send_init_info);
+        if (c->getCalledFunction() == get_mpi_functions(M)->mpi_recv_init) {
+          replace_init_call(c, get_mpiopt_functions(M)->mpi_recv_init_info);
+        } else if (c->getCalledFunction() ==
+                   get_mpi_functions(M)->mpi_send_init) {
+          replace_init_call(c, get_mpiopt_functions(M)->mpi_send_init_info);
         }
       }
 
@@ -228,8 +226,6 @@ struct MPICompilerAssistanceMatchingPass
       add_finalize(M);
     }
 
-    delete mpi_func;
-    delete mpiopt_functions;
     ImplementationSpecifics::delete_instance();
     PrecomputeFunctions::delete_instance();
     // FrontendPluginData::delete_instance();

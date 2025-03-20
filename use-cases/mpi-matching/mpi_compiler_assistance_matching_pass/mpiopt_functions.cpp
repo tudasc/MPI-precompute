@@ -24,6 +24,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 using namespace llvm;
 
 void add_mpi_info_functions(llvm::Module &M) {
+  auto mpi_func = get_mpi_functions(M);
   auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
 
   if (mpi_func->mpi_info_create == nullptr) {
@@ -60,87 +61,93 @@ void add_mpi_info_functions(llvm::Module &M) {
   }
 }
 
+struct mpiopt_functions *mpiopt_funct = nullptr;
+
 struct mpiopt_functions *get_mpiopt_functions(llvm::Module &M) {
 
-  struct mpiopt_functions *result = new struct mpiopt_functions;
-  assert(result != nullptr);
+  if (mpiopt_funct)
+    return mpiopt_funct;
+
+  auto mpi_func = get_mpi_functions(M);
+
+  struct mpiopt_functions *mpiopt_funct = new struct mpiopt_functions;
   auto *mpi_implementation_specifics = ImplementationSpecifics::get_instance();
 
   // construct the optimized version of functions, if original functions where
   // used:
 
   if (mpi_func->mpi_wait) {
-    result->mpi_wait = cast<Function>(
+    mpiopt_funct->mpi_wait = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Wait",
                               mpi_func->mpi_wait->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_waitall) {
-    result->mpi_waitall = cast<Function>(
+    mpiopt_funct->mpi_waitall = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Waitall",
                               mpi_func->mpi_waitall->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_waitany) {
-    result->mpi_waitany = cast<Function>(
+    mpiopt_funct->mpi_waitany = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Waitany",
                               mpi_func->mpi_waitany->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_waitsome) {
-    result->mpi_waitsome = cast<Function>(
+    mpiopt_funct->mpi_waitsome = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Waitsome",
                               mpi_func->mpi_waitsome->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_test) {
-    result->mpi_test = cast<Function>(
+    mpiopt_funct->mpi_test = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Test",
                               mpi_func->mpi_test->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_testall) {
-    result->mpi_testall = cast<Function>(
+    mpiopt_funct->mpi_testall = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Testall",
                               mpi_func->mpi_testall->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_testany) {
-    result->mpi_testany = cast<Function>(
+    mpiopt_funct->mpi_testany = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Testany",
                               mpi_func->mpi_testany->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_testsome) {
-    result->mpi_testsome = cast<Function>(
+    mpiopt_funct->mpi_testsome = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Testsome",
                               mpi_func->mpi_testsome->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_start) {
-    result->mpi_start = cast<Function>(
+    mpiopt_funct->mpi_start = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Start",
                               mpi_func->mpi_start->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_startall) {
-    result->mpi_startall = cast<Function>(
+    mpiopt_funct->mpi_startall = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Startall",
                               mpi_func->mpi_startall->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_send_init) {
-    result->mpi_send_init = cast<Function>(
+    mpiopt_funct->mpi_send_init = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Send_init",
                               mpi_func->mpi_send_init->getFunctionType())
             .getCallee()
@@ -148,14 +155,14 @@ struct mpiopt_functions *get_mpiopt_functions(llvm::Module &M) {
   }
 
   if (mpi_func->mpi_recv_init) {
-    result->mpi_recv_init = cast<Function>(
+    mpiopt_funct->mpi_recv_init = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Recv_init",
                               mpi_func->mpi_recv_init->getFunctionType())
             .getCallee()
             ->stripPointerCasts());
   }
   if (mpi_func->mpi_request_free) {
-    result->mpi_request_free = cast<Function>(
+    mpiopt_funct->mpi_request_free = cast<Function>(
         M.getOrInsertFunction("MPIOPT_Request_free",
                               mpi_func->mpi_request_free->getFunctionType())
             .getCallee()
@@ -171,7 +178,7 @@ struct mpiopt_functions *get_mpiopt_functions(llvm::Module &M) {
 
     auto new_fntype =
         FunctionType::get(orig_fn_type->getReturnType(), params, false);
-    result->mpi_send_init_info =
+    mpiopt_funct->mpi_send_init_info =
         cast<Function>(M.getOrInsertFunction("MPIOPT_Send_init_x", new_fntype)
                            .getCallee()
                            ->stripPointerCasts());
@@ -185,7 +192,7 @@ struct mpiopt_functions *get_mpiopt_functions(llvm::Module &M) {
 
     auto new_fntype =
         FunctionType::get(orig_fn_type->getReturnType(), params, false);
-    result->mpi_recv_init_info =
+    mpiopt_funct->mpi_recv_init_info =
         cast<Function>(M.getOrInsertFunction("MPIOPT_Recv_init_x", new_fntype)
                            .getCallee()
                            ->stripPointerCasts());
@@ -196,15 +203,15 @@ struct mpiopt_functions *get_mpiopt_functions(llvm::Module &M) {
       mpi_func->mpi_finalize) {
     // void funcs that do not have params
     auto *ftype = FunctionType::get(Type::getVoidTy(M.getContext()), false);
-    result->init =
+    mpiopt_funct->init =
         cast<Function>(M.getOrInsertFunction("MPIOPT_INIT", ftype, {})
                            .getCallee()
                            ->stripPointerCasts());
-    result->finalize =
+    mpiopt_funct->finalize =
         cast<Function>(M.getOrInsertFunction("MPIOPT_FINALIZE", ftype, {})
                            .getCallee()
                            ->stripPointerCasts());
   }
 
-  return result;
+  return mpiopt_funct;
 }

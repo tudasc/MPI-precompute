@@ -31,9 +31,9 @@ using namespace llvm;
 bool add_init(llvm::Module &M) {
 
   bool result = false;
-  if (mpi_func->mpi_init) {
-    assert(mpiopt_functions->init);
-    for (auto *u : mpi_func->mpi_init->users()) {
+  if (get_mpi_functions(M)->mpi_init) {
+    assert(get_mpiopt_functions(M)->init);
+    for (auto *u : get_mpi_functions(M)->mpi_init->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
 
         auto *insert_pt = call->getNextNode();
@@ -42,15 +42,15 @@ bool add_init(llvm::Module &M) {
         }
 
         IRBuilder<> builder(insert_pt);
-        builder.CreateCall(mpiopt_functions->init);
+        builder.CreateCall(get_mpiopt_functions(M)->init);
         result = true;
       }
     }
   }
 
-  if (mpi_func->mpi_init_thread) {
-    assert(mpiopt_functions->init);
-    for (auto *u : mpi_func->mpi_init_thread->users()) {
+  if (get_mpi_functions(M)->mpi_init_thread) {
+    assert(get_mpiopt_functions(M)->init);
+    for (auto *u : get_mpi_functions(M)->mpi_init_thread->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
 
         auto *insert_pt = call->getNextNode();
@@ -59,7 +59,7 @@ bool add_init(llvm::Module &M) {
         }
 
         IRBuilder<> builder(insert_pt);
-        builder.CreateCall(mpiopt_functions->init);
+        builder.CreateCall(get_mpiopt_functions(M)->init);
         result = true;
       }
     }
@@ -69,12 +69,12 @@ bool add_init(llvm::Module &M) {
 
 bool add_finalize(llvm::Module &M) {
   bool result = false;
-  if (mpi_func->mpi_finalize) {
-    assert(mpiopt_functions->finalize);
-    for (auto *u : mpi_func->mpi_finalize->users()) {
+  if (get_mpi_functions(M)->mpi_finalize) {
+    assert(get_mpiopt_functions(M)->finalize);
+    for (auto *u : get_mpi_functions(M)->mpi_finalize->users()) {
       if (auto *call = dyn_cast<CallBase>(u)) {
         IRBuilder<> builder(call);
-        builder.CreateCall(mpiopt_functions->finalize);
+        builder.CreateCall(get_mpiopt_functions(M)->finalize);
         result = true;
       }
     }
@@ -90,6 +90,7 @@ void replace_call(CallBase *call, Function *func) {
 }
 
 void replace_init_call(llvm::CallBase *call, llvm::Function *func) {
+  auto mpi_func = get_mpi_functions(*func->getParent());
 
   // one could assert that the only addition is the info object
   assert(call->getFunctionType() != func->getFunctionType());
@@ -173,6 +174,7 @@ std::vector<CallBase *> get_request_handling_calls_for(Module &M, Function *f) {
 std::vector<CallBase *> get_request_handling_calls(Module &M) {
 
   std::vector<CallBase *> calls_to_replace;
+  auto mpi_func = get_mpi_functions(M);
 
   auto temp = get_request_handling_calls_for(M, mpi_func->mpi_start);
   calls_to_replace.insert(calls_to_replace.end(), temp.begin(), temp.end());
@@ -206,6 +208,8 @@ std::vector<CallBase *> get_request_handling_calls(Module &M) {
 void replace_request_handling_calls(llvm::Module &M) {
 
   auto calls_to_replace = get_request_handling_calls(M);
+  auto mpi_func = get_mpi_functions(M);
+  auto mpiopt_functions = get_mpiopt_functions(M);
 
   // do the actual replacement
   for (auto *call : calls_to_replace) {

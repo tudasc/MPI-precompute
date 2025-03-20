@@ -43,7 +43,7 @@ public:
   PrecalculationAnalysisImpl(llvm::Module &M, llvm::Function *entry_point,
                              std::vector<llvm::Value *> to_precompute_value,
                              std::vector<llvm::Instruction *> to_precompute_cfg)
-      : mpi_func(get_used_mpi_functions(M)), M(M), entry_point(entry_point),
+      : mpi_func(get_mpi_functions(M)), M(M), entry_point(entry_point),
         to_precompute_value(std::move(to_precompute_value)),
         to_precompute_cfg(std::move(to_precompute_cfg)) {
 

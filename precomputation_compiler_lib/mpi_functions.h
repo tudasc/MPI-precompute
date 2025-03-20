@@ -20,66 +20,59 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Module.h"
 
-// global:
-// will be init and destroyed in the Passes runOnModule function (equivalent to
-// main)
-extern struct mpi_functions *mpi_func;
-// TODO proper singelton design pattern?
-//  this struct is const after initialization
-
 struct mpi_functions {
-    llvm::Function *mpi_init = nullptr;
-    llvm::Function *mpi_init_thread = nullptr;
-    llvm::Function *mpi_finalize = nullptr;
-    llvm::Function *mpi_comm_rank = nullptr;
-    llvm::Function *mpi_comm_size = nullptr;
+  llvm::Function *mpi_init = nullptr;
+  llvm::Function *mpi_init_thread = nullptr;
+  llvm::Function *mpi_finalize = nullptr;
+  llvm::Function *mpi_comm_rank = nullptr;
+  llvm::Function *mpi_comm_size = nullptr;
 
-    llvm::Function *mpi_send = nullptr;
-    llvm::Function *mpi_Bsend = nullptr;
-    llvm::Function *mpi_Ssend = nullptr;
-    llvm::Function *mpi_Rsend = nullptr;
-    llvm::Function *mpi_Isend = nullptr;
-    llvm::Function *mpi_Ibsend = nullptr;
-    llvm::Function *mpi_Issend = nullptr;
-    llvm::Function *mpi_Irsend = nullptr;
+  llvm::Function *mpi_send = nullptr;
+  llvm::Function *mpi_Bsend = nullptr;
+  llvm::Function *mpi_Ssend = nullptr;
+  llvm::Function *mpi_Rsend = nullptr;
+  llvm::Function *mpi_Isend = nullptr;
+  llvm::Function *mpi_Ibsend = nullptr;
+  llvm::Function *mpi_Issend = nullptr;
+  llvm::Function *mpi_Irsend = nullptr;
 
-    llvm::Function *mpi_Sendrecv = nullptr;
+  llvm::Function *mpi_Sendrecv = nullptr;
 
-    llvm::Function *mpi_recv = nullptr;
-    llvm::Function *mpi_Irecv = nullptr;
+  llvm::Function *mpi_recv = nullptr;
+  llvm::Function *mpi_Irecv = nullptr;
 
-    llvm::Function *mpi_test = nullptr;
-    llvm::Function *mpi_testall = nullptr;
-    llvm::Function *mpi_testany = nullptr;
-    llvm::Function *mpi_testsome = nullptr;
-    llvm::Function *mpi_wait = nullptr;
-    llvm::Function *mpi_waitall = nullptr;
-    llvm::Function *mpi_waitany = nullptr;
-    llvm::Function *mpi_waitsome = nullptr;
-    llvm::Function *mpi_buffer_detach = nullptr;
+  llvm::Function *mpi_test = nullptr;
+  llvm::Function *mpi_testall = nullptr;
+  llvm::Function *mpi_testany = nullptr;
+  llvm::Function *mpi_testsome = nullptr;
+  llvm::Function *mpi_wait = nullptr;
+  llvm::Function *mpi_waitall = nullptr;
+  llvm::Function *mpi_waitany = nullptr;
+  llvm::Function *mpi_waitsome = nullptr;
+  llvm::Function *mpi_buffer_detach = nullptr;
 
-    llvm::Function *mpi_barrier = nullptr;
-    llvm::Function *mpi_allreduce = nullptr;
-    llvm::Function *mpi_Ibarrier = nullptr;
-    llvm::Function *mpi_Iallreduce = nullptr;
+  llvm::Function *mpi_barrier = nullptr;
+  llvm::Function *mpi_allreduce = nullptr;
+  llvm::Function *mpi_Ibarrier = nullptr;
+  llvm::Function *mpi_Iallreduce = nullptr;
 
-    llvm::Function *mpi_wtime = nullptr;
+  llvm::Function *mpi_wtime = nullptr;
 
-    llvm::Function *mpi_start = nullptr;
-    llvm::Function *mpi_startall = nullptr;
-    llvm::Function *mpi_send_init = nullptr;
-    llvm::Function *mpi_recv_init = nullptr;
-    llvm::Function *mpi_request_free = nullptr;
+  llvm::Function *mpi_start = nullptr;
+  llvm::Function *mpi_startall = nullptr;
+  llvm::Function *mpi_send_init = nullptr;
+  llvm::Function *mpi_recv_init = nullptr;
+  llvm::Function *mpi_request_free = nullptr;
 
-    llvm::Function *mpi_info_create = nullptr;
-    llvm::Function *mpi_info_set = nullptr;
-    llvm::Function *mpi_info_free = nullptr;
+  llvm::Function *mpi_info_create = nullptr;
+  llvm::Function *mpi_info_set = nullptr;
+  llvm::Function *mpi_info_free = nullptr;
 
-    std::vector<llvm::CallBase *> send_calls; // all calls that send MPI messages
-    std::vector<llvm::CallBase *> recv_calls; // all calls that recv mpi messages
+  std::vector<llvm::CallBase *> send_calls; // all calls that send MPI messages
+  std::vector<llvm::CallBase *> recv_calls; // all calls that recv mpi messages
 };
 
-struct mpi_functions *get_used_mpi_functions(llvm::Module &M);
+struct mpi_functions *get_mpi_functions(llvm::Module &M);
 
 inline bool is_mpi_function(llvm::Function *f) {
   if (f) {

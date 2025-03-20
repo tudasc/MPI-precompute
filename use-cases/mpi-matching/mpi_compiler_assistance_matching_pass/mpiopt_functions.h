@@ -20,13 +20,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Module.h"
 
-#include <set>
-
-// global:
-// will be init and destroyed in the Passes runOnModule function (equivalent to
-// main)
-extern struct mpiopt_functions *mpiopt_functions;
-
 // optimized version of persistent ops
 struct mpiopt_functions {
   llvm::Function *mpi_wait = nullptr;
