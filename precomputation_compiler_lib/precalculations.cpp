@@ -87,7 +87,8 @@ void PrecalculationAnalysisImpl::analyze_functions() {
           auto targets = get_possible_call_targets(call);
           for (auto *target : targets) {
             if (target == get_omp_functions(M)->kmpc_fork_call) {
-              // for openmp call: the openmp runtime will call the parallel function
+              // for openmp call: the openmp runtime will call the parallel
+              // function
               auto *ompoutlined_func = cast<Function>(call->getArgOperand(2));
               function_analysis[ompoutlined_func]->callsites.insert(call);
               function_analysis[call->getFunction()]->callees.insert(
