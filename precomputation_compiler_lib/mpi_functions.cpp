@@ -155,9 +155,10 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 }
 
 bool is_mpi_initialized() {
-  //TODO this does not work correctly if init:thread is used, or no init but other mpi calls are present
   if (mpi_func->mpi_init != nullptr) {
     return mpi_func->mpi_init->getNumUses() > 0;
+  } else if (mpi_func->mpi_init_thread != nullptr) {
+    return mpi_func->mpi_init_thread->getNumUses() > 0;
   } else {
     return false;
   }
