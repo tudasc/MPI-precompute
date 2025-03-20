@@ -14,11 +14,11 @@ export LD_PRELOAD="$(clang -print-file-name=libclang_rt.asan.so)"
 
 if [ ${1: -2} == ".c" ]; then
 
-clang $CFLAGS $PASS_FLAGS -fpass-plugin=./sanitizer_precompute_compiler_pass/libsanitizer_precompute_pass.so -lprecompute $1 $LIBS
+clang $CFLAGS $PASS_FLAGS -fpass-plugin=$SANITIZER_PASS -lprecompute $1 $LIBS
 clang $CFLAGS -o a.out_original $1 $LIBS
 
 elif [ ${1: -4} == ".cpp" ]; then
-clang++ $CXXFLAGS $PASS_FLAGS -fpass-plugin=$./sanitizer_precompute_compiler_pass/libsanitizer_precompute_pass.so -lprecompute $1 $LIBS
+clang++ $CXXFLAGS $PASS_FLAGS -fpass-plugin=$SANITIZER_PASS -lprecompute $1 $LIBS
 clang++ $CXXFLAGS -o a.out_original $1 $LIBS
 else
 echo "Unknown file suffix, use this script with .c or .cpp files"
