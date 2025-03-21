@@ -25,6 +25,9 @@ foreach (DRB_BENCHMARK_SRC_FILE ${BENCHMARK_SOURCES})
     add_test(NAME ${TEST_NAME}
             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/compare.sh ${USECASE_SANITIZER_BINARY_DIR} ${DRB_BENCHMARK_SRC_FILE}
     )
+    set_tests_properties(${TEST_NAME} PROPERTIES
+            TIMEOUT 5
+    )
 endforeach ()
 
 
