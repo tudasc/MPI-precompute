@@ -686,6 +686,8 @@ void PrecalculationAnalysisImpl::visit_arg(
   auto *func = arg->getParent();
   auto fun_to_precalc = function_analysis.at(func);
 
+  // TODO implement args for parallel region!
+
   if (fun_to_precalc->args_to_use.find(arg->getArgNo()) ==
       fun_to_precalc->args_to_use.end()) {
     // else: nothing to do, this was already visited
@@ -896,8 +898,26 @@ void PrecalculationAnalysisImpl::visit_call(
 
 void PrecalculationAnalysisImpl::visit_call_to_parallel(
     const std::shared_ptr<TaintedValue> &call_info) {
+  auto *call = cast<CallInst>(call_info->v);
+  assert(call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call);
 
-  // TODO implement
+  // need to include all calls to omp runtime that set the settings for this
+  // parallel region these calls can only be inside of the same BB before this
+  // call, as they need to be called right before this fork
+
+  for (auto it = call->getParent()->begin(); &*it != call; ++it) {
+    if (auto *other_call = dyn_cast<CallInst>(&*it)) {
+      if (other_call->getCalledFunction() ==
+          get_omp_functions(M)->kmpc_push_num_threads) {
+        // TODO are there other such calls in omp runtime?
+        auto other_call_info = insert_tainted_value(other_call, call_info);
+        for (auto &arg : other_call->args()) {
+          // always need all args for these this calls
+          insert_tainted_value(arg, other_call_info);
+        }
+      }
+    }
+  }
 }
 
 bool PrecalculationAnalysisImpl::check_if_call_should_be_included(
