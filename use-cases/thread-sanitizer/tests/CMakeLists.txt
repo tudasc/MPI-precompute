@@ -1,0 +1,30 @@
+include(FetchContent)
+
+# use DataRaceBench as test
+FetchContent_Declare(
+        drb
+        GIT_REPOSITORY https://github.com/LLNL/dataracebench.git
+        GIT_TAG v1.4.1
+        GIT_PROGRESS TRUE
+)
+# ensure it is downloaded
+
+message("Download DataRaceBench for testing")
+FetchContent_MakeAvailable(drb)
+
+# Find all C files in micro_benches and create tests
+file(GLOB BENCHMARK_SOURCES "${drb_SOURCE_DIR}/micro-benchmarks/*.c")
+list(LENGTH BENCHMARK_SOURCES LEN_BENCHMARK_SOURCES)
+
+message("Import ${LEN_BENCHMARK_SOURCES} Testcases from DataRaceBench")
+
+# Define a test for each code in DRB
+foreach (DRB_BENCHMARK_SRC_FILE ${BENCHMARK_SOURCES})
+    get_filename_component(TEST_NAME ${DRB_BENCHMARK_SRC_FILE} NAME_WE) # Extract filename without extension
+
+    add_test(NAME ${TEST_NAME}
+            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/compare.sh ${USECASE_SANITIZER_BINARY_DIR} ${DRB_BENCHMARK_SRC_FILE}
+    )
+endforeach ()
+
+
