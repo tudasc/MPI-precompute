@@ -90,6 +90,7 @@ void PrecalculationAnalysisImpl::analyze_functions() {
               // for openmp call: the openmp runtime will call the parallel
               // function
               auto *ompoutlined_func = cast<Function>(call->getArgOperand(2));
+              assert(function_analysis[ompoutlined_func]->is_openmp_parallel);
               function_analysis[ompoutlined_func]->callsites.insert(call);
               function_analysis[call->getFunction()]->callees.insert(
                   function_analysis[ompoutlined_func]);
@@ -1468,6 +1469,11 @@ PrecalculationAnalysisImpl::get_possible_call_targets(
   if (call->isIndirectCall()) {
     possible_targets = DevirtAnalysis::get_possible_call_targets(call);
   } else {
+    if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+      // is parallel region
+      possible_targets.push_back(cast<Function>(call->getArgOperand(2)));
+    }
+
     possible_targets.push_back(call->getCalledFunction());
     return possible_targets;
   }
