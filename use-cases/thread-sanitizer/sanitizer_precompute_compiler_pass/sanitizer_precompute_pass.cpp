@@ -142,10 +142,15 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     auto *bb = BasicBlock::Create(M.getContext(), "entry", main_func);
     // add call to precompute
     IRBuilder<> builder = IRBuilder<>(bb);
-    builder.CreateCall(precalcuation->get_precompute_phase_main());
+    // forward args of main
+    std::vector<Value *> args;
+    for (auto &arg : main_func->args()) {
+      args.push_back(&arg);
+    }
+    builder.CreateCall(precalcuation->get_precompute_phase_main(), args);
     builder.CreateRet(Constant::getNullValue(main_func->getReturnType()));
+
     // TODO remove other non-precompute functions now? or let a later run of DCE
-    // pass handle that?
 
     remove_noinline_from_module(M);
 
