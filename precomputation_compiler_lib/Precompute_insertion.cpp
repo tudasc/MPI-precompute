@@ -17,6 +17,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "CompilerPassConstants.h"
 #include "VtableManager.h"
 #include "debug.h"
+#include "openmp_runtime_functions.h"
 #include "precalculation_impl.h"
 #include "precompute_backend_funcs.h"
 #include "std_funcs.h"
@@ -277,6 +278,11 @@ void PrecomputeInsertion::replace_calls_in_copy(
             to_replace.push_back(call);
             continue;
           } else {
+            if (callee == get_omp_functions(M)->kmpc_fork_call) {
+              // need to change arg in openmp call
+              to_replace.push_back(call);
+              continue;
+            }
             // call->dump();
             assert(not precompute_analyis_result.is_included_in_precompute(
                        callee) ||
@@ -327,6 +333,12 @@ void PrecomputeInsertion::replace_calls_in_copy(
         // call->dump();
         assert(is_func_from_std(callee) || is_mpi_function(callee) ||
                callee->isIntrinsic());
+        if (callee == get_omp_functions(M)->kmpc_fork_call) {
+          auto old_parallel_region = cast<Function>(call->getArgOperand(2));
+          auto new_parallel_region =
+              functions_copied.at(old_parallel_region)->F_copy;
+          call->setArgOperand(2, new_parallel_region);
+        }
       }
     }
 
