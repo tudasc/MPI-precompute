@@ -15,6 +15,8 @@ source ${BINARY_DIR}/setup_env.sh
 
 GREP_STRING="WARNING: ThreadSanitizer: data race"
 
+rm ./a.out ./a.out_original
+
 # compile
 $RUN_SCRIPT $TEST_CASE
 
