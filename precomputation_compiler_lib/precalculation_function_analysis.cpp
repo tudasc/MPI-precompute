@@ -128,6 +128,12 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
             call->getCalledFunction() ==
                 get_omp_functions(*func->getParent())->kmpc_fork_call) {
           //  call to openmp
+          assert(is_openmp_parallel ==
+                 false); // only part of one parallel region
+          is_openmp_parallel = true;
+          parallel_region =
+              std::make_shared<ParallelRegion>(cast<CallInst>(call));
+
         } else
           is_func_ptr_captured = true;
       }

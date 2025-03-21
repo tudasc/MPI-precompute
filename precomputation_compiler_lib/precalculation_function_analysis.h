@@ -2,6 +2,7 @@
 #ifndef PRECALCULATION_FUNCTION_ANALYSIS_H
 #define PRECALCULATION_FUNCTION_ANALYSIS_H
 
+#include "Openmp_region.h"
 #include "mpi_functions.h"
 #include "ptr_info.h"
 #include <llvm/IR/Intrinsics.h>
@@ -45,6 +46,9 @@ public:
   // the register precompute cals) for other functions, if the writes done by
   // the func are not important anymore, we can skip calling them
   bool include_all_callsites = false;
+
+  bool is_openmp_parallel = false;
+  std::shared_ptr<ParallelRegion> parallel_region = nullptr;
 
   // used outside of call instructions
   bool is_func_ptr_captured;
