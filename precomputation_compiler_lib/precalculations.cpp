@@ -882,12 +882,22 @@ void PrecalculationAnalysisImpl::visit_call(
     }
   }
 
+  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+    visit_call_to_parallel(call_info);
+  }
+
   //  check if we need to include the call
   if (not call_info->isIncludeInPrecompute()) {
     if (check_if_call_should_be_included(call_info)) {
       include_value_in_precompute(call_info);
     }
   }
+}
+
+void PrecalculationAnalysisImpl::visit_call_to_parallel(
+    const std::shared_ptr<TaintedValue> &call_info) {
+
+  // TODO implement
 }
 
 bool PrecalculationAnalysisImpl::check_if_call_should_be_included(

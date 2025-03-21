@@ -244,6 +244,8 @@ private:
 
   void visit_call(const std::shared_ptr<TaintedValue> &call_info);
 
+  void visit_call_to_parallel(const std::shared_ptr<TaintedValue> &call_info);
+
   void visit_call_from_ptr(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr);
 
