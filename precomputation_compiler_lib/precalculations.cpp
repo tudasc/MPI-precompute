@@ -168,7 +168,7 @@ void PrecalculationAnalysisImpl::analyze() {
       auto func_info = get_function_analysis(inst->getFunction());
       func_info->include_all_callsites = true;
       func_info->re_visit_callsites(); // not strictly necessary here, but
-                                       // whenever something changes, we shuld
+                                       // whenever something changes, we should
                                        // re-visit the callsites
     }
   }
@@ -180,8 +180,9 @@ void PrecalculationAnalysisImpl::analyze() {
     auto func_info = get_function_analysis(val->getFunction());
     func_info->include_all_callsites = true;
     func_info->re_visit_callsites(); // if one of the values tainted for cfg is
-                                     // a call tho this func
+                                     // a call to this func
   }
+
   find_all_tainted_vals();
 
 #ifndef NDEBUG
@@ -694,6 +695,7 @@ void PrecalculationAnalysisImpl::visit_arg(
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
 
     for (auto *call : fun_to_precalc->callsites) {
+      call->dump();
       assert(not is_func_from_std(call->getFunction()));
       auto *operand = call->getArgOperand(arg->getArgNo());
       auto new_val = insert_tainted_value(operand, arg_info);
@@ -704,6 +706,7 @@ void PrecalculationAnalysisImpl::visit_arg(
       }
     }
   }
+  assert(not func->getName().starts_with(".ompout"));
 }
 
 bool PrecalculationAnalysisImpl::is_retval_of_call_needed(
