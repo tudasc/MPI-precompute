@@ -686,19 +686,41 @@ void PrecalculationAnalysisImpl::visit_arg(
     // else: nothing to do, this was already visited
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
 
-    for (auto *call : fun_to_precalc->callsites) {
-      call->dump();
-      assert(not is_func_from_std(call->getFunction()));
-      auto *operand = call->getArgOperand(arg->getArgNo());
-      auto new_val = insert_tainted_value(operand, arg_info);
-      new_val->visited =
-          false; // may need to re visit if we discover it is important
-      if (arg_info->is_pointer()) {
-        arg_info->ptr_info->merge_with(new_val->ptr_info);
+    if (fun_to_precalc->is_openmp_parallel) {
+      assert(arg->getType()->isPointerTy());
+
+      if (arg->getArgNo() == 0) {
+        //%.global_tid.
+        // will be set by omp runtime: nothing to do
+      }
+      if (arg->getArgNo() == 1) {
+        //%.bound_tid.
+        // will be set by omp runtime: nothing to do
+      }
+      if (arg->getArgNo() >= 2) {
+        // shared variables
+        auto in_serial =
+            fun_to_precalc->parallel_region->get_value_in_serial(arg);
+        auto serial_info = insert_tainted_value(in_serial, arg_info);
+        // create another ptr alias
+        serial_info->ptr_info->merge_with(arg_info->ptr_info);
+      }
+
+    } else {
+
+      for (auto *call : fun_to_precalc->callsites) {
+        call->dump();
+        assert(not is_func_from_std(call->getFunction()));
+        auto *operand = call->getArgOperand(arg->getArgNo());
+        auto new_val = insert_tainted_value(operand, arg_info);
+        new_val->visited =
+            false; // may need to re visit if we discover it is important
+        if (arg_info->is_pointer()) {
+          arg_info->ptr_info->merge_with(new_val->ptr_info);
+        }
       }
     }
   }
-  assert(not func->getName().starts_with(".ompout"));
 }
 
 bool PrecalculationAnalysisImpl::is_retval_of_call_needed(
