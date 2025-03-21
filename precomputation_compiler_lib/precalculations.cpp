@@ -351,14 +351,6 @@ void PrecalculationAnalysisImpl::visit_val(
   errs() << "Visit\n";
   v->v->dump();
 
-  if (auto *inst = dyn_cast<Instruction>(v->v)) {
-    if (inst->getFunction()->getName().contains(".omp_outlined.")) {
-      // TODO ignore openmp for now
-      v->visited = true;
-      return;
-    }
-  }
-
   // TODO clang tidy repeated branch body (the v->visited = true part)
 
   if (isa<Constant>(v->v)) {
