@@ -732,6 +732,12 @@ bool PrecalculationAnalysisImpl::is_ptr_usage_in_std_read(
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
+
+  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+    // TODO determine if parallel region actually reads from shared var
+    return true;
+  }
+
   long arg_no = -1;
 
   for (unsigned i = 0; i < call->arg_size(); ++i) {
@@ -761,6 +767,12 @@ bool PrecalculationAnalysisImpl::is_ptr_usage_in_std_write(
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
+
+  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+    // TODO determine if parallel region actually writes to shared var
+    return true;
+  }
+
   long arg_no = -1;
 
   for (unsigned i = 0; i < call->arg_size(); ++i) {

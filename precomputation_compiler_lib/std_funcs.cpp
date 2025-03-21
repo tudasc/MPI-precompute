@@ -1,5 +1,6 @@
 
 #include "std_funcs.h"
+#include "openmp_runtime_functions.h"
 
 #include "analysis_results.h"
 #include "precalculation_function_analysis.h"
@@ -88,6 +89,11 @@ bool is_func_from_std(llvm::Function *func) {
   if (allowed_function_prefixes.empty()) {
     // read in env variable one time
     initialize_allowed_function_prefixes();
+  }
+
+  // openmp
+  if (is_omp_function(func)) {
+    return true;
   }
 
   // C API

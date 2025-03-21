@@ -14,4 +14,11 @@ struct omp_functions {
 
 struct omp_functions *get_omp_functions(llvm::Module &M);
 
+inline bool is_omp_function(llvm::Function *func) {
+  auto omp_funcs = get_omp_functions(*func->getParent());
+  return func == omp_funcs->kmpc_fork_call ||
+         func == omp_funcs->kmpc_global_thread_num ||
+         func == omp_funcs->kmpc_push_num_threads;
+}
+
 #endif /* MACH_OMP_FUNCS_H_ */
