@@ -1110,10 +1110,10 @@ void PrecalculationAnalysisImpl::visit_call_for_retval(
 
 void PrecalculationAnalysisImpl::visit_call_from_ptr(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
-  if (call->getCalledFunction()->getName() == "__kmpc_fork_call") {
+  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
     // TODO IMPLEMENT
     //  ignore openmp regions for now
-    return;
+    assert(0 && "not implemented yet");
   }
 
   std::set<unsigned int> ptr_given_as_arg;
