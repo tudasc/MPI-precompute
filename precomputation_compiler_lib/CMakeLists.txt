@@ -27,6 +27,8 @@ add_library(precomputation_compiler_lib SHARED
         std_funcs.h
         openmp_runtime_functions.h
         openmp_runtime_functions.cpp
+        Openmp_region.h
+        Openmp_region.cpp
 )
 
 #TODO cmake is complaining about boost
