@@ -1110,11 +1110,6 @@ void PrecalculationAnalysisImpl::visit_call_for_retval(
 
 void PrecalculationAnalysisImpl::visit_call_from_ptr(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr) {
-  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
-    // TODO IMPLEMENT
-    //  ignore openmp regions for now
-    assert(0 && "not implemented yet");
-  }
 
   std::set<unsigned int> ptr_given_as_arg;
   for (unsigned int i = 0; i < call->arg_size(); ++i) {
@@ -1237,6 +1232,26 @@ void PrecalculationAnalysisImpl::visit_call_from_ptr(
       }
       return;
     }
+  }
+
+  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+    // find parallel region
+    auto parallel_func = cast<Function>(call->getArgOperand(2));
+    auto parallel_region_info =
+        function_analysis[parallel_func]->parallel_region;
+
+    for (auto arg_num : ptr_given_as_arg) {
+      if (arg_num == 0) {
+        // ptr to global managed by omp runtime: nothing to do
+        continue;
+      }
+      assert(arg_num != 2); // function ptr to parallel region
+      auto parallel_info = insert_tainted_value(
+          parallel_region_info->get_value_in_parallel(ptr->v));
+      parallel_info->ptr_info->merge_with(ptr->ptr_info);
+    }
+
+    return;
   }
 
   for (auto *func : get_possible_call_targets(call)) {
