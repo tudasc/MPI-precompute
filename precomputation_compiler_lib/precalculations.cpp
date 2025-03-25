@@ -358,8 +358,10 @@ void PrecalculationAnalysisImpl::visit_val(
     v->visited = true;
   } else if (isa<LoadInst>(v->v)) {
     visit_load(v);
-  } else if (isa<AllocaInst>(v->v)) {
-    // nothing to do: visit_ptr_usages is called on all ptrs anyway
+  } else if (auto *alloc = dyn_cast<AllocaInst>(v->v)) {
+    // visit_ptr_usages is called on all ptrs anyway
+    // need to calculate allocation size
+    insert_tainted_value(alloc->getArraySize(), v);
     v->visited = true;
   } else if (isa<StoreInst>(v->v)) {
     visit_store(v);
