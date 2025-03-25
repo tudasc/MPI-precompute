@@ -30,6 +30,7 @@
 
 #include "analysis_results.h"
 #include "debug.h"
+#include "openmp_runtime_functions.h"
 #include "precompute_backend_funcs.h"
 
 #include "llvm/Transforms/IPO/ModuleInliner.h"
@@ -113,7 +114,10 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
           Instruction *inst = &*it_i;
           if (auto *call = dyn_cast<CallBase>(inst)) {
             if (!call->isIndirectCall() &&
-                call->getCalledFunction()->getName().startswith("__tsan")) {
+                // eiter tsan or omp function
+                // omp function necessary e.g. to keep synchronization
+                (call->getCalledFunction()->getName().startswith("__tsan") ||
+                 is_omp_function(call->getCalledFunction()))) {
               // no invoke to tsan just plain call
               assert(dyn_cast<CallInst>(call));
               for (auto it_arg = call->arg_begin(); it_arg != call->arg_end();
