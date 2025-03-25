@@ -687,7 +687,6 @@ void PrecalculationAnalysisImpl::visit_arg(
     fun_to_precalc->args_to_use.insert(arg->getArgNo());
 
     if (fun_to_precalc->is_openmp_parallel) {
-      assert(arg->getType()->isPointerTy());
 
       if (arg->getArgNo() == 0) {
         //%.global_tid.
@@ -703,7 +702,9 @@ void PrecalculationAnalysisImpl::visit_arg(
             fun_to_precalc->parallel_region->get_value_in_serial(arg);
         auto serial_info = insert_tainted_value(in_serial, arg_info);
         // create another ptr alias
-        serial_info->ptr_info->merge_with(arg_info->ptr_info);
+        if (arg->getType()->isPointerTy()) {
+          serial_info->ptr_info->merge_with(arg_info->ptr_info);
+        }
       }
 
     } else {
@@ -819,6 +820,7 @@ void PrecalculationAnalysisImpl::include_call_to_std(
   auto *call = cast<CallBase>(call_info->v);
 
   for (auto *func : get_possible_call_targets(call)) {
+    errs() << func->getName() << "\n";
     assert((func->isIntrinsic() &&
             should_call_intrinsic(func->getIntrinsicID())) ||
            is_func_from_std(func));
@@ -1544,10 +1546,6 @@ PrecalculationAnalysisImpl::get_possible_call_targets(
   if (call->isIndirectCall()) {
     possible_targets = DevirtAnalysis::get_possible_call_targets(call);
   } else {
-    if (is_omp_fork_call(call)) {
-      // is parallel region
-      possible_targets.push_back(cast<Function>(call->getArgOperand(2)));
-    }
 
     possible_targets.push_back(call->getCalledFunction());
     return possible_targets;
