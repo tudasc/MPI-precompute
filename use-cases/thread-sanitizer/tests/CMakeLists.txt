@@ -27,6 +27,7 @@ foreach (DRB_BENCHMARK_SRC_FILE ${BENCHMARK_SOURCES})
     )
     set_tests_properties(${TEST_NAME} PROPERTIES
             TIMEOUT 5
+            SKIP_RETURN_CODE 1
     )
 endforeach ()
 

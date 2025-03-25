@@ -17,6 +17,14 @@ GREP_STRING="WARNING: ThreadSanitizer: data race"
 
 rm ./a.out ./a.out_original
 
+if grep -q 'PolyBench' "$TEST_CASE"; then
+  echo "Skip testcase for now, it needs different compile flags"
+#  additional_compile_flags+=" $POLYFLAG";
+exit 1 # SKIP_RETURN_CODE
+fi
+
+POLYFLAG="micro-benchmarks/utilities/polybench.c -I micro-benchmarks -I micro-benchmarks/utilities -DPOLYBENCH_NO_FLUSH_CACHE -DPOLYBENCH_TIME -D_POSIX_C_SOURCE=200112L"
+
 # compile
 $RUN_SCRIPT $TEST_CASE
 
@@ -46,7 +54,7 @@ if [[ -x "./a.out" ]]; then
     fi
 else
     echo "Compilation fail"
-    exit -1
+    exit -2
 fi
 
 # should never reach this
