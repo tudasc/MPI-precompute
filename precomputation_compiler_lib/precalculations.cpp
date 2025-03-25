@@ -750,7 +750,7 @@ bool PrecalculationAnalysisImpl::is_ptr_usage_in_std_read(
   assert(ptr_arg_info->ptr_info);
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
 
-  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+  if (is_omp_fork_call(call)) {
     // TODO determine if parallel region actually reads from shared var
     return true;
   }
@@ -785,7 +785,7 @@ bool PrecalculationAnalysisImpl::is_ptr_usage_in_std_write(
   assert(ptr_arg_info->ptr_info);
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
 
-  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+  if (is_omp_fork_call(call)) {
     // TODO determine if parallel region actually writes to shared var
     return true;
   }
@@ -913,7 +913,7 @@ void PrecalculationAnalysisImpl::visit_call(
     }
   }
 
-  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+  if (is_omp_fork_call(call)) {
     visit_call_to_parallel(call_info);
   }
 
@@ -928,7 +928,7 @@ void PrecalculationAnalysisImpl::visit_call(
 void PrecalculationAnalysisImpl::visit_call_to_parallel(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallInst>(call_info->v);
-  assert(call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call);
+  assert(is_omp_fork_call(call));
 
   // need to include all calls to omp runtime that set the settings for this
   // parallel region these calls can only be inside of the same BB before this
@@ -936,8 +936,9 @@ void PrecalculationAnalysisImpl::visit_call_to_parallel(
 
   for (auto it = call->getParent()->begin(); &*it != call; ++it) {
     if (auto *other_call = dyn_cast<CallInst>(&*it)) {
-      if (other_call->getCalledFunction() ==
-          get_omp_functions(M)->kmpc_push_num_threads) {
+      if (!other_call->isIndirectCall() &&
+          other_call->getCalledFunction() ==
+              get_omp_functions(M)->kmpc_push_num_threads) {
         // TODO are there other such calls in omp runtime?
         auto other_call_info = insert_tainted_value(other_call, call_info);
         for (auto &arg : other_call->args()) {
@@ -1234,7 +1235,7 @@ void PrecalculationAnalysisImpl::visit_call_from_ptr(
     }
   }
 
-  if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+  if (is_omp_fork_call(call)) {
     // find parallel region
     auto parallel_func = cast<Function>(call->getArgOperand(2));
     auto parallel_region_info =
@@ -1543,7 +1544,7 @@ PrecalculationAnalysisImpl::get_possible_call_targets(
   if (call->isIndirectCall()) {
     possible_targets = DevirtAnalysis::get_possible_call_targets(call);
   } else {
-    if (call->getCalledFunction() == get_omp_functions(M)->kmpc_fork_call) {
+    if (is_omp_fork_call(call)) {
       // is parallel region
       possible_targets.push_back(cast<Function>(call->getArgOperand(2)));
     }

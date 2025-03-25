@@ -124,9 +124,7 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
     }
     if (auto call = llvm::dyn_cast<llvm::CallBase>(u)) {
       if (call->getCalledFunction() != func) {
-        if (call->getCalledFunction() &&
-            call->getCalledFunction() ==
-                get_omp_functions(*func->getParent())->kmpc_fork_call) {
+        if (is_omp_fork_call(call)) {
           //  call to openmp
           assert(is_openmp_parallel ==
                  false); // only part of one parallel region

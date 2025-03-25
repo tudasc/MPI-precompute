@@ -23,4 +23,10 @@ inline bool is_omp_function(llvm::Function *func) {
          func == omp_funcs->kmpc_push_num_threads;
 }
 
+inline bool is_omp_fork_call(llvm::CallBase *call) {
+  return (not call->isIndirectCall()) &&
+         (call->getCalledFunction() ==
+          get_omp_functions(*call->getModule())->kmpc_fork_call);
+}
+
 #endif /* MACH_OMP_FUNCS_H_ */
