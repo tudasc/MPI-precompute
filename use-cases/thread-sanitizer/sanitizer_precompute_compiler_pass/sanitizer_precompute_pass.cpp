@@ -158,9 +158,18 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     builder.CreateRet(Constant::getNullValue(main_func->getReturnType()));
 
     // TODO remove other non-precompute functions now? or let a later run of DCE
+    // do that
 
     remove_noinline_from_module(M);
 
+    for (auto it_f = M.begin(); it_f != M.end(); ++it_f) {
+      Function *f = &*it_f;
+      if (precalcuation->is_func_part_of_precompute_phase(f)) {
+        // the tsan calls are already part of precompute, no need to instrumente
+        // them again
+        f->removeFnAttr(Attribute::SanitizeThread);
+      }
+    }
     delete analysis_results;
 
     Debug(errs() << "After Modification:\n"; M.dump();

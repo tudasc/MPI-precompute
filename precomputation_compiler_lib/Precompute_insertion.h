@@ -41,6 +41,15 @@ public:
 
   llvm::Function *get_precompute_main() const { return precompute_main; };
 
+  bool is_func_part_of_precompute_phase(llvm::Function *const F) const {
+    assert(F != nullptr);
+
+    return (std::find_if(functions_copied.begin(), functions_copied.end(),
+                         [&F](const auto &it) {
+                           return it.second->F_copy == F;
+                         }) != functions_copied.end());
+  }
+
 private:
   llvm::Module &M;
   PrecalculationAnalysisImpl &precompute_analyis_result;

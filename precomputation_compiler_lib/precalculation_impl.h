@@ -36,6 +36,8 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "precalculation.h"
 #include "precalculation_function_analysis.h"
 
+class PrecomputeInsertion; // such that include order doesn't matter
+
 class PrecalculationAnalysisImpl
     : public PrecalculationAnalysis,
       private std::enable_shared_from_this<PrecalculationAnalysisImpl> {
@@ -67,10 +69,7 @@ public:
   llvm::Value *get_precomputed_value(llvm::Value *v) const override {
     return precomputed_values_map.at(v);
   }
-  bool is_func_part_of_precompute(llvm::Function *F) const override {
-    assert(false && "not implemented");
-    // TODO implement
-  }
+  bool is_func_part_of_precompute_phase(llvm::Function *F) const override;
 
   llvm::Function *precompute_main;
 
@@ -86,6 +85,7 @@ public:
   friend class PrecalculationFunctionCopy;
 
 private:
+  std::shared_ptr<PrecomputeInsertion> insertion_information = nullptr;
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>
       function_analysis;
 

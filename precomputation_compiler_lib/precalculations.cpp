@@ -204,9 +204,14 @@ PrecalculationAnalysisImpl::getFunctionsToInclude() const {
 
 void PrecalculationAnalysisImpl::generate_slice() {
   // todo refactoring this functionality should be part of *this
-  auto insertion = new PrecomputeInsertion(M, *this);
+  insertion_information = std::make_shared<PrecomputeInsertion>(M, *this);
   // constructor performs everything
-  delete insertion;
+}
+
+bool PrecalculationAnalysisImpl::is_func_part_of_precompute_phase(
+    llvm::Function *F) const {
+  assert(insertion_information);
+  return insertion_information->is_func_part_of_precompute_phase(F);
 }
 
 void PrecalculationAnalysisImpl::find_all_tainted_vals() {
@@ -1676,7 +1681,6 @@ bool PrecalculationAnalysisImpl::is_store_important(
 
   return true;
 }
-
 
 // TODO better function name
 //  if an instruction in foo is included in the set: the resulting set will

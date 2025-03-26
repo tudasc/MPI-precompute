@@ -55,7 +55,7 @@ public:
   virtual llvm::Value *get_precomputed_value(llvm::Value *v) const;
 
   // true if F is part of the precompute phase
-  virtual bool is_func_part_of_precompute(llvm::Function *F) const;
+  virtual bool is_func_part_of_precompute_phase(llvm::Function *F) const;
 
   // to include the precompute phase in main
   virtual llvm::Function *get_precompute_phase_main() const;
