@@ -88,7 +88,7 @@ inline bool is_global_from_std(llvm::GlobalValue *global) {
   if (global->getName() == "stdout") {
     return true;
   }
-  if (global->getName() == "sterr") {
+  if (global->getName() == "stderr") {
     return true;
   }
 
