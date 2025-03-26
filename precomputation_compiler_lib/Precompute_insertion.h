@@ -37,6 +37,13 @@ public:
     insert_precomputation();
   };
 
+  // TODO documentation
+  //  constructor performs the analysis and generated a slice
+  //  than use get_precomputed_value to do what is necessary for the
+  //  precomputed values
+
+  // TODO offer helper functions to add calls to precompute backend library
+
   llvm::Function *get_precompute_main() const { return precompute_main; };
 
   bool is_func_part_of_precompute_phase(llvm::Function *const F) const {

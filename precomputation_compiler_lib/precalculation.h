@@ -49,12 +49,6 @@ public:
 
     analyze();
   };
-  // TODO documentation
-  //  constructor performs the analysis and generated a slice
-  //  than use get_precomputed_value to do what is necessary for the
-  //  precomputed values
-
-  // TODO offer helper functions to add calls to precompute backend library
 
   ~PrecalculationAnalysis() = default;
 
