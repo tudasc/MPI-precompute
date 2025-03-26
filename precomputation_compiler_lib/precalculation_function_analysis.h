@@ -10,14 +10,14 @@
 #include <memory>
 
 class PrecalculationFunctionCopy;
-class PrecalculationAnalysisImpl;
+class PrecalculationAnalysis;
 
 class PrecalculationFunctionAnalysis
     : public std::enable_shared_from_this<PrecalculationFunctionAnalysis> {
 public:
   // analysis Part
   explicit PrecalculationFunctionAnalysis(llvm::Function *F,
-                                          PrecalculationAnalysisImpl *precalc);
+                                          PrecalculationAnalysis *precalc);
 
   void add_relevant_args(const std::set<unsigned int> &new_args_to_use) {
     std::copy(new_args_to_use.begin(), new_args_to_use.end(),
@@ -26,7 +26,7 @@ public:
 
   std::set<unsigned int> args_to_use = {};
   llvm::Function *func;
-  PrecalculationAnalysisImpl *precalculatioanalysis;
+  PrecalculationAnalysis *precalculatioanalysis;
   std::set<llvm::GlobalValue *> aliases;
   const std::set<llvm::GlobalValue *> &getAliases() const { return aliases; }
 
@@ -105,7 +105,7 @@ public:
   }
 
   void analyze_can_except_in_precompute(
-      const PrecalculationAnalysisImpl *precompute_analysis);
+      const PrecalculationAnalysis *precompute_analysis);
 };
 
 inline bool should_exclude_function_for_debugging(llvm::Function *func) {

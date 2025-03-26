@@ -24,7 +24,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include <map>
 #include <set>
 
-class PrecalculationAnalysisImpl;
+class PrecalculationAnalysis;
 
 class VtableManager {
   // manages the vtables to use in function copies

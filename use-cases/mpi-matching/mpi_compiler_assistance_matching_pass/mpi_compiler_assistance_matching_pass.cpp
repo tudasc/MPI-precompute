@@ -51,7 +51,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "llvm/Transforms/IPO/ModuleInliner.h"
 
-#include <precalculation_impl.h>
+#include <precalculation.h>
 
 using namespace llvm;
 
@@ -200,7 +200,7 @@ struct MPICompilerAssistanceMatchingPass
       auto init_call = get_mpi_init_call(M, main_func);
 
       auto precalcuation = std::make_shared<PrecomputeInsertion>(
-          M, std::make_shared<PrecalculationAnalysisImpl>(
+          M, std::make_shared<PrecalculationAnalysis>(
                  M, main_func, to_precompute, init_calls));
 
       replace_MPI_with_precompute(precalcuation, get_mpi_functions(M),

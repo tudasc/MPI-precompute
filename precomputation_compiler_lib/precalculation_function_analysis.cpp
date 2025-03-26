@@ -1,7 +1,7 @@
 
 #include "precalculation_function_analysis.h"
 #include "openmp_runtime_functions.h"
-#include "precalculation_impl.h"
+#include "precalculation.h"
 #include "std_funcs.h"
 
 using namespace llvm;
@@ -99,7 +99,7 @@ std::string get_function_name(const std::string &demangled_name) {
 }
 
 PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
-    llvm::Function *F, PrecalculationAnalysisImpl *precalc)
+    llvm::Function *F, PrecalculationAnalysis *precalc)
     : func(F), precalculatioanalysis(precalc) {
   // assert(not F->isDeclaration() && "Cannot analyze external function");
 
@@ -143,7 +143,7 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
 };
 
 void PrecalculationFunctionAnalysis::analyze_can_except_in_precompute(
-    const PrecalculationAnalysisImpl *precompute_analysis) {
+    const PrecalculationAnalysis *precompute_analysis) {
   // the precompute_analysis object is not fully initialized yet, as we are
   // currently analyzing the functions
   assert(not analysis_except_in_precompute);

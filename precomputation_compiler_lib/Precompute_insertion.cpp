@@ -18,7 +18,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "VtableManager.h"
 #include "debug.h"
 #include "openmp_runtime_functions.h"
-#include "precalculation_impl.h"
+#include "precalculation.h"
 #include "precompute_backend_funcs.h"
 #include "std_funcs.h"
 

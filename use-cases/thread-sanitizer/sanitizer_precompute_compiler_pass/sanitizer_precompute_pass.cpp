@@ -36,7 +36,7 @@
 
 #include "llvm/Transforms/IPO/ModuleInliner.h"
 
-#include <precalculation_impl.h>
+#include <precalculation.h>
 
 using namespace llvm;
 
@@ -135,8 +135,8 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     }
 
     auto precalcuation = std::make_shared<PrecomputeInsertion>(
-        M, std::make_shared<PrecalculationAnalysisImpl>(
-               M, main_func, to_precompute, precompute_locations));
+        M, std::make_shared<PrecalculationAnalysis>(M, main_func, to_precompute,
+                                                    precompute_locations));
 
     // do NOT call clean_precompute() as we want the tsan calls to stick around
 

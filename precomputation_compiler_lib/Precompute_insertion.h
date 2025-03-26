@@ -16,12 +16,12 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H
 #define MPI_ASSERTION_CHECKING_PRECOMPUTE_INSERTION_H
 
-#include <map>
-#include "precalculation_impl.h"
+#include "precalculation.h"
 #include "precalculation_function_analysis.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include <map>
 
-class PrecalculationAnalysisImpl; // such that include order doesn't matter
+class PrecalculationAnalysis; // such that include order doesn't matter
 class PrecalculationFunctionAnalysis;
 
 
@@ -32,8 +32,7 @@ class PrecalculationFunctionCopy;
 class PrecomputeInsertion {
 public:
   PrecomputeInsertion(llvm::Module &M,
-                      const std::shared_ptr<PrecalculationAnalysisImpl>
-                          &precompute_analyis_result)
+      const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result)
       : M(M), precompute_analyis_result(precompute_analyis_result) {
     insert_precomputation();
   };
@@ -59,7 +58,7 @@ public:
 
 private:
   llvm::Module &M;
-  std::shared_ptr<const PrecalculationAnalysisImpl> precompute_analyis_result;
+  std::shared_ptr<const PrecalculationAnalysis> precompute_analyis_result;
   llvm::Function *precompute_main;
 
   std::map<llvm::Value *, llvm::Value *> precomputed_values_map;

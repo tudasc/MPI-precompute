@@ -30,7 +30,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 // defined in taintedValue.h
 struct TaintedValue;
-class PrecalculationAnalysisImpl;
+class PrecalculationAnalysis;
 class PtrUsageInfo;
 
 // specialized comparison operators that include the fact that objects may be
@@ -70,7 +70,7 @@ public:
     return is_written_to;
   }
   void setIsWrittenTo(llvm::Instruction *store,
-                      const PrecalculationAnalysisImpl *precalc_analysis);
+                      const PrecalculationAnalysis *precalc_analysis);
   bool isCalled() const {
     if (merged_with) {
       return merged_with->isCalled();
@@ -108,7 +108,7 @@ public:
     return is_read_from;
   }
   void setIsReadFrom(llvm::Instruction *load,
-                     const PrecalculationAnalysisImpl *precalc_analysis);
+                     const PrecalculationAnalysis *precalc_analysis);
 
   bool isWholePtrIsRelevant() const {
     if (merged_with) {
