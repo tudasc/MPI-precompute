@@ -140,14 +140,6 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 
     // do NOT call clean_precompute() as we want the tsan calls to stick around
 
-    // we don't need the management stuff, we directly replace our program with
-    // precomputed one
-    auto precompute_main = precalcuation->get_precompute_main();
-    auto it = precompute_main->begin()->begin();
-    ++it; // second instruction is call to precomputed main
-    auto *call = cast<CallBase>(it);
-    auto precomputed_main = call->getCalledFunction();
-
     // remove old main
     auto orig_linkeage = main_func->getLinkage();
     main_func->deleteBody(); // will set linkeage to weak, which we dont want
@@ -162,8 +154,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     for (auto &arg : main_func->args()) {
       args.push_back(&arg);
     }
-
-    builder.CreateCall(precomputed_main, args);
+    builder.CreateCall(precalcuation->get_precompute_main(), args);
     builder.CreateRet(Constant::getNullValue(main_func->getReturnType()));
 
     // TODO remove other non-precompute functions now? or let a later run of DCE
