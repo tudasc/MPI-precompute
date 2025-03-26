@@ -8,6 +8,10 @@
 #include <llvm/IR/InstrTypes.h>
 #include <regex>
 
+// call before creating a PrecomputeAnalysis object if this is needed
+void allow_function_prefixes_to_be_called_in_precompute(
+    const std::vector<std::string> &prefixes_to_allow);
+
 inline bool is_free(const llvm::Function *func) {
   assert(func);
   // operator delete

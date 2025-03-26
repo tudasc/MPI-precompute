@@ -32,6 +32,7 @@
 #include "debug.h"
 #include "openmp_runtime_functions.h"
 #include "precompute_backend_funcs.h"
+#include "std_funcs.h"
 
 #include "llvm/Transforms/IPO/ModuleInliner.h"
 
@@ -95,6 +96,8 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
           errs() << "END MODULE\n";);
     auto has_error2 = verifyModule(M, &errs(), nullptr);
     assert(!has_error2);
+
+    allow_function_prefixes_to_be_called_in_precompute({"__tsan_"});
 
     PrecomputeFunctions::create_instance(M);
     analysis_results = new RequiredAnalysisResults(AM, M);

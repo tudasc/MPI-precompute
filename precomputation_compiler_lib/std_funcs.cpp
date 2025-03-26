@@ -62,7 +62,6 @@ bool is_interaction_with_cout(llvm::CallBase *call) {
 }
 
 static std::vector<std::string> allowed_function_prefixes = {};
-
 void initialize_allowed_function_prefixes() {
   allowed_function_prefixes = {// from std
                                "std::",
@@ -82,6 +81,14 @@ void initialize_allowed_function_prefixes() {
       }
     }
   }
+}
+
+void allow_function_prefixes_to_be_called_in_precompute(
+    const std::vector<std::string> &prefixes_to_allow) {
+  assert(allowed_function_prefixes.empty() && "it was already initialized");
+  initialize_allowed_function_prefixes();
+  std::copy(prefixes_to_allow.begin(), prefixes_to_allow.end(),
+            std::back_inserter(allowed_function_prefixes));
 }
 
 bool is_func_from_std(llvm::Function *func) {

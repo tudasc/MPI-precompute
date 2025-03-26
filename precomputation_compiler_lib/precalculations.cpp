@@ -1337,8 +1337,8 @@ void PrecalculationAnalysisImpl::include_value_in_precompute(
       }
     }
 
-    if (auto* f = dyn_cast<Function>(taint_info->v)) {
-      function_analysis[f]->include_in_precompute= true;
+    if (auto *f = dyn_cast<Function>(taint_info->v)) {
+      function_analysis[f]->include_in_precompute = true;
     }
 
     insert_necessary_control_flow(taint_info->v);
