@@ -199,9 +199,9 @@ struct MPICompilerAssistanceMatchingPass
 
       auto init_call = get_mpi_init_call(M, main_func);
 
-      auto precalcuation = PrecalculationAnalysisFactroy(
-          M, main_func, to_precompute, init_calls);
-      precalcuation->generate_slice();
+      auto precalcuation = std::make_shared<PrecomputeInsertion>(
+          M, std::make_shared<PrecalculationAnalysisImpl>(
+                 M, main_func, to_precompute, init_calls));
 
       replace_MPI_with_precompute(precalcuation, get_mpi_functions(M),
                                   combined_init_list);

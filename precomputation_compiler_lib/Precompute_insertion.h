@@ -29,12 +29,11 @@ class PrecalculationFunctionAnalysis;
 
 class PrecalculationFunctionCopy;
 
-// doesn't need to be a class, but that way it is easier to friend the
-// PrecalculationAnalysisImpl so that we can reference its internal status
 class PrecomputeInsertion {
 public:
   PrecomputeInsertion(llvm::Module &M,
-                      PrecalculationAnalysisImpl &precompute_analyis_result)
+                      const std::shared_ptr<PrecalculationAnalysisImpl>
+                          &precompute_analyis_result)
       : M(M), precompute_analyis_result(precompute_analyis_result) {
     insert_precomputation();
   };
@@ -50,10 +49,20 @@ public:
                          }) != functions_copied.end());
   }
 
+  // this removes all values in to_precompute_cfg
+  virtual void clean_precompute();
+
+  // accessor (use it to modify the program slice if necessary)
+  virtual llvm::Value *get_precomputed_value(llvm::Value *v) const {
+    return precomputed_values_map.at(v);
+  };
+
 private:
   llvm::Module &M;
-  PrecalculationAnalysisImpl &precompute_analyis_result;
+  std::shared_ptr<const PrecalculationAnalysisImpl> precompute_analyis_result;
   llvm::Function *precompute_main;
+
+  std::map<llvm::Value *, llvm::Value *> precomputed_values_map;
 
   std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionCopy>>
       functions_copied;
@@ -72,6 +81,7 @@ private:
   // returns nullptr if not
   std::shared_ptr<PrecalculationFunctionCopy>
   is_in_a_precompute_copy_func(llvm::Instruction *inst);
+  void build_precomputed_values_map();
 };
 
 class PrecalculationFunctionCopy {

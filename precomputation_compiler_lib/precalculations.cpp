@@ -202,18 +202,6 @@ PrecalculationAnalysisImpl::getFunctionsToInclude() const {
   return result;
 }
 
-void PrecalculationAnalysisImpl::generate_slice() {
-  // todo refactoring this functionality should be part of *this
-  insertion_information = std::make_shared<PrecomputeInsertion>(M, *this);
-  // constructor performs everything
-}
-
-bool PrecalculationAnalysisImpl::is_func_part_of_precompute_phase(
-    llvm::Function *F) const {
-  assert(insertion_information);
-  return insertion_information->is_func_part_of_precompute_phase(F);
-}
-
 void PrecalculationAnalysisImpl::find_all_tainted_vals() {
   std::vector<std::shared_ptr<TaintedValue>> to_visit;
 
@@ -1738,51 +1726,4 @@ bool PrecalculationAnalysisImpl::store_happens_after_all_loads(
     }
   }
   return true;
-}
-
-void PrecalculationAnalysisImpl::clean_precompute() {
-
-  // TODO
-  // problem what if the user tells that they want this instruction location to
-  // be reached in precompute and then this instr itself is also relevant for
-  // precompute?
-  for (auto *inst : to_precompute_cfg) {
-    auto *new_inst = cast<Instruction>(get_precomputed_value(inst));
-    if (inst->isTerminator()) {
-      if (auto *ret = dyn_cast<ReturnInst>(inst)) {
-        if (is_tainted(ret->getReturnValue())) {
-          // need to KEEP it
-        } else {
-          IRBuilder<> builder = IRBuilder<>(new_inst);
-          if (inst->getFunction()->getReturnType()->isVoidTy()) {
-            builder.CreateRetVoid();
-          } else {
-            builder.CreateRet(
-                Constant::getNullValue(inst->getFunction()->getReturnType()));
-          }
-          new_inst->eraseFromParent();
-        }
-      } else {
-        IRBuilder<> builder = IRBuilder<>(new_inst);
-        auto *bb = new_inst->getParent();
-        if (bb->getTerminator() == new_inst) {
-          // will probably not trigger, as CFG is already simplified at that
-          // point
-          builder.CreateBr(inst->getSuccessor(0));
-        }
-        // else the CFG was already simplified, as that invoke is not necessary
-        new_inst->eraseFromParent();
-      }
-    } else {
-      new_inst->eraseFromParent();
-    }
-  }
-}
-
-std::shared_ptr<PrecalculationAnalysis> PrecalculationAnalysisFactroy(
-    llvm::Module &M, llvm::Function *entry_point,
-    std::vector<llvm::Value *> to_precompute_value,
-    std::vector<llvm::Instruction *> to_precompute_cfg) {
-  return std::make_shared<PrecalculationAnalysisImpl>(
-      M, entry_point, to_precompute_value, to_precompute_cfg);
 }

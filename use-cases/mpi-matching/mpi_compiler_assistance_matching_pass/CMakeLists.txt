@@ -7,8 +7,6 @@ add_library(mpi_compiler_assistance_matching_pass MODULE
         implementation_specific.cpp
         replacement.h
         replacement.cpp
-        Precompute_insertion.h
-        Precompute_insertion.cpp
 )
 
 set(Boost_USE_STATIC_LIBS OFF)

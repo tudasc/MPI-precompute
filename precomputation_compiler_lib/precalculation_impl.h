@@ -39,8 +39,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 class PrecomputeInsertion; // such that include order doesn't matter
 
 class PrecalculationAnalysisImpl
-    : public PrecalculationAnalysis,
-      private std::enable_shared_from_this<PrecalculationAnalysisImpl> {
+    : private std::enable_shared_from_this<PrecalculationAnalysisImpl> {
 public:
   PrecalculationAnalysisImpl(llvm::Module &M, llvm::Function *entry_point,
                              std::vector<llvm::Value *> to_precompute_value,
@@ -58,24 +57,7 @@ public:
 
   // TODO offer helper functions to add calls to precompute backend library
 
-  ~PrecalculationAnalysisImpl() override = default;
-
-  void generate_slice() override;
-  // this removes all values in to_precompute_cfg
-  void clean_precompute() override;
-
-  // TODO add simplify cfg step
-
-  llvm::Value *get_precomputed_value(llvm::Value *v) const override {
-    return precomputed_values_map.at(v);
-  }
-  bool is_func_part_of_precompute_phase(llvm::Function *F) const override;
-
-  llvm::Function *precompute_main;
-
-  llvm::Function *get_precompute_phase_main() const override {
-    return precompute_main;
-  }
+  ~PrecalculationAnalysisImpl() = default;
 
   friend class PrecalculationFunctionAnalysis;
 

@@ -134,9 +134,9 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
       }
     }
 
-    auto precalcuation = PrecalculationAnalysisFactroy(
-        M, main_func, to_precompute, precompute_locations);
-    precalcuation->generate_slice();
+    auto precalcuation = std::make_shared<PrecomputeInsertion>(
+        M, std::make_shared<PrecalculationAnalysisImpl>(
+               M, main_func, to_precompute, precompute_locations));
 
     // do NOT call clean_precompute() as we want the tsan calls to stick around
 
@@ -154,7 +154,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     for (auto &arg : main_func->args()) {
       args.push_back(&arg);
     }
-    builder.CreateCall(precalcuation->get_precompute_phase_main(), args);
+    builder.CreateCall(precalcuation->get_precompute_main(), args);
     builder.CreateRet(Constant::getNullValue(main_func->getReturnType()));
 
     // TODO remove other non-precompute functions now? or let a later run of DCE

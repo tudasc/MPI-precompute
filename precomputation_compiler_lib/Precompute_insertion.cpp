@@ -56,10 +56,10 @@ llvm::Function *PrecomputeInsertion::get_global_re_init_function() {
     // if Comm World is needed there is no need to initialize it again, it
     // cannot be modified comm World will have no ptr info and therefore is
     // Written to check cannot be made
-    if (precompute_analyis_result.is_included_in_precompute(&global) &&
+    if (precompute_analyis_result->is_included_in_precompute(&global) &&
         &global != get_mpi_comm_world(M)) {
       assert(global.getType()->isPointerTy());
-      auto global_info = precompute_analyis_result.get_taint_info(&global);
+      auto global_info = precompute_analyis_result->get_taint_info(&global);
 
       if (not global.isConstant()) {
         assert(global_info->ptr_info);
@@ -253,7 +253,7 @@ void PrecomputeInsertion::replace_calls_in_copy(
   for (auto I = inst_begin(func->F_copy), E = inst_end(func->F_copy); I != E;
        ++I) {
     if (auto *call = dyn_cast<CallBase>(&*I)) {
-      if (precompute_analyis_result.is_included_in_precompute(
+      if (precompute_analyis_result->is_included_in_precompute(
               func->new_to_old_map[call])) {
         // if it is not included, it will be removed anyway, so no need to
         // change anything
@@ -262,8 +262,8 @@ void PrecomputeInsertion::replace_calls_in_copy(
         } else {
           auto *callee = call->getCalledFunction();
 
-          if (callee == precompute_analyis_result.mpi_func->mpi_comm_rank ||
-              callee == precompute_analyis_result.mpi_func->mpi_comm_size) {
+          if (callee == precompute_analyis_result->mpi_func->mpi_comm_rank ||
+              callee == precompute_analyis_result->mpi_func->mpi_comm_size) {
             continue; // noting to do, keep original call
           }
           // end handling calls to MPI
@@ -273,13 +273,13 @@ void PrecomputeInsertion::replace_calls_in_copy(
             continue;
           }
 
-          if (precompute_analyis_result.is_func_included_in_precompute(
+          if (precompute_analyis_result->is_func_included_in_precompute(
                   call->getCalledFunction())) {
             to_replace.push_back(call);
             continue;
           } else {
             if (callee == get_omp_functions(M)->kmpc_fork_call &&
-                precompute_analyis_result.is_included_in_precompute(
+                precompute_analyis_result->is_included_in_precompute(
                     call->getArgOperand(2))) {
               assert(isa<Function>(call->getArgOperand(2)));
               // need to change arg in openmp call
@@ -287,7 +287,7 @@ void PrecomputeInsertion::replace_calls_in_copy(
               continue;
             }
             // call->dump();
-            assert(not precompute_analyis_result.is_included_in_precompute(
+            assert(not precompute_analyis_result->is_included_in_precompute(
                        callee) ||
                    // callee is the original function
                    // which should not be a user function
@@ -322,7 +322,7 @@ void PrecomputeInsertion::replace_calls_in_copy(
       }
 
       for (unsigned int i = 0; i < call->arg_size(); ++i) {
-        if (not precompute_analyis_result.is_included_in_precompute(
+        if (not precompute_analyis_result->is_included_in_precompute(
                 orig_call->getArgOperand(i))) {
           // set unused arg to 0 (so we don't need to compute it)
           call->setArgOperand(
@@ -347,7 +347,7 @@ void PrecomputeInsertion::replace_calls_in_copy(
     }
 
     if (call->isIndirectCall()) {
-      if (not precompute_analyis_result.is_retval_of_call_needed(orig_call)) {
+      if (not precompute_analyis_result->is_retval_of_call_needed(orig_call)) {
         surround_indirect_call_with_nullptr_check(func, call);
         // if retval is used: the precompute vtable can not contain null
         // TODO performance: only insert null check if we know the precompute
@@ -368,9 +368,9 @@ void PrecomputeInsertion::replace_exceptionless_invoke_with_call(
     // or the exception case is not needed
     if (auto *invoke = dyn_cast<InvokeInst>(&*I)) {
       auto *old_v = func->new_to_old_map[invoke];
-      if ((not precompute_analyis_result.can_except_in_precompute(
+      if ((not precompute_analyis_result->can_except_in_precompute(
               cast<InvokeInst>(old_v))) ||
-          (not precompute_analyis_result.is_invoke_exception_case_needed(
+          (not precompute_analyis_result->is_invoke_exception_case_needed(
               cast<InvokeInst>(old_v)))) {
         ivokes.push_back(invoke);
       }
@@ -426,7 +426,7 @@ void PrecomputeInsertion::prune_function_copy(
        ++I) {
     Instruction *inst = &*I;
     auto *old_v = func->new_to_old_map[inst];
-    if (not precompute_analyis_result.is_included_in_precompute(old_v)) {
+    if (not precompute_analyis_result->is_included_in_precompute(old_v)) {
       if (auto *call = dyn_cast<CallBase>(inst)) {
         if (PrecomputeFunctions::get_instance()->is_call_to_precompute(call)) {
           // do not remove
@@ -524,10 +524,10 @@ void PrecomputeInsertion::prune_function_copy(
 llvm::Function *PrecomputeInsertion::create_precompute_main(
     const std::shared_ptr<PrecalculationFunctionCopy> &entry_function) {
 
-  Function *result =
-      Function::Create(precompute_analyis_result.entry_point->getFunctionType(),
-                       precompute_analyis_result.entry_point->getLinkage(),
-                       "precompute_main", M);
+  Function *result = Function::Create(
+      precompute_analyis_result->entry_point->getFunctionType(),
+      precompute_analyis_result->entry_point->getLinkage(), "precompute_main",
+      M);
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "entry", result);
 
@@ -552,7 +552,7 @@ llvm::Function *PrecomputeInsertion::create_precompute_main(
 void PrecomputeInsertion::insert_precomputation() {
 
   auto vtm = VtableManager(M);
-  for (const auto &f : precompute_analyis_result.getFunctionsToInclude()) {
+  for (const auto &f : precompute_analyis_result->getFunctionsToInclude()) {
     auto f_copy = std::make_shared<PrecalculationFunctionCopy>(f);
     assert(f->func == f_copy->F_orig);
     functions_copied[f->func] = f_copy;
@@ -573,16 +573,82 @@ void PrecomputeInsertion::insert_precomputation() {
     // add_debug_printfs_to_precalculation(pair.second->F_copy);
   }
 
-  precompute_analyis_result.build_precomputed_values_map(functions_copied);
+  build_precomputed_values_map();
 
-  auto *entry_point = precompute_analyis_result.entry_point;
+  auto *entry_point = precompute_analyis_result->entry_point;
   assert(entry_point);
   auto entry_point_copy = functions_copied[entry_point];
+
   if (entry_point_copy) {
     // otherwise: nothing to do nothing to precalculate was found
-    precompute_analyis_result.precompute_main =
-        create_precompute_main(entry_point_copy);
+    precompute_main = create_precompute_main(entry_point_copy);
   } else {
-    precompute_analyis_result.precompute_main = nullptr;
+    precompute_main = nullptr;
+  }
+}
+
+void PrecomputeInsertion::build_precomputed_values_map() {
+
+  for (auto *val : precompute_analyis_result->to_precompute_value) {
+    if (auto *inst = dyn_cast<Instruction>(val)) {
+      auto *f = inst->getFunction();
+      assert(precompute_analyis_result->is_func_included_in_precompute(f));
+      const auto &copy_func = functions_copied.at(f);
+      precomputed_values_map[val] = copy_func->old_new_map[val];
+    } else if (auto *arg = dyn_cast<Argument>(val)) {
+      auto *f = arg->getParent();
+      assert(precompute_analyis_result->is_func_included_in_precompute(f));
+      const auto &copy_func = functions_copied.at(f);
+      precomputed_values_map[val] = copy_func->old_new_map[val];
+    } else {
+      // constant or global: same as original vlaue
+      precomputed_values_map[val] = val;
+    }
+  }
+  // same loop as above but without the casts
+  for (auto *inst : precompute_analyis_result->to_precompute_cfg) {
+    auto *f = inst->getFunction();
+    assert(precompute_analyis_result->is_func_included_in_precompute(f));
+    const auto &copy_func = functions_copied.at(f);
+    precomputed_values_map[inst] = copy_func->old_new_map[inst];
+  }
+}
+
+void PrecomputeInsertion::clean_precompute() {
+
+  // TODO
+  // problem what if the user tells that they want this instruction location to
+  // be reached in precompute and then this instr itself is also relevant for
+  // precompute?
+  for (auto *inst : precompute_analyis_result->to_precompute_cfg) {
+    auto *new_inst = cast<Instruction>(get_precomputed_value(inst));
+    if (inst->isTerminator()) {
+      if (auto *ret = dyn_cast<ReturnInst>(inst)) {
+        if (precompute_analyis_result->is_tainted(ret->getReturnValue())) {
+          // need to KEEP it
+        } else {
+          IRBuilder<> builder = IRBuilder<>(new_inst);
+          if (inst->getFunction()->getReturnType()->isVoidTy()) {
+            builder.CreateRetVoid();
+          } else {
+            builder.CreateRet(
+                Constant::getNullValue(inst->getFunction()->getReturnType()));
+          }
+          new_inst->eraseFromParent();
+        }
+      } else {
+        IRBuilder<> builder = IRBuilder<>(new_inst);
+        auto *bb = new_inst->getParent();
+        if (bb->getTerminator() == new_inst) {
+          // will probably not trigger, as CFG is already simplified at that
+          // point
+          builder.CreateBr(inst->getSuccessor(0));
+        }
+        // else the CFG was already simplified, as that invoke is not necessary
+        new_inst->eraseFromParent();
+      }
+    } else {
+      new_inst->eraseFromParent();
+    }
   }
 }

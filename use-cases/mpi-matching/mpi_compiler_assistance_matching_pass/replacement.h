@@ -16,6 +16,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #ifndef MACH_REPLACEMENT_H_
 #define MACH_REPLACEMENT_H_
 
+#include "Precompute_insertion.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 
@@ -56,5 +57,15 @@ bool add_finalize(llvm::Module &M);
 void replace_request_handling_calls(llvm::Module &M);
 
 void replace_init_call(llvm::CallBase *call, llvm::Function *func);
+
+void replace_MPI_with_precompute(
+    const std::shared_ptr<PrecomputeInsertion> &precompute_analyis_result,
+    struct mpi_functions *mpi_func,
+    const std::vector<llvm::CallBase *> &init_calls);
+
+void add_call_to_precalculation_to_main(
+    llvm::Module &M, llvm::CallBase *call_to_init,
+    llvm::Function *entry_function,
+    const std::shared_ptr<PrecomputeInsertion> &precompute_analyis_result);
 
 #endif /* MACH_REPLACEMENT_H_ */

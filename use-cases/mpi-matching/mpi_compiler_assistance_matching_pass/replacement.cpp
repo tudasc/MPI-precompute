@@ -14,6 +14,8 @@ Licensed under the Apache License, Version 2.0 (the "License");
  limitations under the License.
 */
 #include "replacement.h"
+#include "CompilerPassConstants.h"
+#include "Precompute_insertion.h"
 #include "analysis_results.h"
 
 #include "implementation_specific.h"
@@ -25,6 +27,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 
 #include "debug.h"
 #include "nc_settings.h"
+#include "precompute_backend_funcs.h"
 
 using namespace llvm;
 
@@ -260,4 +263,67 @@ llvm::Constant *StringConstants::get_string_ptr(const std::string &s) {
   auto val = builder.CreateGlobalStringPtr(s, "", 0, M);
   strings_used[s] = val;
   return val;
+}
+
+void replace_MPI_with_precompute(
+    const std::shared_ptr<PrecomputeInsertion> &precompute,
+    struct mpi_functions *mpi_func,
+    const std::vector<llvm::CallBase *> &init_calls) {
+  for (auto *old_call : init_calls) {
+    const bool is_send = is_send_function(old_call->getCalledFunction());
+    auto *old_tag = get_tag_value(old_call, is_send);
+    auto *old_src = get_src_value(old_call, is_send);
+
+    // TODO this map is currently not build correctly
+    auto *precomputed_call = precompute->get_precomputed_value(old_call);
+
+    auto *precomputed_tag = precompute->get_precomputed_value(old_tag);
+    auto *precomputed_src = precompute->get_precomputed_value(old_src);
+
+    assert(precomputed_tag ==
+           get_tag_value(cast<CallBase>(precomputed_call), is_send));
+    assert(precomputed_src ==
+           get_src_value(cast<CallBase>(precomputed_call), is_send));
+
+    assert(precomputed_call != nullptr && precomputed_tag != nullptr &&
+           precomputed_src != nullptr);
+    assert(isa<CallBase>(precomputed_call));
+
+    IRBuilder<> builder = IRBuilder<>(cast<Instruction>(precomputed_call));
+
+    int precompute_envelope_dest;
+    int precompute_envelope_tag;
+    if (old_call->getCalledFunction() == mpi_func->mpi_send_init) {
+      precompute_envelope_dest = SEND_ENVELOPE_DEST;
+      precompute_envelope_tag = SEND_ENVELOPE_TAG;
+    } else {
+      assert(old_call->getCalledFunction() == mpi_func->mpi_recv_init);
+      precompute_envelope_dest = RECV_ENVELOPE_DEST;
+      precompute_envelope_tag = RECV_ENVELOPE_TAG;
+    }
+
+    builder.CreateCall(
+        PrecomputeFunctions::get_instance()->register_precomputed_value,
+        {builder.getInt32(precompute_envelope_dest), precomputed_src});
+
+    builder.CreateCall(
+        PrecomputeFunctions::get_instance()->register_precomputed_value,
+        {builder.getInt32(precompute_envelope_tag), precomputed_tag});
+  }
+}
+
+void add_call_to_precalculation_to_main(
+    llvm::Module &M, llvm::CallBase *call_to_init,
+    llvm::Function *entry_function,
+    const std::shared_ptr<PrecomputeInsertion> &precompute) {
+
+  // insert after init
+  IRBuilder<> builder(call_to_init->getNextNode());
+
+  // forward args of main
+  std::vector<Value *> args;
+  for (auto &arg : entry_function->args()) {
+    args.push_back(&arg);
+  }
+  builder.CreateCall(precompute->get_precompute_main(), args);
 }
