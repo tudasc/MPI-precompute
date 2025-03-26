@@ -150,12 +150,6 @@ private:
   bool is_store_important(llvm::Instruction *inst,
                           const std::shared_ptr<PtrUsageInfo> &ptr_info);
 
-  bool is_store_important(llvm::CallBase *call,
-                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
-
-  bool is_store_important(llvm::StoreInst *store,
-                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
-
   bool
   store_happens_after_all_loads(llvm::Instruction *inst,
                                 const std::shared_ptr<PtrUsageInfo> &ptr_info);
@@ -234,9 +228,11 @@ private:
 
   void visit_arg(const std::shared_ptr<TaintedValue> &arg_info);
 
-  void visit_load(const std::shared_ptr<TaintedValue> &load_info);
+  void visit_load(const std::shared_ptr<TaintedValue> &load_info,
+                  const std::shared_ptr<TaintedValue> &ptr_operand);
 
-  void visit_store(const std::shared_ptr<TaintedValue> &store_info);
+  void visit_store(const std::shared_ptr<TaintedValue> &store_info,
+                   llvm::Value *ptr, llvm::Value *store_val);
 
   void visit_gep(const std::shared_ptr<TaintedValue> &gep_info);
 
@@ -250,6 +246,12 @@ private:
                            const std::shared_ptr<TaintedValue> &ptr);
 
   void visit_ptr_usages(const std::shared_ptr<TaintedValue> &ptr);
+
+  void visit_ptr_load(const std::shared_ptr<TaintedValue> &ptr,
+                      llvm::Instruction *inst);
+
+  void visit_ptr_store(const std::shared_ptr<TaintedValue> &ptr,
+                       llvm::Instruction *inst);
 
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);

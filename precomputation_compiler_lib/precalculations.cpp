@@ -253,45 +253,40 @@ void PrecalculationAnalysisImpl::find_all_tainted_vals() {
 }
 
 void PrecalculationAnalysisImpl::visit_load(
-    const std::shared_ptr<TaintedValue> &load_info) {
-  assert(not load_info->visited);
+    const std::shared_ptr<TaintedValue> &load_info,
+    const std::shared_ptr<TaintedValue> &ptr_operand) {
   load_info->visited = true;
-  auto *load = dyn_cast<LoadInst>(load_info->v);
-  assert(load);
 
-  auto loaded_from = insert_tainted_value(load->getPointerOperand(), load_info);
-  assert(loaded_from->is_pointer());
-  assert(loaded_from->ptr_info);
-  loaded_from->ptr_info->setIsReadFrom(load, this);
+  ptr_operand->ptr_info->setIsReadFrom(cast<Instruction>(load_info->v), this);
 
   if (load_info->is_pointer()) {
-    loaded_from->ptr_info->setIsUsedDirectly(true, load_info->ptr_info);
+    ptr_operand->ptr_info->setIsUsedDirectly(true, load_info->ptr_info);
   } else {
-    loaded_from->ptr_info->setIsUsedDirectly(true);
+    ptr_operand->ptr_info->setIsUsedDirectly(true);
   }
 }
 
 void PrecalculationAnalysisImpl::visit_store(
-    const std::shared_ptr<TaintedValue> &store_info) {
-  assert(not store_info->visited);
+    const std::shared_ptr<TaintedValue> &store_info, llvm::Value *ptr,
+    llvm::Value *store_val) {
   store_info->visited = true;
-  auto *store = dyn_cast<StoreInst>(store_info->v);
-  assert(store);
 
-  auto ptr = insert_tainted_value(store->getPointerOperand(), store_info, true);
-  ptr->ptr_info->setIsUsedDirectly(
+  auto ptr_info = insert_tainted_value(ptr, store_info, true);
+  ptr_info->ptr_info->setIsUsedDirectly(
       true, store_info->ptr_info); // null if stored value is no ptr
-  ptr->ptr_info->setIsWrittenTo(store, this);
+  ptr_info->ptr_info->setIsWrittenTo(cast<Instruction>(store_info->v), this);
 
-  auto func = get_function_analysis(store->getFunction());
-  func->add_ptr_write(ptr->ptr_info);
+  auto func =
+      get_function_analysis(cast<Instruction>(store_info->v)->getFunction());
+  func->add_ptr_write(ptr_info->ptr_info);
 
-  if (is_store_important(store, ptr->ptr_info)) {
+  if (is_store_important(cast<Instruction>(store_info->v),
+                         ptr_info->ptr_info)) {
     // we need to include all 3: the ptr, the store, and the stored val
-    auto val = insert_tainted_value(store->getValueOperand(), store_info, true);
+    auto val = insert_tainted_value(store_val, store_info, true);
     include_value_in_precompute(val);
     include_value_in_precompute(store_info);
-    include_value_in_precompute(ptr);
+    include_value_in_precompute(ptr_info);
   }
 }
 
@@ -356,15 +351,16 @@ void PrecalculationAnalysisImpl::visit_val(
   if (isa<Constant>(v->v)) {
     // nothing to do for constant
     v->visited = true;
-  } else if (isa<LoadInst>(v->v)) {
-    visit_load(v);
+  } else if (auto load = dyn_cast<LoadInst>(v->v)) {
+    auto loaded_from = insert_tainted_value(load->getPointerOperand(), v);
+    visit_load(v, loaded_from);
   } else if (auto *alloc = dyn_cast<AllocaInst>(v->v)) {
     // visit_ptr_usages is called on all ptrs anyway
     // need to calculate allocation size
     insert_tainted_value(alloc->getArraySize(), v);
     v->visited = true;
-  } else if (isa<StoreInst>(v->v)) {
-    visit_store(v);
+  } else if (auto store = dyn_cast<StoreInst>(v->v)) {
+    visit_store(v, store->getPointerOperand(), store->getValueOperand());
   } else if (auto *op = dyn_cast<BinaryOperator>(v->v)) {
     // arithmetic
     // TODO do we need to exclude some opcodes?
@@ -455,7 +451,14 @@ void PrecalculationAnalysisImpl::visit_val(
       insert_tainted_value(operand, v);
     }
     v->visited = true;
-  } else {
+  } else if (auto *atomic = dyn_cast<AtomicRMWInst>(v->v)) {
+    // a load and store to ptr
+    visit_store(v, atomic->getPointerOperand(), atomic->getValOperand());
+    visit_load(v, get_taint_info(atomic->getPointerOperand()));
+  }
+
+  else {
+
     errs() << "Support for analyzing this Value is not implemented yet\n";
     v->v->dump();
     if (auto *inst = dyn_cast<Instruction>(v->v)) {
@@ -468,6 +471,32 @@ void PrecalculationAnalysisImpl::visit_val(
   if (v->is_pointer()) {
     visit_ptr_usages(v);
   }
+}
+
+void PrecalculationAnalysisImpl::visit_ptr_load(
+    const std::shared_ptr<TaintedValue> &ptr, Instruction *inst) {
+  if (inst->getType()->isPointerTy()) {
+    // if a ptr is loaded we need to trace its usages
+    if (ptr->ptr_info->isUsedDirectly() &&
+        ptr->ptr_info->getInfoOfDirectUsage()) {
+      if (ptr->ptr_info->getInfoOfDirectUsage()->isReadFrom()) {
+        insert_tainted_value(inst, ptr, false);
+      }
+    }
+  } // else no need to take care about this, reading the val is allowed
+}
+
+void PrecalculationAnalysisImpl::visit_ptr_store(
+    const std::shared_ptr<TaintedValue> &ptr, Instruction *inst) {
+  // taint the store to analyze if it is important
+  auto store_info = insert_tainted_value(inst, ptr, false);
+  ptr->ptr_info->setIsUsedDirectly(
+      true, store_info->ptr_info); // null if stored value is no ptr
+  ptr->ptr_info->setIsWrittenTo(inst, this);
+  auto func = get_function_analysis(inst->getFunction());
+  func->add_ptr_write(ptr->ptr_info);
+  // may need to re-visit if we discovered its importance later
+  store_info->visited = false;
 }
 
 void PrecalculationAnalysisImpl::visit_ptr_usages(
@@ -521,32 +550,12 @@ void PrecalculationAnalysisImpl::visit_ptr_usages(
     }
 
     if (auto *store = dyn_cast<StoreInst>(u)) {
-      // taint the store to analyze if it is important
-      auto store_info = insert_tainted_value(store, ptr, false);
-      ptr->ptr_info->setIsUsedDirectly(
-          true, store_info->ptr_info); // null if stored value is no ptr
-      ptr->ptr_info->setIsWrittenTo(store, this);
-      auto func = get_function_analysis(store->getFunction());
-      func->add_ptr_write(ptr->ptr_info);
-      // may need to re-visit if we discovered its importance later
-      store_info->visited = false;
+      visit_ptr_store(ptr, store);
 
       continue;
     }
     if (auto *l = dyn_cast<LoadInst>(u)) {
-      if (l->getType()->isPointerTy()) {
-        // if a ptr is loaded we need to trace its usages
-
-        // TODO !!!!!
-        //  we need better analysis here
-
-        if (ptr->ptr_info->isUsedDirectly() &&
-            ptr->ptr_info->getInfoOfDirectUsage()) {
-          if (ptr->ptr_info->getInfoOfDirectUsage()->isReadFrom()) {
-            insert_tainted_value(l, ptr, false);
-          }
-        }
-      } // else no need to take care about this, reading the val is allowed
+      visit_ptr_load(ptr, l);
       continue;
     }
     if (auto *call = dyn_cast<CallBase>(u)) {
@@ -611,6 +620,21 @@ void PrecalculationAnalysisImpl::visit_ptr_usages(
       // nothing to do:
       // we don't care if the typeinfo is used in a catch clause,
       // as the catch itself does not do anything harmful to the ptr
+      continue;
+    }
+    if (auto *atomic = dyn_cast<AtomicRMWInst>(u)) {
+      assert(atomic->getPointerOperand() == ptr->v);
+      //  currently analysis for performing atomic operations on a ptr type is
+      //  not supported
+      assert(not atomic->getValOperand()->getType()->isPointerTy());
+
+      // is essentially a store to ptr
+      visit_ptr_load(ptr, atomic);
+      // and is essentially a load of ptr
+      visit_ptr_store(ptr, atomic);
+
+      insert_tainted_value(atomic->getValOperand(), get_taint_info(atomic));
+
       continue;
     }
 
@@ -1636,50 +1660,19 @@ bool PrecalculationAnalysisImpl::can_except_in_precompute(
 
 bool PrecalculationAnalysisImpl::is_store_important(
     llvm::Instruction *inst, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
-  if (isa<StoreInst>(inst)) {
-    return is_store_important(cast<StoreInst>(inst), ptr_info);
-  }
-  if (isa<CallBase>(inst)) {
-    return is_store_important(cast<CallBase>(inst), ptr_info);
-  }
-  assert(false && "Not a store instruction");
-}
+  assert(isa<StoreInst>(inst) || isa<AtomicRMWInst>(inst) ||
+         isa<CallBase>(inst));
 
-bool PrecalculationAnalysisImpl::is_store_important(
-    llvm::StoreInst *store, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
-  // the ptr must be used
-  assert(std::find_if(ptr_info->getPtrsWithThisInfo().begin(),
-                      ptr_info->getPtrsWithThisInfo().end(),
-                      [&store](auto elem) {
-                        if (auto elem_instance = elem.lock()) {
-                          return elem_instance->v == store->getPointerOperand();
-                        }
-                        return false;
-                      }) != ptr_info->getPtrsWithThisInfo().end());
   if (not ptr_info->isReadFrom()) {
     return false;
   }
-
-  if (store_happens_after_all_loads(store, ptr_info)) {
+  if (store_happens_after_all_loads(inst, ptr_info)) {
     return false;
   }
 
   return true;
 }
 
-bool PrecalculationAnalysisImpl::is_store_important(
-    llvm::CallBase *call, const std::shared_ptr<PtrUsageInfo> &ptr_info) {
-  // TODO can we add a the ptr must be used assertion?
-
-  if (not ptr_info->isReadFrom()) {
-    return false;
-  }
-  if (store_happens_after_all_loads(call, ptr_info)) {
-    return false;
-  }
-
-  return true;
-}
 
 // TODO better function name
 //  if an instruction in foo is included in the set: the resulting set will

@@ -372,7 +372,9 @@ void PtrUsageInfo::setIsWrittenTo(
   }
   assert(precalc_analysis);
   assert(is_valid);
-  assert(llvm::isa<llvm::StoreInst>(store) || llvm::isa<llvm::CallBase>(store));
+  assert(llvm::isa<llvm::StoreInst>(store) ||
+         llvm::isa<llvm::CallBase>(store) ||
+         llvm::isa<llvm::AtomicRMWInst>(store));
   is_written_to = true;
   auto pair = stores.insert(store);
   if (pair.second) { // if it was inserted
@@ -398,7 +400,8 @@ void PtrUsageInfo::setIsReadFrom(
   }
   assert(precalc_analysis);
   assert(is_valid);
-  assert(llvm::isa<llvm::LoadInst>(load) || llvm::isa<llvm::CallBase>(load));
+  assert(llvm::isa<llvm::LoadInst>(load) || llvm::isa<llvm::CallBase>(load) ||
+         llvm::isa<AtomicRMWInst>(load));
   is_read_from = true;
   auto pair = loads.insert(load);
   if (pair.second) { // if it was inserted
