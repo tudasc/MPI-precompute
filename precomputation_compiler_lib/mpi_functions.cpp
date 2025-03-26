@@ -39,7 +39,12 @@ std::vector<CallBase *> gather_all_calls(Function *f) {
   return result;
 }
 
+struct mpi_functions *mpi_funcs = nullptr;
+
 struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
+
+  if (mpi_funcs)
+    return mpi_funcs;
 
   struct mpi_functions *result = new struct mpi_functions;
   assert(result != nullptr);
@@ -151,6 +156,7 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
     }
   }
 
+  mpi_funcs = result;
   return result;
 }
 
