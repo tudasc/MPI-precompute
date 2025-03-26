@@ -166,6 +166,7 @@ inline bool should_call_intrinsic(llvm::Intrinsic::ID id) {
       id == llvm::Intrinsic::returnaddress ||
       id == llvm::Intrinsic::addressofreturnaddress ||
       id == llvm::Intrinsic::sponentry || id == llvm::Intrinsic::frameaddress ||
+      id == llvm::Intrinsic::threadlocal_address ||
 
       // vector instructions
       llvm::Intrinsic::getName(id).starts_with("llvm.x86.sse"); // NOLINT
