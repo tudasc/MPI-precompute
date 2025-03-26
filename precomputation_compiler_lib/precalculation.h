@@ -52,50 +52,8 @@ public:
 
   ~PrecalculationAnalysis() = default;
 
-  friend class PrecalculationFunctionAnalysis;
-
-  // TODO getter methods instead of friend?
-  friend class PtrUsageInfo;
-  friend class PrecomputeInsertion;
-  friend class PrecalculationFunctionCopy;
-
-private:
-  std::shared_ptr<PrecomputeInsertion> insertion_information = nullptr;
-  std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>
-      function_analysis;
-
-  std::map<llvm::Value *, llvm::Value *> precomputed_values_map;
-
   std::set<std::shared_ptr<PrecalculationFunctionAnalysis>>
   getFunctionsToInclude() const;
-
-  void build_precomputed_values_map(
-      const std::map<llvm::Function *,
-                     std::shared_ptr<PrecalculationFunctionCopy>>
-          &functions_copied);
-
-  void analyze();
-  void analyze_functions();
-
-  std::unique_ptr<struct mpi_functions> mpi_func;
-
-  llvm::Module &M;
-  llvm::Function *entry_point;
-
-  std::vector<llvm::Value *> to_precompute_value;
-  std::vector<llvm::Instruction *> to_precompute_cfg;
-
-  std::set<std::shared_ptr<TaintedValue>> tainted_values;
-
-  void include_value_in_precompute(const std::shared_ptr<TaintedValue> &);
-
-  std::shared_ptr<TaintedValue>
-  insert_tainted_value(llvm::Value *v,
-                       const std::shared_ptr<TaintedValue> &from = nullptr,
-                       bool needed_from = true);
-
-  std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
-                                                     TaintReason reason);
 
   std::shared_ptr<TaintedValue> get_taint_info(llvm::Value *v) const {
     assert(is_tainted(v));
@@ -112,36 +70,12 @@ private:
     return function_analysis.at(F);
   }
 
-  void insert_function_to_include(llvm::Function *func);
-
-  void find_all_tainted_vals();
-
-  // we need a function to re-initialize all globals that may be overwritten
-
-  void print_analysis_result_remarks();
-
-  void debug_printings();
-
-  bool is_store_important(llvm::Instruction *inst,
-                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
-
-  bool
-  store_happens_after_all_loads(llvm::Instruction *inst,
-                                const std::shared_ptr<PtrUsageInfo> &ptr_info);
-
-  void get_all_transitive_insts(std::set<llvm::Instruction *> &instrs);
-
-  // materialize call
-  void include_call_to_std(const std::shared_ptr<TaintedValue> &call_info);
-
-public:
   bool is_tainted(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) { return vv->v == v; }) !=
            tainted_values.end();
   }
 
-public:
   bool is_included_in_precompute(llvm::Value *v) const {
     return std::find_if(tainted_values.begin(), tainted_values.end(),
                         [&v](const auto &vv) {
@@ -174,7 +108,70 @@ public:
 
   bool can_except_in_precompute(llvm::CallBase *call) const;
 
+  std::vector<llvm::Function *>
+  get_possible_call_targets(llvm::CallBase *call) const;
+
+  llvm::Function *get_entry_point() const { return entry_point; }
+
+  std::vector<llvm::Value *> get_values_to_precompute() const {
+    return to_precompute_value;
+  }
+  std::vector<llvm::Instruction *> get_locations_to_precompute() const {
+    return to_precompute_cfg;
+  }
+
 private:
+  std::shared_ptr<PrecomputeInsertion> insertion_information = nullptr;
+  std::map<llvm::Function *, std::shared_ptr<PrecalculationFunctionAnalysis>>
+      function_analysis;
+
+  std::map<llvm::Value *, llvm::Value *> precomputed_values_map;
+
+  void analyze();
+  void analyze_functions();
+
+  std::unique_ptr<struct mpi_functions> mpi_func;
+
+  llvm::Module &M;
+  llvm::Function *entry_point;
+
+  std::vector<llvm::Value *> to_precompute_value;
+  std::vector<llvm::Instruction *> to_precompute_cfg;
+
+  std::set<std::shared_ptr<TaintedValue>> tainted_values;
+
+  void include_value_in_precompute(const std::shared_ptr<TaintedValue> &);
+
+  std::shared_ptr<TaintedValue>
+  insert_tainted_value(llvm::Value *v,
+                       const std::shared_ptr<TaintedValue> &from = nullptr,
+                       bool needed_from = true);
+
+  std::shared_ptr<TaintedValue> insert_tainted_value(llvm::Value *v,
+                                                     TaintReason reason);
+
+  void insert_function_to_include(llvm::Function *func);
+
+  void find_all_tainted_vals();
+
+  // we need a function to re-initialize all globals that may be overwritten
+
+  void print_analysis_result_remarks();
+
+  void debug_printings();
+
+  bool is_store_important(llvm::Instruction *inst,
+                          const std::shared_ptr<PtrUsageInfo> &ptr_info);
+
+  bool
+  store_happens_after_all_loads(llvm::Instruction *inst,
+                                const std::shared_ptr<PtrUsageInfo> &ptr_info);
+
+  void get_all_transitive_insts(std::set<llvm::Instruction *> &instrs);
+
+  // materialize call
+  void include_call_to_std(const std::shared_ptr<TaintedValue> &call_info);
+
   bool
   is_ptr_usage_in_std_read(llvm::CallBase *call,
                            const std::shared_ptr<TaintedValue> &ptr_arg_info);
@@ -183,11 +180,6 @@ private:
   is_ptr_usage_in_std_write(llvm::CallBase *call,
                             const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
-public:
-  std::vector<llvm::Function *>
-  get_possible_call_targets(llvm::CallBase *call) const;
-
-private:
   void insert_necessary_control_flow(llvm::Value *v);
 
   void visit_call_for_retval(const std::shared_ptr<TaintedValue> &call_info);

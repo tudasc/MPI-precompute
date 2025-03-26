@@ -262,8 +262,8 @@ void PrecomputeInsertion::replace_calls_in_copy(
         } else {
           auto *callee = call->getCalledFunction();
 
-          if (callee == precompute_analyis_result->mpi_func->mpi_comm_rank ||
-              callee == precompute_analyis_result->mpi_func->mpi_comm_size) {
+          if (callee == get_mpi_functions(M)->mpi_comm_rank ||
+              callee == get_mpi_functions(M)->mpi_comm_size) {
             continue; // noting to do, keep original call
           }
           // end handling calls to MPI
@@ -525,9 +525,9 @@ llvm::Function *PrecomputeInsertion::create_precompute_main(
     const std::shared_ptr<PrecalculationFunctionCopy> &entry_function) {
 
   Function *result = Function::Create(
-      precompute_analyis_result->entry_point->getFunctionType(),
-      precompute_analyis_result->entry_point->getLinkage(), "precompute_main",
-      M);
+      precompute_analyis_result->get_entry_point()->getFunctionType(),
+      precompute_analyis_result->get_entry_point()->getLinkage(),
+      "precompute_main", M);
 
   BasicBlock *BB = BasicBlock::Create(M.getContext(), "entry", result);
 
@@ -575,7 +575,7 @@ void PrecomputeInsertion::insert_precomputation() {
 
   build_precomputed_values_map();
 
-  auto *entry_point = precompute_analyis_result->entry_point;
+  auto *entry_point = precompute_analyis_result->get_entry_point();
   assert(entry_point);
   auto entry_point_copy = functions_copied[entry_point];
 
@@ -589,7 +589,7 @@ void PrecomputeInsertion::insert_precomputation() {
 
 void PrecomputeInsertion::build_precomputed_values_map() {
 
-  for (auto *val : precompute_analyis_result->to_precompute_value) {
+  for (auto *val : precompute_analyis_result->get_values_to_precompute()) {
     if (auto *inst = dyn_cast<Instruction>(val)) {
       auto *f = inst->getFunction();
       assert(precompute_analyis_result->is_func_included_in_precompute(f));
@@ -606,7 +606,7 @@ void PrecomputeInsertion::build_precomputed_values_map() {
     }
   }
   // same loop as above but without the casts
-  for (auto *inst : precompute_analyis_result->to_precompute_cfg) {
+  for (auto *inst : precompute_analyis_result->get_locations_to_precompute()) {
     auto *f = inst->getFunction();
     assert(precompute_analyis_result->is_func_included_in_precompute(f));
     const auto &copy_func = functions_copied.at(f);
@@ -620,7 +620,7 @@ void PrecomputeInsertion::clean_precompute() {
   // problem what if the user tells that they want this instruction location to
   // be reached in precompute and then this instr itself is also relevant for
   // precompute?
-  for (auto *inst : precompute_analyis_result->to_precompute_cfg) {
+  for (auto *inst : precompute_analyis_result->get_locations_to_precompute()) {
     auto *new_inst = cast<Instruction>(get_precomputed_value(inst));
     if (inst->isTerminator()) {
       if (auto *ret = dyn_cast<ReturnInst>(inst)) {
