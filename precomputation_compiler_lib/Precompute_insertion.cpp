@@ -278,7 +278,10 @@ void PrecomputeInsertion::replace_calls_in_copy(
             to_replace.push_back(call);
             continue;
           } else {
-            if (callee == get_omp_functions(M)->kmpc_fork_call) {
+            if (callee == get_omp_functions(M)->kmpc_fork_call &&
+                precompute_analyis_result.is_included_in_precompute(
+                    call->getArgOperand(2))) {
+              assert(isa<Function>(call->getArgOperand(2)));
               // need to change arg in openmp call
               to_replace.push_back(call);
               continue;
@@ -334,6 +337,7 @@ void PrecomputeInsertion::replace_calls_in_copy(
         assert(is_func_from_std(callee) || is_mpi_function(callee) ||
                callee->isIntrinsic());
         if (callee == get_omp_functions(M)->kmpc_fork_call) {
+          call->dump();
           auto old_parallel_region = cast<Function>(call->getArgOperand(2));
           auto new_parallel_region =
               functions_copied.at(old_parallel_region)->F_copy;
