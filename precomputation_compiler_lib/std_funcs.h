@@ -83,6 +83,15 @@ inline bool is_global_from_std(llvm::GlobalValue *global) {
   if (global->getName() == "__dso_handle") {
     return true;
   }
+
+  // these are set if calling fflush on them
+  if (global->getName() == "stdout") {
+    return true;
+  }
+  if (global->getName() == "sterr") {
+    return true;
+  }
+
   return false;
 }
 
