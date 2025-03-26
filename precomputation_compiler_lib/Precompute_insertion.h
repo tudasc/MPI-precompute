@@ -56,10 +56,10 @@ public:
   }
 
   // this removes all values in to_precompute_cfg
-  virtual void clean_precompute();
+  void clean_precompute();
 
   // accessor (use it to modify the program slice if necessary)
-  virtual llvm::Value *get_precomputed_value(llvm::Value *v) const {
+  llvm::Value *get_precomputed_value(llvm::Value *v) const {
     return precomputed_values_map.at(v);
   };
 
