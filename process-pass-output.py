@@ -1,12 +1,15 @@
 # /bin/python3
 
 import sys
+import re
 
 # settings: which output files to use
 
-output_orig = "IR_orig.txt"
-output_modified = "IR_modified.txt"
-output_modified_executable = "IR_modified.txt_executable"
+output_orig = "IR_orig"
+output_orig_annotated = "IR_orig_annotated"
+output_modified = "IR_modified"
+# this can be compiled further:
+output_modified_executable = "IR_modified_executable"
 output_pass_remarks = "pass_comments.txt"
 
 # markers used by the pass
@@ -89,20 +92,115 @@ def annotate(module, remarks):
             to_anno_idx = [i for i in to_anno_idx if
                            function_defines[match_func_idx[0]][0] < i < function_defines[match_func_idx[0] + 1][0]]
 
-        #assert len(to_anno_idx) > 0
+        # assert len(to_anno_idx) > 0
         for ii in to_anno_idx:
             module[ii] = annotation + " " + module[ii]
 
     return module
 
 
-def print_orig(module, remarks):
+def remove_extra_spaces(line):
+    """Replace multiple spaces with a single space."""
+    return " ".join(line.split())
+
+
+def remove_metadata(line):
+    # removes metadata annotations such as !dbg !123
+    return remove_extra_spaces(
+        re.sub(r'\s*![-\w,]+(\s|$)', ' ', line)
+        .rstrip(" ,")
+    )
+
+
+def extract_between_at_and_paren(s):
+    match = re.search(r"@([^()]+)\(", s)
+    return match.group(1) if match else None
+
+
+def get_functions(module):
+    functions = {}
+
+    current_func = []
+    has_attr_line = False
+    in_func = False
+
+    for line in module:
+        if line.startswith("; Function Attrs:"):
+            has_attr_line = True
+            in_func = True
+        if line.startswith("define"):
+            in_func = True
+        if in_func:
+            current_func.append(line)
+        if line == "}" or line.startswith("declare"):
+            if not in_func:
+                current_func.append(line)
+                # the declare is just this line with no attributes
+
+            assert len(current_func) > 0
+
+            # get function name
+            name = current_func[0]
+            if has_attr_line:
+                name = current_func[1]
+            name = extract_between_at_and_paren(name)
+
+            functions[name] = current_func
+            # reset
+            current_func = []
+            in_func = False
+            has_attr_line = False
+
+    return functions
+
+
+# the name of the copied func
+def find_matching_func(name, data):
+    prefix = f"{name}."
+    return [key for key in data if key.startswith(prefix) and key[len(prefix):].isdigit()]
+
+
+# such that one can easily view the IR diff of original function to precomputed one
+def align(orig, modified):
+    orig = [l for l in orig if (not l.startswith("!")) and (not "@llvm.dbg.value" in l)]
+    orig = [remove_metadata(l) for l in orig]
+    modified = [l for l in modified if not l.startswith("!")]
+    modified = [remove_metadata(l) for l in modified]
+    functions_orig = get_functions(orig)
+    functions_modified = get_functions(modified)
+
+    # match original func to precompute one
+    module_orig = []
+    module_modified = []
+
+    for name, content in functions_orig.items():
+        name_modified_list = find_matching_func(name, functions_modified)
+        if len(name_modified_list) > 0:
+            assert len(name_modified_list) == 1
+            name_modified = name_modified_list[0]
+            module_orig.extend(content)
+            module_modified.extend(functions_modified[name_modified])
+            module_orig.append("")
+            module_modified.append("")
+
+    return module_orig, module_modified
+
+
+def print_orig_annotated(module, remarks):
     without_debug_info = [l for l in module if not l.startswith("!")]
 
     with_anno = annotate(without_debug_info, remarks)
 
-    with open(output_orig, 'w') as the_file:
+    with open(output_orig_annotated, 'w') as the_file:
         the_file.write("\n".join(with_anno))
+
+
+def print_aligned_orig_modified(module_orig, module_modified):
+    orig, modified = align(module_orig, module_modified)
+    with open(output_orig, 'w') as the_file:
+        the_file.write("\n".join(orig))
+    with open(output_modified, 'w') as the_file:
+        the_file.write("\n".join(modified))
 
 
 def print_modified(module):
@@ -124,7 +222,7 @@ def print_remarks(remarks):
 def main():
     if sys.stdin.isatty():
         print("use this with a pipe")
-        print("Example: ./run.sh sourcefile.cpp |& python ./process-pass-output.py")
+        print("Example: ./run.sh sourcefile.cpp |& python3 ./process-pass-output.py")
         exit(0)
 
     print("processing pass output")
@@ -152,8 +250,8 @@ def main():
 
     pass_comments = full_input[end_idx[0]:begin_mod_idx[0]]
 
-    print_orig(original_mod, pass_comments)
-    print_modified(altered_mod)
+    print_orig_annotated(original_mod, pass_comments)
+    print_aligned_orig_modified(original_mod, altered_mod)
     print_modified_executable(altered_mod)
     print_remarks(pass_comments)
 
