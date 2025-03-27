@@ -268,7 +268,7 @@ void PrecomputeInsertion::replace_calls_in_copy(
           }
           // end handling calls to MPI
 
-          if (is_allocation(call)) {
+          if (replace_allocation && is_allocation(call)) {
             to_replace.push_back(call);
             continue;
           }

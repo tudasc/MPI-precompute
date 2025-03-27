@@ -32,8 +32,10 @@ class PrecalculationFunctionCopy;
 class PrecomputeInsertion {
 public:
   PrecomputeInsertion(llvm::Module &M,
-      const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result)
-      : M(M), precompute_analyis_result(precompute_analyis_result) {
+      const std::shared_ptr<PrecalculationAnalysis> &precompute_analyis_result,
+      bool replace_allocation = true)
+      : M(M), precompute_analyis_result(precompute_analyis_result),
+        replace_allocation(replace_allocation) {
     insert_precomputation();
   };
 
@@ -66,6 +68,11 @@ public:
 private:
   llvm::Module &M;
   std::shared_ptr<const PrecalculationAnalysis> precompute_analyis_result;
+  // true if allocations should be managed (and freed after precompute) by
+  // precompute backend library
+  bool replace_allocation;
+
+
   llvm::Function *precompute_main;
 
   std::map<llvm::Value *, llvm::Value *> precomputed_values_map;
