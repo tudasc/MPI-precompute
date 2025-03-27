@@ -206,7 +206,7 @@ private:
   // may be a StoreInst or a CallBase
   std::set<llvm::Instruction *> stores;
 
-  bool need_pad_for_gep(llvm::Type *gep_type);
+  bool need_pad_for_gep(llvm::GetElementPtrInst *gep);
 
 public:
   const std::set<llvm::Instruction *> &getStores() const;

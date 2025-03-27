@@ -222,26 +222,54 @@ void PtrUsageInfo::add_important_member(
     gep_type = gep->getSourceElementType();
   }
 
-  auto member_idx =
-      get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType()));
+  auto member_idx = get_gep_idxs(gep, need_pad_for_gep(gep));
   add_important_member(member_idx, result_ptr);
 }
 
-bool PtrUsageInfo::need_pad_for_gep(llvm::Type *gep_type) {
+bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
   if (this->gep_type == nullptr) {
     return false;
   }
-  if (this->gep_type == gep_type) {
+  if (this->gep_type == gep->getSourceElementType()) {
     return false;
   }
   if (auto this_array_type = dyn_cast<ArrayType>(this->gep_type)) {
-    assert(!isa<ArrayType>(gep_type));
-    assert(this_array_type->getElementType() == gep_type);
+    assert(!isa<ArrayType>(gep->getSourceElementType()));
+    assert(this_array_type->getElementType() == gep->getSourceElementType());
     return true;
   }
+  if (auto other_array_type =
+          dyn_cast<ArrayType>(gep->getSourceElementType())) {
+    // in this case we need to raise the type of our gep type to the array type
+    assert(!isa<ArrayType>(this->gep_type));
+    assert(other_array_type->getElementType() == this->gep_type);
+    this->gep_type = gep->getSourceElementType();
+    // pre-pend 0 to all existing gep members (need to copy whole map)
+    std::map<std::vector<long>, std::shared_ptr<PtrUsageInfo>>
+        old_important_members(important_members);
+    important_members.clear();
+    for (const auto &[key, value] : old_important_members) {
 
-  assert(false && "not implemented yet");
-  // in this case we need to raise the type of our gep type to the array type
+      std::vector<long> new_key = {0};
+      std::copy(key.begin(), key.end(), std::back_inserter(new_key));
+      important_members[new_key] = value;
+    }
+
+    return false;
+  }
+
+  // can check if type sizes are same and allow that
+  auto DL = gep->getModule()->getDataLayout();
+  if (DL.getTypeAllocSize(this->gep_type) ==
+      DL.getTypeAllocSize(gep->getSourceElementType())) {
+    return false;
+  }
+
+  this->gep_type->dump();
+  gep->getSourceElementType()->dump();
+
+  assert(false && "not supported yet");
+
   return false;
 }
 
@@ -330,8 +358,7 @@ bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
   }
   assert(is_valid);
 
-  return find_info_for_gep_idx(
-             get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType())))
+  return find_info_for_gep_idx(get_gep_idxs(gep, need_pad_for_gep(gep)))
              .second != nullptr;
 }
 
