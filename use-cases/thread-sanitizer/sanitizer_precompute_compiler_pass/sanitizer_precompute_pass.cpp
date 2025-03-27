@@ -135,8 +135,10 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     }
 
     auto precalcuation = std::make_shared<PrecomputeInsertion>(
-        M, std::make_shared<PrecalculationAnalysis>(M, main_func, to_precompute,
-                                                    precompute_locations));
+        M,
+        std::make_shared<PrecalculationAnalysis>(M, main_func, to_precompute,
+                                                 precompute_locations),
+        false);
 
     // do NOT call clean_precompute() as we want the tsan calls to stick around
 
