@@ -64,6 +64,13 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     return;
   }
 
+  if (gep_type && _other->gep_type) {
+    assert(_other->gep_type == gep_type && "currently Not implemented");
+  }
+  if (!gep_type && _other->gep_type) {
+    gep_type = _other->gep_type;
+  }
+
   assert(_other != nullptr);
 
   auto other = _other;
@@ -152,8 +159,13 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
   }
 }
 
-std::vector<long> get_gep_idxs(llvm::GetElementPtrInst *gep) {
+// pad= true: add additional 0 in front to handle acces from basetype instead of
+// array type
+std::vector<long> get_gep_idxs(llvm::GetElementPtrInst *gep, bool pad) {
   std::vector<long> idxs;
+  if (pad) {
+    idxs.push_back(0);
+  }
   for (auto &idx : gep->indices()) {
     auto idx_constant = dyn_cast<ConstantInt>(&idx);
     if (idx_constant) {
@@ -205,8 +217,32 @@ void PtrUsageInfo::add_important_member(
     // e.g. an iterator where it++ is realized as a GEP instruction
   }
 
-  auto member_idx = get_gep_idxs(gep);
+  if (!gep_type) {
+    assert(important_members.empty());
+    gep_type = gep->getSourceElementType();
+  }
+
+  auto member_idx =
+      get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType()));
   add_important_member(member_idx, result_ptr);
+}
+
+bool PtrUsageInfo::need_pad_for_gep(llvm::Type *gep_type) {
+  if (this->gep_type == nullptr) {
+    return false;
+  }
+  if (this->gep_type == gep_type) {
+    return false;
+  }
+  if (auto this_array_type = dyn_cast<ArrayType>(this->gep_type)) {
+    assert(!isa<ArrayType>(gep_type));
+    assert(this_array_type->getElementType() == gep_type);
+    return true;
+  }
+
+  assert(false && "not implemented yet");
+  // in this case we need to raise the type of our gep type to the array type
+  return false;
 }
 
 void PtrUsageInfo::add_important_member(
@@ -293,7 +329,10 @@ bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
     return merged_with->is_member_relevant(gep);
   }
   assert(is_valid);
-  return find_info_for_gep_idx(get_gep_idxs(gep)).second != nullptr;
+
+  return find_info_for_gep_idx(
+             get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType())))
+             .second != nullptr;
 }
 
 std::pair<bool, std::shared_ptr<PtrUsageInfo>>

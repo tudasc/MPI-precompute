@@ -171,6 +171,10 @@ private:
   bool is_valid = true;
 #endif
 
+  // if this ptr is indexed with different types (can happen on initialization
+  // with braced initializer list)
+  llvm::Type *gep_type = nullptr;
+
   // if we found it aliasing with another ptr: all calls should be forwarded to
   // that info so that we have only one valid object per "pointer alias group"
   std::shared_ptr<PtrUsageInfo> merged_with = nullptr;
@@ -201,6 +205,8 @@ private:
   // all instruction categorized as store to this ptr
   // may be a StoreInst or a CallBase
   std::set<llvm::Instruction *> stores;
+
+  bool need_pad_for_gep(llvm::Type *gep_type);
 
 public:
   const std::set<llvm::Instruction *> &getStores() const;
