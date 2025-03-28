@@ -179,7 +179,6 @@ def align(orig, modified):
             # happens with openmp tasks
             if len(name_modified_list) > 1:
                 name_modified_list = sorted(name_modified_list, reverse=True)
-            print(name_modified_list)
             name_modified = name_modified_list[0]
             module_orig.extend(content)
             module_modified.extend(functions_modified[name_modified])
