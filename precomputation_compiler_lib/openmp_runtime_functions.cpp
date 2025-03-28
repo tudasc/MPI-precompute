@@ -27,6 +27,8 @@ struct omp_functions *get_omp_functions(llvm::Module &M) {
       omp_func->kmpc_omp_task_alloc = f;
     } else if (f->getName().equals("__kmpc_omp_task")) {
       omp_func->kmpc_omp_task = f;
+    } else if (f->getName().equals("__kmpc_omp_task_with_deps")) {
+      omp_func->kmpc_omp_task_with_deps = f;
     }
   }
 

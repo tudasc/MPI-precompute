@@ -8,7 +8,9 @@
 struct omp_functions {
   llvm::Function *kmpc_fork_call = nullptr;
   llvm::Function *kmpc_omp_task_alloc = nullptr;
+
   llvm::Function *kmpc_omp_task = nullptr;
+  llvm::Function *kmpc_omp_task_with_deps = nullptr;
 
   llvm::Function *kmpc_global_thread_num = nullptr;
   llvm::Function *kmpc_push_num_threads = nullptr;
@@ -39,8 +41,11 @@ inline llvm::CallBase *get_task_scheduling_call(llvm::CallBase *alloc_call) {
   for (auto *u : alloc_call->users()) {
     if (auto *call = llvm::dyn_cast<llvm::CallBase>(u)) {
       if (call->getCalledFunction() &&
-          call->getCalledFunction() ==
-              get_omp_functions(*alloc_call->getModule())->kmpc_omp_task) {
+          (call->getCalledFunction() ==
+               get_omp_functions(*alloc_call->getModule())->kmpc_omp_task ||
+           call->getCalledFunction() ==
+               get_omp_functions(*alloc_call->getModule())
+                   ->kmpc_omp_task_with_deps)) {
         assert(sched_call == nullptr);
         sched_call = call;
       }
