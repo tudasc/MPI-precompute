@@ -56,7 +56,9 @@ bool std::operator>=(const std::shared_ptr<PtrUsageInfo> &lhs,
 
 class PtrUsageInfo : public std::enable_shared_from_this<PtrUsageInfo> {
 public:
-  explicit PtrUsageInfo(const std::shared_ptr<TaintedValue> &ptr) {
+  explicit PtrUsageInfo(const std::shared_ptr<TaintedValue> &ptr,
+                        llvm::Module *M) {
+    this->M = M;
     if (ptr != nullptr) {
       ptrs_with_this_info.insert(ptr);
     }
@@ -171,6 +173,8 @@ private:
   bool is_valid = true;
 #endif
 
+  llvm::Module *M;
+
   // if this ptr is indexed with different types (can happen on initialization
   // with braced initializer list)
   llvm::Type *gep_type = nullptr;
@@ -206,10 +210,7 @@ private:
   // may be a StoreInst or a CallBase
   std::set<llvm::Instruction *> stores;
 
-  bool need_pad_for_gep(llvm::GetElementPtrInst *gep);
-  bool need_pad_for_gep(llvm::Module *M, llvm::Type *type_of_gep);
-
-  llvm::Module* getModule();
+  bool need_pad_for_gep(llvm::Type *type_of_gep);
 
 public:
   const std::set<llvm::Instruction *> &getStores() const;

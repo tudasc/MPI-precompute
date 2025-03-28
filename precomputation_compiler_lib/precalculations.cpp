@@ -319,7 +319,7 @@ void PrecalculationAnalysis::visit_phi(
   if (phi->getType()->isPointerTy()) {
     auto ptr_info = phi_info->ptr_info;
     if (not ptr_info) {
-      phi_info->ptr_info = std::make_shared<PtrUsageInfo>(phi_info);
+      phi_info->ptr_info = std::make_shared<PtrUsageInfo>(phi_info, &M);
       ptr_info = phi_info->ptr_info;
     }
     for (unsigned int i = 0; i < phi->getNumOperands(); ++i) {
@@ -1341,7 +1341,8 @@ PrecalculationAnalysis::insert_tainted_value(llvm::Value *v,
     tainted_values.insert(inserted_elem);
     if (v->getType()->isPointerTy()) {
       // create empty info
-      inserted_elem->ptr_info = std::make_shared<PtrUsageInfo>(inserted_elem);
+      inserted_elem->ptr_info =
+          std::make_shared<PtrUsageInfo>(inserted_elem, &M);
     }
   } else {
     // the present value form the set
@@ -1396,7 +1397,8 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
 
     if (v->getType()->isPointerTy()) {
       // create empty info
-      inserted_elem->ptr_info = std::make_shared<PtrUsageInfo>(inserted_elem);
+      inserted_elem->ptr_info =
+          std::make_shared<PtrUsageInfo>(inserted_elem, &M);
     }
     if (from != nullptr) {
       // we don't care why the Control flow was tagged for the parent

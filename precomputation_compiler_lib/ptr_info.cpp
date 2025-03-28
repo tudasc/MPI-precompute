@@ -56,25 +56,6 @@ void PtrUsageInfo::setIsUsedDirectly(
   }
 }
 
-llvm::Module *PtrUsageInfo::getModule() {
-
-  // get reference to module
-  Module *M = nullptr;
-  for (auto it = ptrs_with_this_info.begin(); it != ptrs_with_this_info.end();
-       ++it) {
-    if (auto *global = dyn_cast<GlobalObject>(it->lock()->v)) {
-      M = global->getParent();
-      break;
-    }
-    if (auto *inst = dyn_cast<Instruction>(it->lock()->v)) {
-      M = inst->getModule();
-      break;
-    }
-  }
-  assert(M);
-  return M;
-}
-
 // other MAY NOT be passed as const ref as we might recursively destruct it
 // before we are finish using it
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
@@ -86,7 +67,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
   if (gep_type && _other->gep_type) {
     if (_other->gep_type != gep_type) {
 
-      bool need_prepend_other = need_pad_for_gep(getModule(), _other->gep_type);
+      bool need_prepend_other = need_pad_for_gep(_other->gep_type);
       if (need_prepend_other) {
         gep_type->dump();
         _other->gep_type->dump();
@@ -249,11 +230,12 @@ void PtrUsageInfo::add_important_member(
     gep_type = gep->getSourceElementType();
   }
 
-  auto member_idx = get_gep_idxs(gep, need_pad_for_gep(gep));
+  auto member_idx =
+      get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType()));
   add_important_member(member_idx, result_ptr);
 }
 
-bool PtrUsageInfo::need_pad_for_gep(llvm::Module *M, llvm::Type *type_of_gep) {
+bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
   if (this->gep_type == nullptr) {
     return false;
   }
@@ -305,10 +287,6 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Module *M, llvm::Type *type_of_gep) {
   assert(false && "not supported yet");
 
   return false;
-}
-
-bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
-  return need_pad_for_gep(getModule(), gep->getSourceElementType());
 }
 
 void PtrUsageInfo::add_important_member(
@@ -396,7 +374,8 @@ bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
   }
   assert(is_valid);
 
-  return find_info_for_gep_idx(get_gep_idxs(gep, need_pad_for_gep(gep)))
+  return find_info_for_gep_idx(
+             get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType())))
              .second != nullptr;
 }
 
