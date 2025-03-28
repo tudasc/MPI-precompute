@@ -264,6 +264,14 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
       DL.getTypeAllocSize(gep->getSourceElementType())) {
     return false;
   }
+  if (gep->getSourceElementType() == Type::getInt8Ty(gep->getContext()) ||
+      gep_type == Type::getInt8Ty(gep->getContext())) {
+    // this may happen if ptr is cast to void* e.g. passed to memset call
+    // in this case we dont know which geps will alias
+    whole_ptr_is_relevant = true;
+
+    return false;
+  }
 
   this->gep_type->dump();
   gep->getSourceElementType()->dump();
