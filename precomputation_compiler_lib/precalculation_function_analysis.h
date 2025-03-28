@@ -49,6 +49,8 @@ public:
 
   bool is_openmp_parallel = false;
   std::shared_ptr<ParallelRegion> parallel_region = nullptr;
+  bool is_openmp_task = false;
+  std::vector<llvm::CallBase *> task_alloc_calls = {};
 
   // used outside of call instructions
   bool is_func_ptr_captured;

@@ -286,6 +286,14 @@ void PrecomputeInsertion::replace_calls_in_copy(
               to_replace.push_back(call);
               continue;
             }
+            if (callee == get_omp_functions(M)->kmpc_omp_task_alloc &&
+                precompute_analyis_result->is_included_in_precompute(
+                    call->getArgOperand(5))) {
+              assert(isa<Function>(call->getArgOperand(5)));
+              // need to change arg in openmp call
+              to_replace.push_back(call);
+              continue;
+            }
             // call->dump();
             assert(not precompute_analyis_result->is_included_in_precompute(
                        callee) ||
@@ -342,6 +350,12 @@ void PrecomputeInsertion::replace_calls_in_copy(
           auto new_parallel_region =
               functions_copied.at(old_parallel_region)->F_copy;
           call->setArgOperand(2, new_parallel_region);
+        }
+        if (callee == get_omp_functions(M)->kmpc_omp_task_alloc) {
+          call->dump();
+          auto old_task = cast<Function>(call->getArgOperand(5));
+          auto new_task = functions_copied.at(old_task)->F_copy;
+          call->setArgOperand(5, new_task);
         }
       }
     }

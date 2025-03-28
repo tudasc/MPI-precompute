@@ -32,4 +32,23 @@ inline bool is_omp_fork_call(llvm::CallBase *call) {
           get_omp_functions(*call->getModule())->kmpc_fork_call);
 }
 
+inline llvm::CallBase *get_task_scheduling_call(llvm::CallBase *alloc_call) {
+  assert(alloc_call->getCalledFunction() ==
+         get_omp_functions(*alloc_call->getModule())->kmpc_omp_task_alloc);
+  llvm::CallBase *sched_call = nullptr;
+  for (auto *u : alloc_call->users()) {
+    if (auto *call = llvm::dyn_cast<llvm::CallBase>(u)) {
+      if (call->getCalledFunction() &&
+          call->getCalledFunction() ==
+              get_omp_functions(*alloc_call->getModule())->kmpc_omp_task) {
+        assert(sched_call == nullptr);
+        sched_call = call;
+      }
+    }
+  }
+  assert(sched_call);
+  assert(sched_call->getFunction() == alloc_call->getFunction());
+  return sched_call;
+}
+
 #endif /* MACH_OMP_FUNCS_H_ */

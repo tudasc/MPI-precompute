@@ -95,6 +95,16 @@ void PrecalculationAnalysis::analyze_functions() {
               function_analysis[call->getFunction()]->callees.insert(
                   function_analysis[ompoutlined_func]);
             }
+            if (target == get_omp_functions(M)->kmpc_omp_task_alloc) {
+              auto *ompoutlined_func = cast<Function>(call->getArgOperand(5));
+              assert(function_analysis[ompoutlined_func]->is_openmp_task);
+              auto *omp_task_call = get_task_scheduling_call(call);
+              function_analysis[ompoutlined_func]->callsites.insert(
+                  omp_task_call);
+              function_analysis[call->getFunction()]->callees.insert(
+                  function_analysis[ompoutlined_func]);
+            }
+
             function_analysis[target]->callsites.insert(call);
             function_analysis[call->getFunction()]->callees.insert(
                 function_analysis[target]);
@@ -696,8 +706,6 @@ void PrecalculationAnalysis::visit_arg(
   auto *func = arg->getParent();
   auto fun_to_precalc = function_analysis.at(func);
 
-  // TODO implement args for parallel region!
-
   if (fun_to_precalc->args_to_use.find(arg->getArgNo()) ==
       fun_to_precalc->args_to_use.end()) {
     // else: nothing to do, this was already visited
@@ -724,6 +732,19 @@ void PrecalculationAnalysis::visit_arg(
         }
       }
 
+    } else if (fun_to_precalc->is_openmp_task) {
+      if (arg->getArgNo() == 0) {
+        // will be set by omp runtime: nothing to do
+      } else if (arg->getArgNo() == 1) {
+        assert(arg->getType()->isPointerTy());
+        for (auto *task_alloc_call : fun_to_precalc->task_alloc_calls) {
+          auto alloc_info = insert_tainted_value(task_alloc_call, arg_info);
+          assert(alloc_info->ptr_info);
+          alloc_info->ptr_info->merge_with(arg_info->ptr_info);
+        }
+      } else {
+        assert(0 && "This form of openmp task is not implemented");
+      }
     } else {
 
       for (auto *call : fun_to_precalc->callsites) {

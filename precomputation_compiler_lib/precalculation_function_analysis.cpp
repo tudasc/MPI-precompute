@@ -131,9 +131,13 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
           is_openmp_parallel = true;
           parallel_region =
               std::make_shared<ParallelRegion>(cast<CallInst>(call));
-
-        } else
+        } else if (call->getCalledFunction() ==
+                   get_omp_functions(*call->getModule())->kmpc_omp_task_alloc) {
+          is_openmp_task = true;
+          task_alloc_calls.push_back(call);
+        } else {
           is_func_ptr_captured = true;
+        }
       }
       // else call instruction to function
     } else {
