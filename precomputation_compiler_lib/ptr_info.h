@@ -207,6 +207,9 @@ private:
   std::set<llvm::Instruction *> stores;
 
   bool need_pad_for_gep(llvm::GetElementPtrInst *gep);
+  bool need_pad_for_gep(llvm::Module *M, llvm::Type *type_of_gep);
+
+  llvm::Module* getModule();
 
 public:
   const std::set<llvm::Instruction *> &getStores() const;

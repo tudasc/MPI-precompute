@@ -56,6 +56,25 @@ void PtrUsageInfo::setIsUsedDirectly(
   }
 }
 
+llvm::Module *PtrUsageInfo::getModule() {
+
+  // get reference to module
+  Module *M = nullptr;
+  for (auto it = ptrs_with_this_info.begin(); it != ptrs_with_this_info.end();
+       ++it) {
+    if (auto *global = dyn_cast<GlobalObject>(it->lock()->v)) {
+      M = global->getParent();
+      break;
+    }
+    if (auto *inst = dyn_cast<Instruction>(it->lock()->v)) {
+      M = inst->getModule();
+      break;
+    }
+  }
+  assert(M);
+  return M;
+}
+
 // other MAY NOT be passed as const ref as we might recursively destruct it
 // before we are finish using it
 void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
@@ -65,7 +84,15 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
   }
 
   if (gep_type && _other->gep_type) {
-    assert(_other->gep_type == gep_type && "currently Not implemented");
+    if (_other->gep_type != gep_type) {
+
+      bool need_prepend_other = need_pad_for_gep(getModule(), _other->gep_type);
+      if (need_prepend_other) {
+        gep_type->dump();
+        _other->gep_type->dump();
+        assert(0 && "currently Not implemented");
+      }
+    }
   }
   if (!gep_type && _other->gep_type) {
     gep_type = _other->gep_type;
@@ -226,22 +253,21 @@ void PtrUsageInfo::add_important_member(
   add_important_member(member_idx, result_ptr);
 }
 
-bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
+bool PtrUsageInfo::need_pad_for_gep(llvm::Module *M, llvm::Type *type_of_gep) {
   if (this->gep_type == nullptr) {
     return false;
   }
-  if (this->gep_type == gep->getSourceElementType()) {
+  if (this->gep_type == type_of_gep) {
     return false;
   }
   // or type sizes are same
-  auto DL = gep->getModule()->getDataLayout();
-  if (DL.getTypeAllocSize(this->gep_type) ==
-      DL.getTypeAllocSize(gep->getSourceElementType())) {
+  auto DL = M->getDataLayout();
+  if (DL.getTypeAllocSize(this->gep_type) == DL.getTypeAllocSize(type_of_gep)) {
     return false;
   }
   // cast to void*
-  if (gep->getSourceElementType() == Type::getInt8Ty(gep->getContext()) ||
-      gep_type == Type::getInt8Ty(gep->getContext())) {
+  if (type_of_gep == Type::getInt8Ty(M->getContext()) ||
+      gep_type == Type::getInt8Ty(M->getContext())) {
     // this may happen if ptr is cast to void* e.g. passed to memset call
     // in this case we dont know which geps will alias
     whole_ptr_is_relevant = true;
@@ -250,16 +276,15 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
   }
 
   if (auto this_array_type = dyn_cast<ArrayType>(this->gep_type)) {
-    assert(!isa<ArrayType>(gep->getSourceElementType()));
-    assert(this_array_type->getElementType() == gep->getSourceElementType());
+    assert(!isa<ArrayType>(type_of_gep));
+    assert(this_array_type->getElementType() == type_of_gep);
     return true;
   }
-  if (auto other_array_type =
-          dyn_cast<ArrayType>(gep->getSourceElementType())) {
+  if (auto other_array_type = dyn_cast<ArrayType>(type_of_gep)) {
     // in this case we need to raise the type of our gep type to the array type
     assert(!isa<ArrayType>(this->gep_type));
     assert(other_array_type->getElementType() == this->gep_type);
-    this->gep_type = gep->getSourceElementType();
+    this->gep_type = type_of_gep;
     // pre-pend 0 to all existing gep members (need to copy whole map)
     std::map<std::vector<long>, std::shared_ptr<PtrUsageInfo>>
         old_important_members(important_members);
@@ -275,11 +300,15 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
   }
 
   this->gep_type->dump();
-  gep->getSourceElementType()->dump();
+  type_of_gep->dump();
 
   assert(false && "not supported yet");
 
   return false;
+}
+
+bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
+  return need_pad_for_gep(getModule(), gep->getSourceElementType());
 }
 
 void PtrUsageInfo::add_important_member(
