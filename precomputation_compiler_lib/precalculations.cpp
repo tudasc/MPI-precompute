@@ -1594,17 +1594,19 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
 void PrecalculationAnalysis::debug_printings() {
   errs() << "ADDITIONAL DEBUG PRINTING\n";
 
+  // set to dump each info only once (and not for each alias)
   std::set<std::shared_ptr<PtrUsageInfo>> dumped;
 
   for (const auto &v : tainted_values) {
-    if (v->v->getName() == "this") {
+    if (v->ptr_info) {
       auto pair = dumped.insert(v->ptr_info);
       if (pair.second) {
-        errs() << "THIS PTR\n";
+        errs() << "\n";
         v->ptr_info->dump();
       }
     }
   }
+  errs() << "END ADDITIONAL DEBUG PRINTING\n";
   // assert(false);
 }
 

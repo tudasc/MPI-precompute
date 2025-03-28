@@ -400,10 +400,14 @@ void PtrUsageInfo::dump() {
     errs() << "INVALID\n";
   }
 #endif
-  errs() << "Users:\n";
+  errs() << "Aliasing ptrs:\n";
   for (const auto &u : ptrs_with_this_info) {
     errs() << "\t";
-    u.lock()->v->dump();
+    if (auto *func = dyn_cast<Function>(u.lock()->v)) {
+      errs() << "@" << func->getName();
+    } else {
+      u.lock()->v->dump();
+    }
     errs() << "\t";
     errs() << "\t";
     if (auto *inst = dyn_cast<Instruction>(u.lock()->v)) {
@@ -431,6 +435,7 @@ void PtrUsageInfo::dump() {
       pair.second->dump();
     }
   }
+  errs() << "End PtrUsageInfo\n";
 }
 const std::set<std::weak_ptr<TaintedValue>,
                std::owner_less<std::weak_ptr<TaintedValue>>> &
