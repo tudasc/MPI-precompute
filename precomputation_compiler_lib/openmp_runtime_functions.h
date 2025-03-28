@@ -7,6 +7,7 @@
 
 struct omp_functions {
   llvm::Function *kmpc_fork_call = nullptr;
+  llvm::Function *kmpc_omp_task_alloc = nullptr;
 
   llvm::Function *kmpc_global_thread_num = nullptr;
   llvm::Function *kmpc_push_num_threads = nullptr;

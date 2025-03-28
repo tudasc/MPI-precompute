@@ -23,6 +23,8 @@ struct omp_functions *get_omp_functions(llvm::Module &M) {
       omp_func->kmpc_global_thread_num = f;
     } else if (f->getName().equals("__kmpc_push_num_threads")) {
       omp_func->kmpc_push_num_threads = f;
+    } else if (f->getName().equals("__kmpc_omp_task_alloc")) {
+      omp_func->kmpc_omp_task_alloc = f;
     }
   }
 
