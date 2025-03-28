@@ -233,6 +233,22 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
   if (this->gep_type == gep->getSourceElementType()) {
     return false;
   }
+  // or type sizes are same
+  auto DL = gep->getModule()->getDataLayout();
+  if (DL.getTypeAllocSize(this->gep_type) ==
+      DL.getTypeAllocSize(gep->getSourceElementType())) {
+    return false;
+  }
+  // cast to void*
+  if (gep->getSourceElementType() == Type::getInt8Ty(gep->getContext()) ||
+      gep_type == Type::getInt8Ty(gep->getContext())) {
+    // this may happen if ptr is cast to void* e.g. passed to memset call
+    // in this case we dont know which geps will alias
+    whole_ptr_is_relevant = true;
+
+    return false;
+  }
+
   if (auto this_array_type = dyn_cast<ArrayType>(this->gep_type)) {
     assert(!isa<ArrayType>(gep->getSourceElementType()));
     assert(this_array_type->getElementType() == gep->getSourceElementType());
@@ -254,21 +270,6 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::GetElementPtrInst *gep) {
       std::copy(key.begin(), key.end(), std::back_inserter(new_key));
       important_members[new_key] = value;
     }
-
-    return false;
-  }
-
-  // can check if type sizes are same and allow that
-  auto DL = gep->getModule()->getDataLayout();
-  if (DL.getTypeAllocSize(this->gep_type) ==
-      DL.getTypeAllocSize(gep->getSourceElementType())) {
-    return false;
-  }
-  if (gep->getSourceElementType() == Type::getInt8Ty(gep->getContext()) ||
-      gep_type == Type::getInt8Ty(gep->getContext())) {
-    // this may happen if ptr is cast to void* e.g. passed to memset call
-    // in this case we dont know which geps will alias
-    whole_ptr_is_relevant = true;
 
     return false;
   }
