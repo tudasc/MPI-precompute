@@ -162,6 +162,7 @@ inline bool should_call_intrinsic(llvm::Intrinsic::ID id) {
       id == llvm::Intrinsic::llrint ||
       // specialized arithmetic
       id == llvm::Intrinsic::fmuladd || id == llvm::Intrinsic::fma ||
+      id == llvm::Intrinsic::umul_with_overflow ||
       // exception handling:
       id == llvm::Intrinsic::eh_typeid_for ||
       // stack reading
