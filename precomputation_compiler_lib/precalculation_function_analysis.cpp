@@ -112,12 +112,12 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
       aliases.insert(alias);
 
       if (not alias->user_empty()) {
-        llvm::errs() << "Alias is used\n";
-        for (auto *auu : alias->users()) {
-          auu->dump();
-        }
-        llvm::errs() << "currently not supported\n";
-        assert(false);
+        llvm::errs() << "Function Alias is used:\n";
+        alias->dump();
+        llvm::errs() << "Replace with original func\n";
+        // this way we dont need to handle tha alias explicitly:
+        alias->replaceAllUsesWith(func);
+        // this may impact debug info
       }
 
       continue;
