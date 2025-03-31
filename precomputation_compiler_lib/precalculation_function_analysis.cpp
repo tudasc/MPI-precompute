@@ -127,8 +127,11 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
       if (call->getCalledFunction() != func) {
         if (is_omp_fork_call(call)) {
           //  call to openmp
-          assert(is_openmp_parallel ==
-                 false); // only part of one parallel region
+          errs() << func->getName() << "\n";
+          assert(
+              is_openmp_parallel == false &&
+              "Currently the analysis does not support multiple fork calls to "
+              "the same parallel region"); // only part of one parallel region
           is_openmp_parallel = true;
           parallel_region =
               std::make_shared<ParallelRegion>(cast<CallInst>(call));
