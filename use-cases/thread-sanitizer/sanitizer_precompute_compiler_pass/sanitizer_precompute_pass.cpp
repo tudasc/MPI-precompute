@@ -80,16 +80,18 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
   // Pass starts here
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
 
-    // TODO is there a better solution to that?
-    // TODO make sure that tsan passs is only run once and not again (or check
-    // that it does not instrument everything twice)
-    //  make sure TSAN pass runs
-    auto *FAM =
-        &AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
-    auto tsan_pass = ThreadSanitizerPass();
-    for (auto it = M.begin(); it != M.end(); ++it) {
-      Function *f = &*it;
-      tsan_pass.run(*f, *FAM);
+    if (M.getFunction("__tsan_func_entry") == nullptr ||
+        (M.getFunction("__tsan_func_entry")->users().empty())) {
+
+      Debug(errs() << "Run tsan pass\n");
+      //  make sure TSAN pass runs
+      auto *FAM =
+          &AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+      auto tsan_pass = ThreadSanitizerPass();
+      for (auto it = M.begin(); it != M.end(); ++it) {
+        Function *f = &*it;
+        tsan_pass.run(*f, *FAM);
+      }
     }
 
     Debug(errs() << "Before Modification:\n"; M.dump();
@@ -122,6 +124,19 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
                 (call->getCalledFunction()->getName().startswith("__tsan") ||
                  is_omp_function(call->getCalledFunction()))) {
               // no invoke to tsan just plain call
+              // TODO call to openmp runtime can be an invoke (although no func
+              // in omp can actually except???)
+
+              // TODO cal to __tsan_func_exit in a tsan_cleanup block is not
+              // needed, only relevant for fatal exception anyway
+              /*
+              tsan_cleanup:                                     ; preds = %entry
+  %cleanup.lpad = landingpad { ptr, i32 }
+          cleanup
+  call void @__tsan_func_exit()
+  call void @__tsan_func_exit()
+  resume { ptr, i32 } %cleanup.lpad
+               */
               assert(dyn_cast<CallInst>(call));
               for (auto it_arg = call->arg_begin(); it_arg != call->arg_end();
                    ++it_arg) {

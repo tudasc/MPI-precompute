@@ -103,6 +103,9 @@ if [ "$has_o_files" == true ]; then
             # Use dirname to get the directory part (will at least result in ".")
             directory=$(dirname "$arg")
             COMPILER_INVOCATION="$COMPILER_INVOCATION -L$directory -l$lib_name"
+        elif [[ "$arg" == "-fsanitize=thread" ]]; then
+            # remove thi arg, as tsan instrumentation was already done when compiling .o
+            COMPILER_INVOCATION=$COMPILER_INVOCATION
         else
             COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
         fi
