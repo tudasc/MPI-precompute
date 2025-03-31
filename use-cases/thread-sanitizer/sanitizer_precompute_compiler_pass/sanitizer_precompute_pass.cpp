@@ -62,6 +62,26 @@ void run_optimization_passes(llvm::Module &M, ModuleAnalysisManager &AM) {
   // M.dump();
 }
 
+bool is_tsan_cleanup_block(llvm::BasicBlock *block) {
+  auto it = block->begin();
+  if (it == block->end() || not isa<LandingPadInst>(it)) {
+    return false;
+  }
+  ++it;
+  if (it == block->end() || not isa<CallInst>(it) ||
+      not cast<CallInst>(it)->isIndirectCall() ||
+      not(cast<CallInst>(it)->getCalledFunction()->getName() ==
+          "__tsan_func_exit")) {
+    return false;
+  }
+  ++it;
+  if (it == block->end() || not isa<ResumeInst>(it)) {
+    return false;
+  }
+  ++it;
+  return it == block->end();
+}
+
 namespace {
 struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 
@@ -123,21 +143,15 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
                 // omp function necessary e.g. to keep synchronization
                 (call->getCalledFunction()->getName().startswith("__tsan") ||
                  is_omp_function(call->getCalledFunction()))) {
-              // no invoke to tsan just plain call
-              // TODO call to openmp runtime can be an invoke (although no func
-              // in omp can actually except???)
+              if (call->getCalledFunction()->getName() == "__tsan_func_exit") {
+                if (is_tsan_cleanup_block(call->getParent())) {
+                  // skip, the tsan cleanup part.
+                  // no need to precompute, as it will only handle fatal
+                  // exceptions
+                  continue;
+                }
+              }
 
-              // TODO cal to __tsan_func_exit in a tsan_cleanup block is not
-              // needed, only relevant for fatal exception anyway
-              /*
-              tsan_cleanup:                                     ; preds = %entry
-  %cleanup.lpad = landingpad { ptr, i32 }
-          cleanup
-  call void @__tsan_func_exit()
-  call void @__tsan_func_exit()
-  resume { ptr, i32 } %cleanup.lpad
-               */
-              assert(dyn_cast<CallInst>(call));
               for (auto it_arg = call->arg_begin(); it_arg != call->arg_end();
                    ++it_arg) {
                 to_precompute.push_back(it_arg->get());
