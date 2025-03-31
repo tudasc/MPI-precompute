@@ -16,11 +16,9 @@ if [ ! -d "$TEST_DIR" ]; then
   exit 1
 fi
 
-export MPI_COMPILER_ASSISTANCE_FRONTEND_PLUGIN_FILE="$TEST_DIR/plugin_data.json"
-
 cd $TEST_DIR
 
-export USE_MPI_COMPILER_ASSISTANCE_PASS=true
+export USE_COMPILER_PASS=true
 
 if ls *.cpp 1> /dev/null 2>&1; then
   $RUN_SCRIPT *.cpp

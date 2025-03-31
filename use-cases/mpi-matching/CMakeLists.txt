@@ -18,6 +18,7 @@ add_custom_target(setup_env.sh ALL
         echo "export LIBRARY_PATH=${OMPI_INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}:\\$$LIBRARY_PATH" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export LD_LIBRARY_PATH=${OMPI_INSTALL_DIR}/lib:${PRECOMPUTE_LIB_PATH}:\\$$LD_LIBRARY_PATH" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export MPI_COMPILER_ASSISTANCE_PASS=$<TARGET_FILE:mpi_compiler_assistance_matching_pass>" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export COMPILER_PASS=$<TARGET_FILE:mpi_compiler_assistance_matching_pass>" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export WHOLE_PROGRAM_DEVIRT_ANALYSIS_PASS=${CMAKE_BINARY_DIR}/WholeProgramDevirtAnalysisPass/libwholeProgramDevirtAnalysisPass.so" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export OMPI_CC=${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
@@ -32,9 +33,9 @@ add_custom_target(run.sh ALL
         DEPENDS run.sh)
 
 add_custom_target(clang_wrap_cc ALL
-        COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/clang_wrapper.sh ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc && sed -i '3s/.*/compiler=clang/' ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc
-        DEPENDS clang_wrapper.sh)
+        COMMAND cp ${CMAKE_SOURCE_DIR}/clang_wrapper.sh ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc && sed -i '3s/.*/compiler=clang/' ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc
+        DEPENDS ${CMAKE_SOURCE_DIR}/clang_wrapper.sh)
 
 add_custom_target(clang_wrap_cxx ALL
-        COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/clang_wrapper.sh ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cxx && sed -i '3s/.*/compiler=clang++/' ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cxx
-        DEPENDS clang_wrapper.sh)
+        COMMAND cp ${CMAKE_SOURCE_DIR}/clang_wrapper.sh ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cxx && sed -i '3s/.*/compiler=clang++/' ${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cxx
+        DEPENDS ${CMAKE_SOURCE_DIR}/clang_wrapper.sh)

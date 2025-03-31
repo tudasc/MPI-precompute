@@ -12,7 +12,7 @@ fi
 
 #TODO add check that at least -O1 is used as we require some optimizations done in O1
 
-USE_MPI_COMPILER_ASSISTANCE_PASS=${USE_MPI_COMPILER_ASSISTANCE_PASS:false}
+USE_COMPILER_PASS=${USE_COMPILER_PASS:false}
 
 is_to_obj=false
 has_o_option=false
@@ -35,7 +35,7 @@ for arg in "$@"; do
 done
 
 # check if necessary flags are given
-if [ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ] &&
+if [ "$USE_COMPILER_PASS" == true ] &&
     ( [ "$has_flto" == false ] ||
    [ "$has_fwhole_program_vtables" == false ] ); then
     echo "Error, need -flto and -fwhole-program-vtables for pass to work correctly"
@@ -43,8 +43,8 @@ if [ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ] &&
     exit 1
 fi
 
-if [ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ] && ( ! [[ -v MPI_COMPILER_ASSISTANCE_PASS ]] ); then
-    echo "The MPI_COMPILER_ASSISTANCE_PASS environment variable is not set"
+if [ "$USE_COMPILER_PASS" == true ] && ( ! [[ -v COMPILER_PASS ]] ); then
+    echo "The COMPILER_PASS environment variable is not set"
     export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit 1
 fi
@@ -82,8 +82,8 @@ if [ "$has_o_files" == true ]; then
     fi
     #-x ir - : read ir from stdin
     COMPILER_INVOCATION="$compiler -x ir -"
-    if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
-        COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS -lprecompute"
+    if [[ "$USE_COMPILER_PASS" == true ]]; then
+        COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$COMPILER_PASS -lprecompute"
     fi
     LLVM_LINK_INVOCATION="llvm-link"
     for arg in "$@"; do
@@ -119,8 +119,8 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     echo "MODE: direct to Binary"
 fi
 COMPILER_INVOCATION="$compiler"
-if [[ "$USE_MPI_COMPILER_ASSISTANCE_PASS" == true ]]; then
-    COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$MPI_COMPILER_ASSISTANCE_PASS -lprecompute"
+if [[ "$USE_COMPILER_PASS" == true ]]; then
+    COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$COMPILER_PASS -lprecompute"
 fi
 for arg in "$@"; do
     COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"

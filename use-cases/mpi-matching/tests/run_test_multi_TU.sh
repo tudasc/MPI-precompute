@@ -20,7 +20,7 @@ mkdir -p $TEST_DIR_NAME
 cd $TEST_DIR_NAME
 
 # without pass disabled to get the original application
-export USE_MPI_COMPILER_ASSISTANCE_PASS=false
+export USE_COMPILER_PASS=false
 export OMPI_CC=clang
 export OMPI_CXX=clang++
 
