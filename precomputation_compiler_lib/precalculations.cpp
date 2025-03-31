@@ -457,6 +457,13 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // a load and store to ptr
     visit_store(v, atomic->getPointerOperand(), atomic->getValOperand());
     visit_load(v, get_taint_info(atomic->getPointerOperand()));
+  } else if (auto *insertvalue = dyn_cast<InsertValueInst>(v->v)) {
+    // a load and store to ptr
+    insert_tainted_value(insertvalue->getAggregateOperand(), v);
+    insert_tainted_value(insertvalue->getInsertedValueOperand(), v);
+    // indices are constants
+    // I mean an integral part of teh instruction, not even llvm::ConstantInt
+    v->visited = true;
   }
 
   else {
@@ -537,7 +544,8 @@ void PrecalculationAnalysis::visit_ptr_usages(
         as_inst->deleteValue();
         return;
       }
-      //no alaias analysis for constatn gep necessary, as there should only be one constatn gep (ptr of constexpr need to be const itself)
+      // no alaias analysis for constatn gep necessary, as there should only be
+      // one constatn gep (ptr of constexpr need to be const itself)
     }
     as_inst->deleteValue();
     // don't keep the temporary instruction around
@@ -548,10 +556,8 @@ void PrecalculationAnalysis::visit_ptr_usages(
   if (not(isa<AllocaInst>(ptr->v) || isa<CallBase>(ptr->v) ||
           isa<Argument>(ptr->v) || isa<LoadInst>(ptr->v) ||
           isa<Function>(ptr->v) || isa<GetElementPtrInst>(ptr->v) ||
-          isa<GlobalVariable>(ptr->v) ||
-          isa<SelectInst>(ptr->v) || isa<PHINode>(ptr->v) ||
-          isa<ConstantExpr>(ptr->v)
-          )) {
+          isa<GlobalVariable>(ptr->v) || isa<SelectInst>(ptr->v) ||
+          isa<PHINode>(ptr->v) || isa<ConstantExpr>(ptr->v))) {
     ptr->v->dump();
 
     assert(false && "This ptr type is not supported");
