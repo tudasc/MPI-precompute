@@ -119,9 +119,10 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
         alias->replaceAllUsesWith(func);
         // this may impact debug info
       }
-
-      continue;
     }
+  }
+  // new calls in func.users if aliases arte replaced
+  for (auto *u : func->users()) {
     if (auto call = llvm::dyn_cast<llvm::CallBase>(u)) {
       if (call->getCalledFunction() != func) {
         if (is_omp_fork_call(call)) {
