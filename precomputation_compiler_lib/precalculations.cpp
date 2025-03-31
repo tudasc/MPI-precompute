@@ -537,10 +537,26 @@ void PrecalculationAnalysis::visit_ptr_usages(
         as_inst->deleteValue();
         return;
       }
+      //no alaias analysis for constatn gep necessary, as there should only be one constatn gep (ptr of constexpr need to be const itself)
     }
     as_inst->deleteValue();
     // don't keep the temporary instruction around
   }
+
+  // test that this is a supported ptr origin
+  // for these types, the alias analysis is implemented
+  if (not(isa<AllocaInst>(ptr->v) || isa<CallBase>(ptr->v) ||
+          isa<Argument>(ptr->v) || isa<LoadInst>(ptr->v) ||
+          isa<Function>(ptr->v) || isa<GetElementPtrInst>(ptr->v) ||
+          isa<GlobalVariable>(ptr->v) ||
+          isa<SelectInst>(ptr->v) || isa<PHINode>(ptr->v) ||
+          isa<ConstantExpr>(ptr->v)
+          )) {
+    ptr->v->dump();
+
+    assert(false && "This ptr type is not supported");
+  }
+  // TODO instructions like extractelement?
 
   for (auto *u : ptr->v->users()) {
     if (auto *inst = dyn_cast<Instruction>(u)) {
