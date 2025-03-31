@@ -138,7 +138,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
         for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
           Instruction *inst = &*it_i;
           if (auto *call = dyn_cast<CallBase>(inst)) {
-            if (!call->isIndirectCall() &&
+            if (call->getCalledFunction() &&
                 // eiter tsan or omp function
                 // omp function necessary e.g. to keep synchronization
                 (call->getCalledFunction()->getName().startswith("__tsan") ||
