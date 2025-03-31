@@ -151,6 +151,11 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
                   continue;
                 }
               }
+              if (is_func_from_std(call->getFunction())) {
+                // dont analyze internals of std, though tsan may instrument
+                // them
+                continue;
+              }
 
               for (auto it_arg = call->arg_begin(); it_arg != call->arg_end();
                    ++it_arg) {
