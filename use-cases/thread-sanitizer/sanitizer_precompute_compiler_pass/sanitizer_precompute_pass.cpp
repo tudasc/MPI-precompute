@@ -134,6 +134,12 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
       }
     }
 
+    // no tsan found
+    if (precompute_locations.empty()) {
+      // no modification
+      return PreservedAnalyses::all();
+    }
+
     auto precalcuation = std::make_shared<PrecomputeInsertion>(
         M,
         std::make_shared<PrecalculationAnalysis>(M, main_func, to_precompute,
