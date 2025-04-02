@@ -1,6 +1,7 @@
 #ifndef CATO_MICROTASK_H
 #define CATO_MICROTASK_H
 
+#include <map>
 #include <memory>
 
 #include <llvm/IR/Function.h>
@@ -28,17 +29,17 @@ struct ReductionData {
  **/
 class ParallelRegion {
 private:
-  // The __kmpc_fork_call instruction in the original code, which calls the
+  // The __kmpc_fork_call s instruction in the original code, which calls the
   // OpenMP microtask
-  llvm::CallInst *_fork_call;
+  std::vector<llvm::CallBase *> _fork_calls;
 
-  // The outlinbed function itself (omp.outlined created by the compiler for
+  // The outlined function itself (omp.outlined created by the compiler for
   // OpenMP parallel sections).
   llvm::Function *_function;
 
-  // The Input variables used in this Microtask
-  // list of Value in Main Function -> Value in ompoutline function
-  std::vector<std::pair<llvm::Value *, llvm::Value *>> _shared_variables;
+  // map to match values in serial and parallel region
+  std::map<llvm::Value *, std::vector<llvm::Value *>> _to_serial_map;
+  std::map<llvm::Value *, llvm::Value *> _to_parallel_map;
 
   // Parallel for inside the microtask
   ParallelForData _parallel_for;
@@ -48,13 +49,13 @@ private:
 
 public:
   /**
-   * Constructor expects a CallInst* to __kmpc_fork_call
+   * Constructor expects the ompoutlined function
    **/
-  ParallelRegion(llvm::CallInst *fork_call);
+  ParallelRegion(llvm::Function *ompoutlined);
 
   ~ParallelRegion();
 
-  llvm::CallInst *get_fork_call();
+  std::vector<llvm::CallBase *> get_fork_calls();
 
   llvm::Function *get_function();
 
@@ -67,7 +68,7 @@ public:
   // gets the value that corresponds to the given value from serial region
   llvm::Argument *get_value_in_parallel(llvm::Value *val);
   // get the value that corresponds to the given value in parallel region
-  llvm::Value *get_value_in_serial(llvm::Value *val);
+  std::vector<llvm::Value *> get_value_in_serial(llvm::Value *val);
 
   // get end block of loop
   // this means the omp.dispatch.cond.omp.dispatch.end_crit_edge

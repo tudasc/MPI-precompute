@@ -745,12 +745,14 @@ void PrecalculationAnalysis::visit_arg(
       }
       if (arg->getArgNo() >= 2) {
         // shared variables
-        auto in_serial =
+        auto in_serial_vec =
             fun_to_precalc->parallel_region->get_value_in_serial(arg);
-        auto serial_info = insert_tainted_value(in_serial, arg_info);
-        // create another ptr alias
-        if (arg->getType()->isPointerTy()) {
-          serial_info->ptr_info->merge_with(arg_info->ptr_info);
+        for (auto *in_serial : in_serial_vec) {
+          auto serial_info = insert_tainted_value(in_serial, arg_info);
+          // create another ptr alias
+          if (arg->getType()->isPointerTy()) {
+            serial_info->ptr_info->merge_with(arg_info->ptr_info);
+          }
         }
       }
 

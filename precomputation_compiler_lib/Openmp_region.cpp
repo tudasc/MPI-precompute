@@ -1,5 +1,7 @@
 #include "Openmp_region.h"
 
+#include "openmp_runtime_functions.h"
+
 using namespace llvm;
 
 /**
@@ -29,18 +31,26 @@ InputIt find_if_exactly_one(InputIt first, InputIt last, UnaryPredicate p) {
     return last;
 }
 
-ParallelRegion::ParallelRegion(CallInst *fork_call) {
+ParallelRegion::ParallelRegion(Function *ompoutlined) {
 
-  assert(fork_call->getCalledFunction()->getName().equals("__kmpc_fork_call"));
-  _fork_call = fork_call;
+  _function = ompoutlined;
+
+  for (auto u : ompoutlined->users()) {
+    if (auto *call = dyn_cast<CallBase>(u)) {
+      assert(is_omp_fork_call(call));
+      assert(ompoutlined == call->getArgOperand(2));
+      _fork_calls.push_back(call);
+
+    } else {
+      u->dump();
+      assert(0 && "Not implemented user of ompoutlined");
+    }
+  }
+
   _parallel_for.init = nullptr;
   _parallel_for.fini = nullptr;
   _reduction.reduce = nullptr;
   _reduction.end_reduce = nullptr;
-
-  // Get the microtask function from the fork calls arguments
-  auto *microtask_arg = fork_call->getArgOperand(2);
-  _function = dyn_cast<Function>(microtask_arg->stripPointerCasts());
 
   // Collect the shared variables
   for (auto &argument : _function->args()) {
@@ -53,9 +63,13 @@ ParallelRegion::ParallelRegion(CallInst *fork_call) {
       // first two args of ompoutlined are not interesting
       start_args_at_fork = start_args_at_fork - 2;
 
-      Value *in_serial =
-          _fork_call->getArgOperand(start_args_at_fork + argument.getArgNo());
-      _shared_variables.push_back(std::make_pair(in_serial, in_parallel));
+      _to_serial_map[in_parallel] = {};
+      for (auto *c : _fork_calls) {
+        Value *in_serial =
+            c->getArgOperand(start_args_at_fork + argument.getArgNo());
+        _to_serial_map[in_parallel].push_back(in_serial);
+        _to_parallel_map[in_serial] = in_parallel;
+      }
     }
   }
 
@@ -86,7 +100,7 @@ ParallelRegion::ParallelRegion(CallInst *fork_call) {
 
 ParallelRegion::~ParallelRegion() {}
 
-CallInst *ParallelRegion::get_fork_call() { return _fork_call; }
+std::vector<CallBase *> ParallelRegion::get_fork_calls() { return _fork_calls; }
 
 Function *ParallelRegion::get_function() { return _function; }
 
@@ -106,45 +120,18 @@ ReductionData *ParallelRegion::get_reduction() {
   }
 }
 
-std::vector<std::pair<llvm::Value *, llvm::Value *>> &
-ParallelRegion::get_shared_variables() {
-  return _shared_variables;
-}
-
 // gets the value that corresponds to the given value from main
 llvm::Argument *ParallelRegion::get_value_in_parallel(llvm::Value *val) {
 
-  if (_fork_call->hasArgument(val)) {
-
-    auto pos = std::find_if(_shared_variables.begin(), _shared_variables.end(),
-                            [&val](const std::pair<Value *, Value *> &element) {
-                              return (element.first == val);
-                            });
-    // othewise previous if has captured it
-    assert(pos != _shared_variables.end());
-
-    return cast<Argument>((*pos).second);
-
-  } else {
-    // it is not passed to this microtask
-    return nullptr;
-  }
+  return _to_parallel_map.count(val) > 0
+             ? cast<Argument>(_to_parallel_map.at(val))
+             : nullptr;
 }
 // get the value that corresponds to the given value in microtask
-llvm::Value *ParallelRegion::get_value_in_serial(llvm::Value *val) {
-  if (auto *arg = dyn_cast<Argument>(val)) {
-    if (arg->getParent() == _function) {
-
-      auto pos =
-          std::find_if(_shared_variables.begin(), _shared_variables.end(),
-                       [&val](const std::pair<Value *, Value *> &element) {
-                         return (element.second == val);
-                       });
-      assert(pos != _shared_variables.end());
-      return (*pos).first;
-    }
-  }
-  return nullptr;
+std::vector<llvm::Value *>
+ParallelRegion::get_value_in_serial(llvm::Value *val) {
+  return _to_serial_map.count(val) > 0 ? _to_serial_map.at(val)
+                                       : std::vector<llvm::Value *>{};
 }
 
 BasicBlock *ParallelRegion::find_loop_end_block() {
