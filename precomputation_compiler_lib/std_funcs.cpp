@@ -153,10 +153,16 @@ bool is_func_from_std(llvm::Function *func) {
   }
 
   // TODO why it is not in TLI info??
-  if (func->getName() == "rand") {
+  if (func->getName() == "rand" || func->getName() == "rand_r" ||
+      func->getName() == "srand") {
     // calling rand in precompute is actually "safe",
     // as one should usa a random seed anyway it doesn't matter if we call
     // it in precompute
+    return true;
+  }
+
+  // if std=c99 is supplied to the compiler
+  if (func->getName().starts_with("__isoc99_")) {
     return true;
   }
 
