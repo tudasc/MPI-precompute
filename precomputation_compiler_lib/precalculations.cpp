@@ -1291,6 +1291,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
 
   for (auto *func : get_possible_call_targets(call)) {
     for (auto arg_num : ptr_given_as_arg) {
+      assert(!func->isVarArg() && "not implemented yet");
       auto *arg = func->getArg(arg_num);
       if (arg->hasAttribute(Attribute::NoCapture) &&
           arg->hasAttribute(Attribute::ReadOnly)) {
