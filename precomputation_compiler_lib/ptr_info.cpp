@@ -249,7 +249,9 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
   }
   // cast to void*
   if (type_of_gep == Type::getInt8Ty(M->getContext()) ||
-      gep_type == Type::getInt8Ty(M->getContext())) {
+      type_of_gep == PointerType::get(M->getContext(), 0) ||
+      gep_type == Type::getInt8Ty(M->getContext()) ||
+      gep_type == PointerType::get(M->getContext(), 0)) {
     // this may happen if ptr is cast to void* e.g. passed to memset call
     // in this case we dont know which geps will alias
     whole_ptr_is_relevant = true;

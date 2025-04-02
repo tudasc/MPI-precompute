@@ -464,6 +464,9 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // indices are constants
     // I mean an integral part of teh instruction, not even llvm::ConstantInt
     v->visited = true;
+  } else if (auto *freeze = dyn_cast<FreezeInst>(v->v)) {
+    // essentially a no-op on valid values
+    insert_tainted_value(freeze->getOperand(0), v);
   }
 
   else {
@@ -506,6 +509,69 @@ void PrecalculationAnalysis::visit_ptr_store(
   func->add_ptr_write(ptr->ptr_info);
   // may need to re-visit if we discovered its importance later
   store_info->visited = false;
+}
+
+bool PrecalculationAnalysis::visit_ptr_insertvalue_recursive_impl(
+    const std::shared_ptr<TaintedValue> &ptr,
+    llvm::ArrayRef<unsigned> insert_idx, llvm::Instruction *aggregate_inst) {
+
+  bool is_needed = false;
+
+  for (auto *u : aggregate_inst->users()) {
+    if (auto *extract = dyn_cast<ExtractValueInst>(u)) {
+      if (extract->getIndices() == insert_idx) {
+        // match
+        assert(extract->getType() == ptr->v->getType());
+        // add ptr alias
+        auto info = insert_tainted_value(
+            aggregate_inst); // the needed instructions are marked one lvl up in
+        // recursion
+        assert(info->ptr_info);
+        ptr->ptr_info->merge_with(info->ptr_info);
+        is_needed = true;
+      }
+    } else if (auto *insert = dyn_cast<InsertValueInst>(u)) {
+      if (insert->getIndices() == insert_idx) {
+        // element is overridden
+        return false;
+      } else {
+        // new derived compound
+        bool is_needed_down_lvl =
+            visit_ptr_insertvalue_recursive_impl(ptr, insert_idx, insert);
+        if (is_needed_down_lvl) {
+          // the value needed for aggregate_inst is handled by upper recursion
+          // lvl
+          insert_tainted_value(insert, insert_tainted_value(aggregate_inst));
+        }
+        is_needed = is_needed || is_needed_down_lvl;
+      }
+    } else if (isa<ResumeInst>(u)) {
+      // nothing to do
+    } else {
+      u->dump();
+      assert(0 && "this aggregate usage is not supported yet");
+    }
+  }
+  return is_needed;
+}
+
+void PrecalculationAnalysis::visit_ptr_insertvalue(
+    const std::shared_ptr<TaintedValue> &ptr,
+    llvm::InsertValueInst *insert_value_inst) {
+
+  auto inserted_index = insert_value_inst->getIndices();
+
+  for (auto *u : insert_value_inst->users()) {
+    if (auto *inst = dyn_cast<Instruction>(u)) {
+      bool needed =
+          visit_ptr_insertvalue_recursive_impl(ptr, inserted_index, inst);
+      if (needed)
+        insert_tainted_value(inst, ptr);
+    } else {
+      u->dump();
+      assert(0 && "This is not supported");
+    }
+  }
 }
 
 void PrecalculationAnalysis::visit_ptr_usages(
@@ -557,12 +623,12 @@ void PrecalculationAnalysis::visit_ptr_usages(
           isa<Argument>(ptr->v) || isa<LoadInst>(ptr->v) ||
           isa<Function>(ptr->v) || isa<GetElementPtrInst>(ptr->v) ||
           isa<GlobalVariable>(ptr->v) || isa<SelectInst>(ptr->v) ||
-          isa<PHINode>(ptr->v) || isa<ConstantExpr>(ptr->v))) {
+          isa<PHINode>(ptr->v) || isa<ConstantExpr>(ptr->v) ||
+          isa<ExtractValueInst>(ptr->v) || isa<FreezeInst>(ptr->v))) {
     ptr->v->dump();
 
     assert(false && "This ptr type is not supported");
   }
-  // TODO instructions like extractelement?
 
   for (auto *u : ptr->v->users()) {
     if (auto *inst = dyn_cast<Instruction>(u)) {
@@ -659,6 +725,16 @@ void PrecalculationAnalysis::visit_ptr_usages(
 
       insert_tainted_value(atomic->getValOperand(), get_taint_info(atomic));
 
+      continue;
+    }
+    if (auto *insert_val = dyn_cast<InsertValueInst>(u)) {
+      visit_ptr_insertvalue(ptr, insert_val);
+      continue;
+    }
+    if (auto *f = dyn_cast<FreezeInst>(u)) {
+      // freeze is a no-op on valid ptrs
+      auto info = insert_tainted_value(f, ptr, false);
+      info->ptr_info->merge_with(ptr->ptr_info);
       continue;
     }
 
