@@ -68,9 +68,9 @@ if [ "$is_to_obj" == true ]; then
             COMPILER_INVOCATION="$COMPILER_INVOCATION $new_file"
             # create .o and update timestamp so build-systems work as intended if they use this information
             touch $arg
-        elif [[ "$arg" == "-fsanitize=thread" ]]; then
-            # remove the arg, as tsan instrumentation will be done when linking to one bc file
-            COMPILER_INVOCATION=$COMPILER_INVOCATION
+        #elif [[ "$arg" == "-fsanitize=thread" ]]; then
+        #    # remove the arg, as tsan instrumentation will be done when linking to one bc file
+        #    COMPILER_INVOCATION=$COMPILER_INVOCATION
         else
             COMPILER_INVOCATION="$COMPILER_INVOCATION $arg"
         fi
