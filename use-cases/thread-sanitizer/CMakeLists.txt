@@ -22,7 +22,7 @@ add_custom_target(setup_env.sh_sanitizer ALL
         echo "export LD_LIBRARY_PATH=${PRECOMPUTE_LIB_PATH}:\\$$LD_LIBRARY_PATH" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export SANITIZER_PASS=$<TARGET_FILE:sanitizer_precompute_pass>" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export COMPILER_PASS=$<TARGET_FILE:sanitizer_precompute_pass>" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
-        echo "export USE_COMPILER_PASS=1" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
+        echo "export USE_COMPILER_PASS=true" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export CLANG_WRAP_CC=${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export CLANG_WRAP_CXX=${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
         DEPENDS setup_env.sh.in)

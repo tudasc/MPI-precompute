@@ -12,6 +12,10 @@ fi
 
 #TODO add check that at least -O1 is used as we require some optimizations done in O1
 
+if [ "$USE_COMPILER_PASS" == 1 ]; then
+USE_COMPILER_PASS=true
+fi
+
 USE_COMPILER_PASS=${USE_COMPILER_PASS:false}
 
 is_to_obj=false
