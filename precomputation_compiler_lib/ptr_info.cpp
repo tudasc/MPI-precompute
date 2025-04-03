@@ -282,12 +282,20 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
 
     return false;
   }
+  if ((gep_type->getStructName().starts_with("struct") ||
+       gep_type->getStructName().starts_with("class")) &&
+      (type_of_gep->getStructName().starts_with("struct") ||
+       type_of_gep->getStructName().starts_with("class"))) {
+    // "different" classes e.g. one is base ant the other is derived
+    // no need to take special care
+    return false;
+  }
 
-  errs() <<"\n\n";
+  errs() << "\n\n";
   this->gep_type->dump();
-  errs() <<"\n\n";
+  errs() << "\n\n";
   type_of_gep->dump();
-  errs() <<"\n\n";
+  errs() << "\n\n";
 
   assert(false && "not supported yet");
 
