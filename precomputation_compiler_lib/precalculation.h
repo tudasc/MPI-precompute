@@ -223,10 +223,12 @@ private:
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
-  bool visit_ptr_insertvalue_recursive_impl(const std::shared_ptr<TaintedValue> &ptr,
-                   llvm::ArrayRef<unsigned> insert_idx, llvm::Instruction *aggregate_inst);
+  bool
+  visit_ptr_insertvalue_recursive_impl(const std::shared_ptr<TaintedValue> &ptr,
+                                       llvm::ArrayRef<unsigned> insert_idx,
+                                       llvm::Instruction *aggregate_inst);
   void visit_ptr_insertvalue(const std::shared_ptr<TaintedValue> &ptr,
-                     llvm::InsertValueInst *insert_value_inst);
+                             llvm::InsertValueInst *insert_value_inst);
 };
 
 #endif // MACH_PRECALCULATIONS_IMPL_H_

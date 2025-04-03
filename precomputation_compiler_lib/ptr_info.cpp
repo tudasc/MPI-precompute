@@ -283,8 +283,11 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
     return false;
   }
 
+  errs() <<"\n\n";
   this->gep_type->dump();
+  errs() <<"\n\n";
   type_of_gep->dump();
+  errs() <<"\n\n";
 
   assert(false && "not supported yet");
 

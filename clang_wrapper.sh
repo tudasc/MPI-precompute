@@ -10,8 +10,6 @@ if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     export LD_PRELOAD="$(clang -print-file-name=libclang_rt.asan.so):$LD_PRELOAD_PREV"
 fi
 
-#TODO add check that at least -O1 is used as we require some optimizations done in O1
-
 if [ "$USE_COMPILER_PASS" == 1 ]; then
 USE_COMPILER_PASS=true
 fi
@@ -23,6 +21,7 @@ has_o_option=false
 has_o_files=false
 has_flto=false
 has_fwhole_program_vtables=false
+has_opt_lvl=false
 for arg in "$@"; do
     # Check if the current argument is "-c"
     if [ "$arg" == "-c" ]; then
@@ -35,14 +34,16 @@ for arg in "$@"; do
         has_flto=true
     elif [ "$arg" == "-fwhole-program-vtables" ]; then
         has_fwhole_program_vtables=true
+    elif [ "$arg" == "-O1" ] || [ "$arg" == "-O2" ] || [ "$arg" == "-O3" ]; then
+            has_opt_lvl=true
     fi
 done
 
 # check if necessary flags are given
 if [ "$USE_COMPILER_PASS" == true ] &&
     ( [ "$has_flto" == false ] ||
-   [ "$has_fwhole_program_vtables" == false ] ); then
-    echo "Error, need -flto and -fwhole-program-vtables for pass to work correctly"
+   [ "$has_fwhole_program_vtables" == false ] || [ "$has_opt_lvl" == false ] ); then
+    echo "Error, need -flto and -fwhole-program-vtables and at least -O1 for pass to work correctly"
     export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit 1
 fi
