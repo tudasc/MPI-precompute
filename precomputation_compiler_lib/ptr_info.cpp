@@ -260,7 +260,7 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
   }
 
   if (auto this_array_type = dyn_cast<ArrayType>(this->gep_type)) {
-    assert(!isa<ArrayType>(type_of_gep));
+
     assert(this_array_type->getElementType() == type_of_gep);
     return true;
   }
