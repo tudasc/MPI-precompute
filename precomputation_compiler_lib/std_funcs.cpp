@@ -91,6 +91,17 @@ void allow_function_prefixes_to_be_called_in_precompute(
             std::back_inserter(allowed_function_prefixes));
 }
 
+llvm::Function *std_dummy_func = nullptr;
+
+llvm::Function *get_std_dummy_func(llvm::Module *M) {
+  if (!std_dummy_func) {
+    Function::Create(FunctionType::get(Type::getVoidTy(M->getContext()), false),
+                     GlobalValue::InternalLinkage, "std_dummy_func");
+  }
+
+  return std_dummy_func;
+}
+
 bool is_func_from_std(llvm::Function *func) {
   assert(func);
   if (allowed_function_prefixes.empty()) {
@@ -100,6 +111,9 @@ bool is_func_from_std(llvm::Function *func) {
 
   // openmp
   if (is_omp_function(func)) {
+    return true;
+  }
+  if (func == get_std_dummy_func(func->getParent())) {
     return true;
   }
 

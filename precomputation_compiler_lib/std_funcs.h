@@ -58,6 +58,10 @@ inline bool is_allocation(llvm::CallBase *call) {
 
 bool is_func_from_std(llvm::Function *func);
 
+// this function is used, in order to signal a virtual call to some function of
+// std::
+llvm::Function *get_std_dummy_func(llvm::Module *M);
+
 // we should not mess around with the globals defined by std::
 inline bool is_global_from_std(llvm::GlobalValue *global) {
   assert(global);
