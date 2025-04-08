@@ -261,12 +261,13 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
 
   if (auto this_array_type = dyn_cast<ArrayType>(this->gep_type)) {
 
-    assert(this_array_type->getElementType() == type_of_gep);
-    return true;
+    if (this_array_type->getElementType() == type_of_gep) {
+      return true;
+    }
   }
+
   if (auto other_array_type = dyn_cast<ArrayType>(type_of_gep)) {
     // in this case we need to raise the type of our gep type to the array type
-    assert(!isa<ArrayType>(this->gep_type));
     assert(other_array_type->getElementType() == this->gep_type);
     this->gep_type = type_of_gep;
     // pre-pend 0 to all existing gep members (need to copy whole map)
@@ -282,14 +283,19 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
 
     return false;
   }
-  if ((gep_type->getStructName().starts_with("struct") ||
-       gep_type->getStructName().starts_with("class")) &&
-      (type_of_gep->getStructName().starts_with("struct") ||
-       type_of_gep->getStructName().starts_with("class"))) {
-    // "different" classes e.g. one is base ant the other is derived
+  gep_type->dump();
+  type_of_gep->dump();
+
+  if (gep_type->isStructTy() && type_of_gep->isStructTy()) {
+    // "different" classes e.g. one is base and the other is derived
     // no need to take special care
     return false;
   }
+
+  // other cases, our alias analysis will need to assume all ptr based on this
+  // gep may alias
+  whole_ptr_is_relevant = true;
+  return false;
 
   errs() << "\n\n";
   this->gep_type->dump();
