@@ -62,14 +62,8 @@ bool is_func_from_std(llvm::Function *func);
 // std::
 llvm::Function *get_std_dummy_func(llvm::Module *M);
 
-// we should not mess around with the globals defined by std::
-inline bool is_global_from_std(llvm::GlobalValue *global) {
-  assert(global);
-  if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
-    return is_func_from_std(f);
-  }
-
-  auto demangled = llvm::demangle(global->getName().str());
+inline bool is_name_from_std(const std::string &name) {
+  auto demangled = llvm::demangle(name);
   // startswith std::
   if (demangled.rfind("std::", 0) == 0) {
     return true;
@@ -84,19 +78,29 @@ inline bool is_global_from_std(llvm::GlobalValue *global) {
     return true;
   }
 
-  if (global->getName() == "__dso_handle") {
+  if (name == "__dso_handle") {
     return true;
   }
 
   // these are set if calling fflush on them
-  if (global->getName() == "stdout") {
+  if (name == "stdout") {
     return true;
   }
-  if (global->getName() == "stderr") {
+  if (name == "stderr") {
     return true;
   }
 
   return false;
+}
+
+// we should not mess around with the globals defined by std::
+inline bool is_global_from_std(llvm::GlobalValue *global) {
+  assert(global);
+  if (auto *f = llvm::dyn_cast<llvm::Function>(global)) {
+    return is_func_from_std(f);
+  }
+
+  return is_name_from_std(global->getName().str());
 }
 
 inline bool is_call_to_std(llvm::CallBase *call) {
