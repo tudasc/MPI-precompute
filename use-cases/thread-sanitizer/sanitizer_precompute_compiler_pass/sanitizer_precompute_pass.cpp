@@ -133,35 +133,39 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     std::vector<Instruction *> precompute_locations;
     for (auto it_f = M.begin(); it_f != M.end(); ++it_f) {
       Function *f = &*it_f;
-      for (auto it_bb = f->begin(); it_bb != f->end(); ++it_bb) {
-        BasicBlock *bb = &*it_bb;
-        for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
-          Instruction *inst = &*it_i;
-          if (auto *call = dyn_cast<CallBase>(inst)) {
-            if (call->getCalledFunction() &&
-                // eiter tsan or omp function
-                // omp function necessary e.g. to keep synchronization
-                (call->getCalledFunction()->getName().startswith("__tsan") ||
-                 is_omp_function(call->getCalledFunction()))) {
-              if (call->getCalledFunction()->getName() == "__tsan_func_exit") {
-                if (is_tsan_cleanup_block(call->getParent())) {
-                  // skip, the tsan cleanup part.
-                  // no need to precompute, as it will only handle fatal
-                  // exceptions
+      if (not f->getName().starts_with("tsan.module_ctor")) {
+        // do not instrument tsan itself
+        for (auto it_bb = f->begin(); it_bb != f->end(); ++it_bb) {
+          BasicBlock *bb = &*it_bb;
+          for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
+            Instruction *inst = &*it_i;
+            if (auto *call = dyn_cast<CallBase>(inst)) {
+              if (call->getCalledFunction() &&
+                  // eiter tsan or omp function
+                  // omp function necessary e.g. to keep synchronization
+                  (call->getCalledFunction()->getName().startswith("__tsan") ||
+                   is_omp_function(call->getCalledFunction()))) {
+                if (call->getCalledFunction()->getName() ==
+                    "__tsan_func_exit") {
+                  if (is_tsan_cleanup_block(call->getParent())) {
+                    // skip, the tsan cleanup part.
+                    // no need to precompute, as it will only handle fatal
+                    // exceptions
+                    continue;
+                  }
+                }
+                if (is_func_from_std(call->getFunction())) {
+                  // dont analyze internals of std, though tsan may instrument
+                  // them
                   continue;
                 }
-              }
-              if (is_func_from_std(call->getFunction())) {
-                // dont analyze internals of std, though tsan may instrument
-                // them
-                continue;
-              }
 
-              for (auto it_arg = call->arg_begin(); it_arg != call->arg_end();
-                   ++it_arg) {
-                to_precompute.push_back(it_arg->get());
+                for (auto it_arg = call->arg_begin(); it_arg != call->arg_end();
+                     ++it_arg) {
+                  to_precompute.push_back(it_arg->get());
+                }
+                precompute_locations.push_back(call);
               }
-              precompute_locations.push_back(call);
             }
           }
         }
