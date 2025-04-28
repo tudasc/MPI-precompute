@@ -95,8 +95,9 @@ llvm::Function *std_dummy_func = nullptr;
 
 llvm::Function *get_std_dummy_func(llvm::Module *M) {
   if (!std_dummy_func) {
-    Function::Create(FunctionType::get(Type::getVoidTy(M->getContext()), false),
-                     GlobalValue::InternalLinkage, "std_dummy_func");
+    std_dummy_func = Function::Create(
+        FunctionType::get(Type::getVoidTy(M->getContext()), false),
+        GlobalValue::InternalLinkage, "std_dummy_func");
   }
 
   return std_dummy_func;
