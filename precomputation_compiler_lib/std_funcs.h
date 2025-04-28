@@ -74,7 +74,8 @@ inline bool is_name_from_std(const std::string &name) {
     return true;
   }
 
-  if (std::regex_match(demangled, std::regex("^(typeinfo for )?std::(.+)"))) {
+  if (std::regex_match(demangled,
+                       std::regex("^(typeinfo( name)? for )?std::(.+)"))) {
     return true;
   }
 
