@@ -69,9 +69,11 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include <set>
 #include <string>
 
+#include "std_funcs.h"
+
 // most code from llvms' WholeProgramDevirtPass
 
-DevirtAnalysis* DevirtAnalysis::instance = nullptr;
+DevirtAnalysis *DevirtAnalysis::instance = nullptr;
 
 using namespace std;
 using namespace llvm;
@@ -661,14 +663,41 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
                  ->getOrInsertTypeIdSummary(
                      cast<MDString>(S.first.TypeID)->getString())
                  .WPDRes[S.first.ByteOffset];
+
+    std::vector<Function *> possible_targets;
+
     if (tryFindVirtualCallTargets(TargetsForSlot, TypeMemberInfos,
                                   S.first.ByteOffset, ExportSummary)) {
-      // populate the result
-      std::vector<Function *> possible_targets;
+      // set possible tgts
       for (auto slot : TargetsForSlot) {
         possible_targets.push_back(slot.Fn);
       }
+
+    } else {
+      // no call tgts found
+      // check if it is a virtual call to std (std::ctype result in virtual
+      // calls)
+      if (auto meta = dyn_cast<MDString>(S.first.TypeID)) {
+        if (is_name_from_std(meta->getString().str())) {
+          // set it to the std dummy func indicating virtual call to std
+          possible_targets.push_back(get_std_dummy_func(&M));
+        }
+      }
+    }
+    // populate the result
+    if (not possible_targets.empty()) {
       VTableSlotInfo &CSInfo = S.second;
+      for (auto ccinfo : CSInfo.ConstCSInfo) {
+        for (auto vcs : ccinfo.second.CallSites) {
+          auto *call = &vcs.CB;
+          if (result.find(call) == result.end()) {
+            result[call] = possible_targets;
+          } else {
+            assert(false &&
+                   "Multiple Analysis results for the same callsite??");
+          }
+        }
+      }
       for (auto &cinfo : CSInfo.CSInfo.CallSites) {
         // for calls
         auto *call = &cinfo.CB;
@@ -706,6 +735,7 @@ void DevirtModule::scanTypeTestUsers(
 
     Metadata *TypeId =
         cast<MetadataAsValue>(CI->getArgOperand(1))->getMetadata();
+
     // If we found any, add them to CallSlots.
     if (!Assumes.empty()) {
       Value *Ptr = CI->getArgOperand(0)->stripPointerCasts();
