@@ -77,6 +77,10 @@ void PrecalculationAnalysis::analyze_functions() {
     function_analysis[&f] =
         std::make_shared<PrecalculationFunctionAnalysis>(&f, this);
   }
+  // need to populate std dummy func, so that it is available as a call target
+  auto *std_dummy = get_std_dummy_func(&M);
+  function_analysis[std_dummy] =
+      std::make_shared<PrecalculationFunctionAnalysis>(std_dummy, this);
 
   // populate callees and callsites
   for (auto &f : M.functions()) {
@@ -86,6 +90,7 @@ void PrecalculationAnalysis::analyze_functions() {
         if (auto *call = dyn_cast<CallBase>(&*I)) {
           auto targets = get_possible_call_targets(call);
           for (auto *target : targets) {
+            assert(target != nullptr);
             if (target == get_omp_functions(M)->kmpc_fork_call) {
               // for openmp call: the openmp runtime will call the parallel
               // function
