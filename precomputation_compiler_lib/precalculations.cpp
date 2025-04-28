@@ -910,7 +910,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
   assert(arg_no != -1);
 
   for (auto *tgt : get_possible_call_targets(call)) {
-    if (tgt->isVarArg()) {
+    if (tgt->isVarArg() || tgt == get_std_dummy_func(call->getModule())) {
       return true; // assume it is
     }
 
@@ -945,7 +945,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   assert(arg_no != -1);
 
   for (auto *tgt : get_possible_call_targets(call)) {
-    if (tgt->isVarArg()) {
+    if (tgt->isVarArg() || tgt == get_std_dummy_func(call->getModule())) {
       return true; // assume it is
     }
 
@@ -1371,31 +1371,43 @@ void PrecalculationAnalysis::visit_call_from_ptr(
   }
 
   for (auto *func : get_possible_call_targets(call)) {
-    for (auto arg_num : ptr_given_as_arg) {
-      assert(!func->isVarArg() && "not implemented yet");
-      auto *arg = func->getArg(arg_num);
-      if (arg->hasAttribute(Attribute::NoCapture) &&
-          arg->hasAttribute(Attribute::ReadOnly)) {
-        continue; // nothing to do: reading the val is allowed
-        // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as
-        // first ptr lvl is only read
-      }
-      if (func->isDeclaration()) {
-        if (std::find(to_precompute_cfg.begin(), to_precompute_cfg.end(),
-                      call) == to_precompute_cfg.end()) {
-          // else: user told us to keep that call as they want to precompute it
-          // this means user need to handle this call
-          errs() << "Can not analyze usage of external function:\n";
-          ptr->v->dump();
-          call->dump();
-          errs() << "In: " << call->getFunction()->getName() << "\n";
-          assert(false);
+    if (func == get_std_dummy_func(&M)) {
+      // todo duplicate code with above case for one func
+      if (is_ptr_usage_in_std_write(call, ptr)) {
+        ptr->ptr_info->setIsWrittenTo(call, this);
+        if (is_store_important(call, ptr->ptr_info)) {
+          auto call_info = insert_tainted_value(call, ptr, false);
+          include_call_to_std(call_info);
+          assert(ptr->ptr_info->isWrittenTo());
         }
-      } else {
-        auto call_info = insert_tainted_value(call, ptr, false);
-        auto new_val = insert_tainted_value(arg, ptr, false);
-        ptr->ptr_info->merge_with(new_val->ptr_info);
-        assert(new_val->ptr_info == ptr->ptr_info);
+      }
+    } else {
+      for (auto arg_num : ptr_given_as_arg) {
+        assert(!func->isVarArg() && "not implemented yet");
+        auto *arg = func->getArg(arg_num);
+        if (arg->hasAttribute(Attribute::NoCapture) &&
+            arg->hasAttribute(Attribute::ReadOnly)) {
+          continue; // nothing to do: reading the val is allowed
+          // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as
+          // first ptr lvl is only read
+        }
+        if (func->isDeclaration()) {
+          if (std::find(to_precompute_cfg.begin(), to_precompute_cfg.end(),
+                        call) == to_precompute_cfg.end()) {
+            // else: user told us to keep that call as they want to precompute
+            // it this means user need to handle this call
+            errs() << "Can not analyze usage of external function:\n";
+            ptr->v->dump();
+            call->dump();
+            errs() << "In: " << call->getFunction()->getName() << "\n";
+            assert(false);
+          }
+        } else {
+          auto call_info = insert_tainted_value(call, ptr, false);
+          auto new_val = insert_tainted_value(arg, ptr, false);
+          ptr->ptr_info->merge_with(new_val->ptr_info);
+          assert(new_val->ptr_info == ptr->ptr_info);
+        }
       }
     }
   }
