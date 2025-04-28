@@ -63,22 +63,6 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     merged_with->merge_with(_other);
     return;
   }
-
-  if (gep_type && _other->gep_type) {
-    if (_other->gep_type != gep_type) {
-
-      bool need_prepend_other = need_pad_for_gep(_other->gep_type);
-      if (need_prepend_other) {
-        gep_type->dump();
-        _other->gep_type->dump();
-        assert(0 && "currently Not implemented");
-      }
-    }
-  }
-  if (!gep_type && _other->gep_type) {
-    gep_type = _other->gep_type;
-  }
-
   assert(_other != nullptr);
 
   auto other = _other;
@@ -107,7 +91,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     other->is_valid = false;
 #endif
     assert(this->is_valid);
-    auto obj_to_merge_to = shared_from_this();
+    auto reference_to_this = shared_from_this();
     // this may go out of scope so we capture the shared ptr early in this
     // function
 
@@ -151,13 +135,31 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
       // will merge the info_of_direct_usage
     }
 
+    bool need_pad = false;
+    // merge gep type
+    if (other->gep_type && !this->gep_type) {
+      this->gep_type = other->gep_type;
+    }
+    if (this->gep_type && other->gep_type) {
+      if (this->gep_type != other->gep_type) {
+        this->gep_type->dump();
+        other->gep_type->dump();
+        need_pad = need_pad_for_gep(other->gep_type);
+      } // else nothing zo do
+    }
     // this may be invalidated (if gep is result of self)
     for (const auto &pos : other->important_members) {
-      while (obj_to_merge_to->merged_with != nullptr) {
-        obj_to_merge_to = obj_to_merge_to->merged_with;
+      while (reference_to_this->merged_with != nullptr) {
+        reference_to_this = reference_to_this->merged_with;
+      }
+
+      auto idxs = pos.first;
+      if (need_pad) {
+        // insert pad if needed
+        idxs.insert(idxs.begin(), 0);
       }
       // this will propagate changes if applicable
-      obj_to_merge_to->add_important_member(pos.first, pos.second);
+      reference_to_this->add_important_member(idxs, pos.second);
     }
 
     // we can clean up other, as other is only used to forward to this by now
@@ -313,6 +315,7 @@ void PtrUsageInfo::add_important_member(
     const std::shared_ptr<PtrUsageInfo> &result_ptr) {
   assert(is_valid);
   assert(this->merged_with == nullptr);
+  assert(gep_type); // need to set gep type first
 
   auto to_propergate = shared_from_this();
   // this can go out of scope so we need to capture a shared ptr to it first
