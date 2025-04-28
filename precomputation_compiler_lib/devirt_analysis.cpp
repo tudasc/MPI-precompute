@@ -664,12 +664,13 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
                      cast<MDString>(S.first.TypeID)->getString())
                  .WPDRes[S.first.ByteOffset];
 
-    std::vector<Function *> possible_targets;
+    std::vector<Function *> possible_targets = {};
 
     if (tryFindVirtualCallTargets(TargetsForSlot, TypeMemberInfos,
                                   S.first.ByteOffset, ExportSummary)) {
       // set possible tgts
       for (auto slot : TargetsForSlot) {
+        assert(slot.Fn != nullptr);
         possible_targets.push_back(slot.Fn);
       }
 
@@ -679,6 +680,7 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
       // calls)
       if (auto meta = dyn_cast<MDString>(S.first.TypeID)) {
         if (is_name_from_std(meta->getString().str())) {
+          assert(possible_targets.empty());
           // set it to the std dummy func indicating virtual call to std
           possible_targets.push_back(get_std_dummy_func(&M));
         }
