@@ -169,10 +169,13 @@ bool is_func_from_std(llvm::Function *func) {
 
   // TODO why it is not in TLI info??
   if (func->getName() == "rand" || func->getName() == "rand_r" ||
-      func->getName() == "srand") {
-    // calling rand in precompute is actually "safe",
-    // as one should usa a random seed anyway it doesn't matter if we call
-    // it in precompute
+      func->getName() == "srand" ||
+      // calling rand in precompute is actually "safe",
+      // as one should usa a random seed anyway it doesn't matter if we call
+      // it in precompute
+      func->getName() == "getrusage" || func->getName() == "time" ||
+      func->getName() == "localtime") {
+
     return true;
   }
 
