@@ -280,8 +280,13 @@ void PrecalculationAnalysis::visit_store(
   store_info->visited = true;
 
   auto ptr_info = insert_tainted_value(ptr, store_info, true);
-  ptr_info->ptr_info->setIsUsedDirectly(
-      true, store_info->ptr_info); // null if stored value is no ptr
+  std::shared_ptr<PtrUsageInfo> stored_val_ptr_info =
+      nullptr; // null if stored value is no ptr
+  if (store_val->getType()->isPointerTy()) {
+    auto stored_info = insert_tainted_value(store_val, store_info, true);
+    stored_val_ptr_info = stored_info->ptr_info;
+  }
+  ptr_info->ptr_info->setIsUsedDirectly(true, stored_val_ptr_info);
   ptr_info->ptr_info->setIsWrittenTo(cast<Instruction>(store_info->v), this);
 
   auto func =
