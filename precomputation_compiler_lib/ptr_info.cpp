@@ -368,10 +368,10 @@ void PtrUsageInfo::add_important_member(
       }
     } else {
       // exact match regarding wildcards
-      existing_info.second->merge_with(result_ptr);
       if (existing_info.second != result_ptr) {
         has_changed = true;
       }
+      existing_info.second->merge_with(result_ptr);
     }
   }
 
