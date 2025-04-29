@@ -328,15 +328,18 @@ void PtrUsageInfo::add_important_member(
     // e.g. an iterator where it++ is realized as a GEP instruction
   }
 
+  bool has_changed = false;
   auto existing_info = find_info_for_gep_idx(member_idx);
 
   if (existing_info.second == nullptr) {
     important_members[member_idx] = result_ptr;
+    has_changed = true;
 
   } else { // info already present
     if (not existing_info.first && member_idx[member_idx.size() - 1]) {
       // new usage has wildcard but old usages may not
       // we need to combine all usages that match this wildcard
+      has_changed = true;
 
       std::set<std::shared_ptr<PtrUsageInfo>> to_merge;
       // the set removes duplicates
@@ -366,6 +369,9 @@ void PtrUsageInfo::add_important_member(
     } else {
       // exact match regarding wildcards
       existing_info.second->merge_with(result_ptr);
+      if (existing_info.second != result_ptr) {
+        has_changed = true;
+      }
     }
   }
 
@@ -375,9 +381,9 @@ void PtrUsageInfo::add_important_member(
   while (to_propergate->merged_with) {
     to_propergate = to_propergate->merged_with;
   }
-  // TODO if merge does not change anything: nothing to do
-  // but propergate "changes" is not wrong in either case
-  to_propergate->propergate_changes();
+  if (has_changed) {
+    to_propergate->propergate_changes();
+  }
 }
 
 void PtrUsageInfo::propergate_changes() {

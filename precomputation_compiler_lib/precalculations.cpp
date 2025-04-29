@@ -467,7 +467,7 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     insert_tainted_value(insertvalue->getAggregateOperand(), v);
     insert_tainted_value(insertvalue->getInsertedValueOperand(), v);
     // indices are constants
-    // I mean an integral part of teh instruction, not even llvm::ConstantInt
+    // I mean an integral part of the instruction, not even llvm::ConstantInt
     v->visited = true;
   } else if (auto *freeze = dyn_cast<FreezeInst>(v->v)) {
     // essentially a no-op on valid values
@@ -505,6 +505,19 @@ void PrecalculationAnalysis::visit_ptr_load(
 
 void PrecalculationAnalysis::visit_ptr_store(
     const std::shared_ptr<TaintedValue> &ptr, Instruction *inst) {
+  // visit store from the ptr
+  // store could be an atomic as well, therefore no StoreInst
+  assert(llvm::isa<llvm::StoreInst>(inst) ||
+         llvm::isa<llvm::AtomicRMWInst>(inst));
+  bool is_ptr = false; // is ptr or value operand?
+  if (auto *si = dyn_cast<StoreInst>(inst)) {
+    is_ptr = si->getPointerOperand() == ptr->v;
+    assert(si->getPointerOperand() != si->getValueOperand());
+  } else if (auto *atom = dyn_cast<AtomicRMWInst>(inst)) {
+    is_ptr = atom->getPointerOperand() == ptr->v;
+    assert(atom->getPointerOperand() != atom->getValOperand());
+  }
+
   // taint the store to analyze if it is important
   auto store_info = insert_tainted_value(inst, ptr, false);
   ptr->ptr_info->setIsUsedDirectly(
@@ -512,8 +525,13 @@ void PrecalculationAnalysis::visit_ptr_store(
   ptr->ptr_info->setIsWrittenTo(inst, this);
   auto func = get_function_analysis(inst->getFunction());
   func->add_ptr_write(ptr->ptr_info);
-  // may need to re-visit if we discovered its importance later
-  store_info->visited = false;
+
+  if (is_ptr) {
+    // visit to discover its importance
+    visit_val(store_info);
+  }
+  // else: nothing to do right now: it will be visited when a new alias is
+  // discovered, that is if the value is loaded again
 }
 
 bool PrecalculationAnalysis::visit_ptr_insertvalue_recursive_impl(
