@@ -135,24 +135,23 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
       // will merge the info_of_direct_usage
     }
 
-    bool need_pad = false;
-    // merge gep type
-    if (other->gep_type && !this->gep_type) {
-      this->gep_type = other->gep_type;
-    }
-    if (this->gep_type && other->gep_type) {
-      if (this->gep_type != other->gep_type) {
-        this->gep_type->dump();
-        other->gep_type->dump();
-        need_pad = need_pad_for_gep(other->gep_type);
-      } // else nothing zo do
-    }
     // this may be invalidated (if gep is result of self)
     for (const auto &pos : other->important_members) {
+      // descent further if this was invalidated
       while (reference_to_this->merged_with != nullptr) {
         reference_to_this = reference_to_this->merged_with;
       }
 
+      // set correct gep type
+      bool need_pad = false;
+      // merge gep type
+      if (other->gep_type && !reference_to_this->gep_type) {
+        reference_to_this->gep_type = other->gep_type;
+      } else if (reference_to_this->gep_type && other->gep_type) {
+        if (reference_to_this->gep_type != other->gep_type) {
+          need_pad = reference_to_this->need_pad_for_gep(other->gep_type);
+        } // else nothing to do: already same
+      }
       auto idxs = pos.first;
       if (need_pad) {
         // insert pad if needed
