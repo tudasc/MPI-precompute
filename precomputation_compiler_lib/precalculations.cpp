@@ -993,9 +993,9 @@ void PrecalculationAnalysis::include_call_to_std(
 
     // calling into std is safe, as no side effects will occur (other
     // than for the given parameters)
-    //  as std is designed to have as fw side effects as possible
+    //  as std is designed to have as few side effects as possible
     // TODO implement check for exception std::rand and std::cout/cin
-    // we just need to make shure all parameters are given
+    // we just need to make sure all parameters are given
 
     for (auto &arg : call->args()) {
       auto arg_info = insert_tainted_value(arg, call_info);
@@ -1406,13 +1406,14 @@ void PrecalculationAnalysis::visit_call_from_ptr(
       }
     } else {
       for (auto arg_num : ptr_given_as_arg) {
-        assert(!func->isVarArg() && "not implemented yet");
-        auto *arg = func->getArg(arg_num);
-        if (arg->hasAttribute(Attribute::NoCapture) &&
-            arg->hasAttribute(Attribute::ReadOnly)) {
-          continue; // nothing to do: reading the val is allowed
-          // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as
-          // first ptr lvl is only read
+        if (arg_num < func->getFunctionType()->getNumParams()) {
+          auto *arg = func->getArg(arg_num);
+          if (arg->hasAttribute(Attribute::NoCapture) &&
+              arg->hasAttribute(Attribute::ReadOnly)) {
+            continue; // nothing to do: reading the val is allowed
+            // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as
+            // first ptr lvl is only read
+          }
         }
         if (func->isDeclaration()) {
           if (std::find(to_precompute_cfg.begin(), to_precompute_cfg.end(),
@@ -1426,13 +1427,50 @@ void PrecalculationAnalysis::visit_call_from_ptr(
             assert(false);
           }
         } else {
-          auto call_info = insert_tainted_value(call, ptr, false);
-          auto new_val = insert_tainted_value(arg, ptr, false);
-          ptr->ptr_info->merge_with(new_val->ptr_info);
-          assert(new_val->ptr_info == ptr->ptr_info);
+          if (arg_num < func->getFunctionType()->getNumParams()) {
+            auto *arg = func->getArg(arg_num);
+            auto call_info = insert_tainted_value(call, ptr, false);
+            auto new_val = insert_tainted_value(arg, ptr, false);
+            ptr->ptr_info->merge_with(new_val->ptr_info);
+            assert(new_val->ptr_info == ptr->ptr_info);
+          } else {
+            // arg is one of the var args
+            handle_vararg_ptr_alias(ptr, func);
+          }
         }
       }
     }
+  }
+}
+
+void PrecalculationAnalysis::handle_vararg_ptr_alias(
+    const std::shared_ptr<TaintedValue> &ptr, llvm::Function *func) {
+  // ptr could alias with anything in the vararg list
+  assert(func->isVarArg());
+  assert(not func->isDeclaration());
+
+  // find va arg list
+  auto *va_start = M.getFunction("llvm.va_start");
+  if (not va_start) {
+    // no usage of the varargs: nothing to do
+    return;
+  }
+
+  std::vector<Value *>
+      varargs_list; // one could iterate over vararg multiple times
+  for (auto u : va_start->users()) {
+    if (auto *cb = dyn_cast<CallBase>(u)) {
+      if (cb->getFunction() == func) {
+        varargs_list.push_back(cb->getArgOperand(0));
+      }
+    }
+  }
+  for (auto vararg : varargs_list) {
+    auto va_info = insert_tainted_value(vararg, ptr);
+    va_info->ptr_info->merge_with(ptr->ptr_info);
+    // such that it alias with any of the varargs
+    va_info->ptr_info->setWholePtrIsRelevant(true);
+    va_info->ptr_info->setIsUsedDirectly(true, ptr->ptr_info);
   }
 }
 
@@ -1751,7 +1789,7 @@ void PrecalculationAnalysis::print_analysis_result_remarks() {
       inst->dump();
     }
   }
-  // debug_printings();
+  debug_printings();
 }
 
 // TODO: move to debug file?
@@ -1793,12 +1831,29 @@ bool PrecalculationAnalysis::is_store_important(
   assert(isa<StoreInst>(inst) || isa<AtomicRMWInst>(inst) ||
          isa<CallBase>(inst));
 
+  bool interesting = false;
+  if (ptr_info->getPtrsWithThisInfo().begin()->lock()->v->getName().starts_with(
+          "_M_string_length")) {
+    interesting = true;
+    errs() << "INTERESTING CASE:\n";
+    ptr_info->dump();
+    errs() << "\n";
+    inst->dump();
+  }
+
   if (not ptr_info->isReadFrom()) {
+    if (interesting)
+      errs() << "NOT READ\n";
     return false;
   }
   if (store_happens_after_all_loads(inst, ptr_info)) {
+    if (interesting)
+      errs() << "AFTER ALL LOADS\n";
     return false;
   }
+
+  if (interesting)
+    errs() << "IMPORTANT\n";
 
   return true;
 }

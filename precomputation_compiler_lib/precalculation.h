@@ -223,6 +223,8 @@ private:
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
+  void handle_vararg_ptr_alias(const std::shared_ptr<TaintedValue> &ptr, llvm::Function* func);
+
   bool
   visit_ptr_insertvalue_recursive_impl(const std::shared_ptr<TaintedValue> &ptr,
                                        llvm::ArrayRef<unsigned> insert_idx,
