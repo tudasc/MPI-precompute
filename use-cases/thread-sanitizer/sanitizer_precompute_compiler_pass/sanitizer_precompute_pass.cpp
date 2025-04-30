@@ -147,6 +147,12 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
                    is_omp_function(call->getCalledFunction()))) {
                 if (call->getCalledFunction()->getName() ==
                     "__tsan_func_exit") {
+                  if (dyn_cast<ResumeInst>(
+                          call->getNextNonDebugInstruction())) {
+                    // TODO make this a compiler option!!
+                    //  in cleanup block, dont handle exceptions
+                    continue;
+                  }
                   if (is_tsan_cleanup_block(call->getParent())) {
                     // skip, the tsan cleanup part.
                     // no need to precompute, as it will only handle fatal
