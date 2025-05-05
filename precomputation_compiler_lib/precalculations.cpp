@@ -922,6 +922,13 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
     return true;
   }
 
+  if (call->getCalledFunction() &&
+      (call->getCalledFunction()->getName().starts_with("__tsan_read") ||
+       call->getCalledFunction()->getName().starts_with("__tsan_write"))) {
+    // tsan does not read the ptrs content
+    return false;
+  }
+
   long arg_no = -1;
 
   for (unsigned i = 0; i < call->arg_size(); ++i) {
@@ -955,6 +962,13 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   if (is_omp_fork_call(call)) {
     // TODO determine if parallel region actually writes to shared var
     return true;
+  }
+
+  if (call->getCalledFunction() &&
+      (call->getCalledFunction()->getName().starts_with("__tsan_read") ||
+       call->getCalledFunction()->getName().starts_with("__tsan_write"))) {
+    // tsan does not write to the ptr
+    return false;
   }
 
   long arg_no = -1;
