@@ -1849,29 +1849,12 @@ bool PrecalculationAnalysis::is_store_important(
   assert(isa<StoreInst>(inst) || isa<AtomicRMWInst>(inst) ||
          isa<CallBase>(inst));
 
-  bool interesting = false;
-  if (ptr_info->getPtrsWithThisInfo().begin()->lock()->v->getName().starts_with(
-          "_M_string_length")) {
-    interesting = true;
-    errs() << "INTERESTING CASE:\n";
-    ptr_info->dump();
-    errs() << "\n";
-    inst->dump();
-  }
-
   if (not ptr_info->isReadFrom()) {
-    if (interesting)
-      errs() << "NOT READ\n";
     return false;
   }
   if (store_happens_after_all_loads(inst, ptr_info)) {
-    if (interesting)
-      errs() << "AFTER ALL LOADS\n";
     return false;
   }
-
-  if (interesting)
-    errs() << "IMPORTANT\n";
 
   return true;
 }
