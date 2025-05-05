@@ -474,6 +474,12 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // indices are constants
     // I mean an integral part of the instruction, not even llvm::ConstantInt
     v->visited = true;
+  } else if (auto *insertelem = dyn_cast<InsertElementInst>(v->v)) {
+    // a load and store to ptr
+    insert_tainted_value(insertelem->getOperand(0), v); // vector
+    insert_tainted_value(insertelem->getOperand(1), v); // insterted elem
+    insert_tainted_value(insertelem->getOperand(2), v); // index
+    v->visited = true;
   } else if (auto *freeze = dyn_cast<FreezeInst>(v->v)) {
     // essentially a no-op on valid values
     insert_tainted_value(freeze->getOperand(0), v);
@@ -593,6 +599,83 @@ void PrecalculationAnalysis::visit_ptr_insertvalue(
     if (auto *inst = dyn_cast<Instruction>(u)) {
       bool needed =
           visit_ptr_insertvalue_recursive_impl(ptr, inserted_index, inst);
+      if (needed)
+        insert_tainted_value(inst, ptr);
+    } else {
+      u->dump();
+      assert(0 && "This is not supported");
+    }
+  }
+}
+
+bool PrecalculationAnalysis::visit_ptr_insertelement_recursive_impl(
+    const std::shared_ptr<TaintedValue> &ptr, llvm::Value *insert_idx,
+    llvm::Instruction *aggregate_inst) {
+
+  bool is_needed = false;
+
+  if (isa<ResumeInst>(aggregate_inst) || isa<CmpInst>(aggregate_inst) ||
+      isa<PtrToIntInst>(aggregate_inst)) {
+    // nothing to do: (cast for) comparison is allowed
+    return false;
+  }
+
+  for (auto *u : aggregate_inst->users()) {
+    if (auto *extract = dyn_cast<ExtractElementInst>(u)) {
+      assert(isa<Constant>(extract->getIndexOperand()) && "not supported");
+      if (extract->getIndexOperand() == insert_idx) {
+        // match
+        assert(extract->getType() == ptr->v->getType());
+        // add ptr alias
+        auto info = insert_tainted_value(
+            aggregate_inst); // the needed instructions are marked one lvl up in
+        // recursion
+        assert(info->ptr_info);
+        ptr->ptr_info->merge_with(info->ptr_info);
+        is_needed = true;
+      }
+    } else if (auto *insert = dyn_cast<InsertElementInst>(u)) {
+      auto new_inserted_index = insert->getOperand(2);
+      // getIndexOperand()
+      assert(new_inserted_index->getType()->isIntegerTy());
+      assert(isa<Constant>(new_inserted_index) && "Not supported");
+      if (new_inserted_index == insert_idx) {
+        // element is overridden
+        return false;
+      } else {
+        // new derived compound
+        bool is_needed_down_lvl =
+            visit_ptr_insertelement_recursive_impl(ptr, insert_idx, insert);
+        if (is_needed_down_lvl) {
+          // the value needed for aggregate_inst is handled by upper recursion
+          // lvl
+          insert_tainted_value(insert, insert_tainted_value(aggregate_inst));
+        }
+        is_needed = is_needed || is_needed_down_lvl;
+      }
+    } else if (isa<ResumeInst>(u) || isa<CmpInst>(u) || isa<PtrToIntInst>(u)) {
+      // nothing to do: (cast for) comparison is allowed
+    } else {
+      u->dump();
+      assert(0 && "this aggregate usage is not supported yet");
+    }
+  }
+  return is_needed;
+}
+
+void PrecalculationAnalysis::visit_ptr_insertelement(
+    const std::shared_ptr<TaintedValue> &ptr,
+    llvm::InsertElementInst *insertelem_inst) {
+
+  auto inserted_index = insertelem_inst->getOperand(2);
+  // getIndexOperand()
+  assert(inserted_index->getType()->isIntegerTy());
+  assert(isa<Constant>(inserted_index) && "Not supported");
+
+  for (auto *u : insertelem_inst->users()) {
+    if (auto *inst = dyn_cast<Instruction>(u)) {
+      bool needed =
+          visit_ptr_insertelement_recursive_impl(ptr, inserted_index, inst);
       if (needed)
         insert_tainted_value(inst, ptr);
     } else {
@@ -757,6 +840,10 @@ void PrecalculationAnalysis::visit_ptr_usages(
     }
     if (auto *insert_val = dyn_cast<InsertValueInst>(u)) {
       visit_ptr_insertvalue(ptr, insert_val);
+      continue;
+    }
+    if (auto *insert_val = dyn_cast<InsertElementInst>(u)) {
+      visit_ptr_insertelement(ptr, insert_val);
       continue;
     }
     if (auto *f = dyn_cast<FreezeInst>(u)) {

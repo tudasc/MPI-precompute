@@ -231,6 +231,13 @@ private:
                                        llvm::Instruction *aggregate_inst);
   void visit_ptr_insertvalue(const std::shared_ptr<TaintedValue> &ptr,
                              llvm::InsertValueInst *insert_value_inst);
+
+  bool visit_ptr_insertelement_recursive_impl(
+      const std::shared_ptr<TaintedValue> &ptr, llvm::Value *insert_idx,
+      llvm::Instruction *aggregate_inst);
+
+  void visit_ptr_insertelement(const std::shared_ptr<TaintedValue> &ptr,
+                               llvm::InsertElementInst *insertelem_inst);
 };
 
 #endif // MACH_PRECALCULATIONS_IMPL_H_
