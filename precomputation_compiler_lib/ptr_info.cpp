@@ -224,21 +224,28 @@ bool is_member_matching(const std::vector<long> &member_idx,
 
 void PtrUsageInfo::add_important_member(
     llvm::GetElementPtrInst *gep,
-    const std::shared_ptr<PtrUsageInfo> &result_ptr) {
+    const std::shared_ptr<PtrUsageInfo> &result_ptr_) {
   if (merged_with) {
-    merged_with->add_important_member(gep, result_ptr);
+    merged_with->add_important_member(gep, result_ptr_);
     return;
   }
+
   assert(is_valid);
+  if (result_ptr_) {
+    std::shared_ptr<PtrUsageInfo> result_ptr = result_ptr_;
+    while (result_ptr->merged_with != nullptr) {
+      // decent
+      result_ptr = result_ptr->merged_with;
+    }
 
-  if (result_ptr == shared_from_this()) {
-    return; // nothing to do
-    // e.g. an iterator where it++ is realized as a GEP instruction
-  }
-
-  if (is_derived_ptr_relevant) {
-    shared_from_this()->merge_with(result_ptr);
-    return;
+    if (result_ptr == shared_from_this()) {
+      return; // nothing to do
+      // e.g. an iterator where it++ is realized as a GEP instruction
+    }
+    if (is_derived_ptr_relevant) {
+      shared_from_this()->merge_with(result_ptr);
+      return;
+    }
   }
 
   if (!gep_type) {
@@ -248,7 +255,7 @@ void PtrUsageInfo::add_important_member(
 
   auto member_idx =
       get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType()));
-  add_important_member(member_idx, result_ptr);
+  add_important_member(member_idx, result_ptr_);
 }
 
 bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
@@ -337,7 +344,7 @@ void PtrUsageInfo::add_important_member(
   // auto reference_to_self = shared_from_this();
 
   // we don't keep track of if the GEP results in ptr again
-  if (result_ptr == shared_from_this()) {
+  if (result_ptr && result_ptr == shared_from_this()) {
     return; // nothing to do
     // e.g. an iterator where it++ is realized as a GEP instruction
   }
@@ -454,7 +461,7 @@ bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
   return whole_ptr_is_relevant ||
          find_info_for_gep_idx(
              get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType())))
-             .second != nullptr;
+                 .second != nullptr;
 }
 
 std::pair<bool, std::shared_ptr<PtrUsageInfo>>
