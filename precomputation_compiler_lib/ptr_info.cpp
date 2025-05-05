@@ -64,7 +64,9 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     merged_with->merge_with(_other);
     return;
   }
-  assert(_other != nullptr);
+  if (_other == nullptr) {
+    return; // no-op
+  }
 
   auto other = _other;
   while (other->merged_with != nullptr) {
