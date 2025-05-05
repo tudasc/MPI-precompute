@@ -1086,13 +1086,13 @@ void PrecalculationAnalysis::visit_call(
             get_function_analysis(call->getFunction())
                 ->add_ptr_write(get_taint_info(v)->ptr_info);
             // std may write to derived ptrs
-            get_taint_info(v)->ptr_info->setWholeDerivedPtrIsRelevant(true);
+            get_taint_info(v)->ptr_info->setDerivedPtrIsRelevant(true);
           }
           if (is_ptr_usage_in_std_read(call, get_taint_info(v))) {
             get_function_analysis(call->getFunction())
                 ->add_ptr_read(get_taint_info(v)->ptr_info);
             // std may read derived ptrs
-            get_taint_info(v)->ptr_info->setWholeDerivedPtrIsRelevant(true);
+            get_taint_info(v)->ptr_info->setDerivedPtrIsRelevant(true);
           }
         }
       }

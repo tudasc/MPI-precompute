@@ -132,14 +132,14 @@ public:
     // else nothing to do
   }
 
-  bool isWholeDerivedPtrIsRelevant() const {
+  bool isDerivedPtrIsRelevant() const {
     if (merged_with) {
-      return merged_with->isWholeDerivedPtrIsRelevant();
+      return merged_with->isDerivedPtrIsRelevant();
     }
     assert(is_valid);
-    return whole_derived_ptr_relevant;
+    return is_derived_ptr_relevant;
   }
-  void setWholeDerivedPtrIsRelevant(bool derived_relevant) ;
+  void setDerivedPtrIsRelevant(bool derived_relevant);
 
   const std::shared_ptr<PtrUsageInfo> &getInfoOfDirectUsage() const {
     if (merged_with) {
@@ -210,9 +210,13 @@ private:
   bool is_read_from = false;
   bool is_written_to = false;
   bool whole_ptr_is_relevant = false; // if accessed in a non-constant gep
-  bool whole_derived_ptr_relevant =
+  // this means one gep aliases with all other gep, since a non constant one is
+  // used
+
+  bool is_derived_ptr_relevant =
       false; // if whole_ptr_is_relevant should be applied to all derived ptrs
-             // as well (e.g. read is hidden in std)
+             // as well (e.g. read is hidden in std), we dont know which part is
+             // read by std
   bool is_called = false;
 
   // std::set<std::shared_ptr<PtrUsageInfo>> parents;
