@@ -175,6 +175,8 @@ bool is_func_from_std(llvm::Function *func) {
       // it in precompute
       func->getName() == "getrusage" || func->getName() == "time" ||
       func->getName() == "localtime" || func->getName() == "clock_gettime" ||
+      func->getName() == "isspace" ||
+
       // from gnu
       func->getName() == "__getdelim") {
 
