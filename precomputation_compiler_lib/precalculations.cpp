@@ -483,9 +483,8 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
   } else if (auto *freeze = dyn_cast<FreezeInst>(v->v)) {
     // essentially a no-op on valid values
     insert_tainted_value(freeze->getOperand(0), v);
-  }
-
-  else {
+    v->visited = true;
+  } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
     v->v->dump();
