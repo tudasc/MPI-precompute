@@ -137,6 +137,10 @@ bool is_func_from_std(llvm::Function *func) {
     }
   }
 
+  if (func->getName() == "llvm.va_start" || func->getName() == "llvm.va_end") {
+    return true;
+  }
+
   // more like a stack ptr than a function call
   if (func->getName() == "__errno_location") {
     return true;
