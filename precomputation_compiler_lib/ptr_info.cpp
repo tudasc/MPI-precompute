@@ -418,16 +418,29 @@ void PtrUsageInfo::setDerivedPtrIsRelevant(bool derived_relevant) {
   assert(is_valid);
   if ((not is_derived_ptr_relevant) && derived_relevant) {
     is_derived_ptr_relevant = true;
+    this->setWholePtrIsRelevant(true);
     auto reference_to_this =
         shared_from_this(); // may be invalidated when merging
-    this->setWholePtrIsRelevant(true);
+
+    // may be invalidated when merging, need to collect ptrs first
+    std::vector<std::shared_ptr<PtrUsageInfo>> to_merge;
+
     if (info_of_direct_usage) {
-      reference_to_this->merge_with(info_of_direct_usage);
+      to_merge.push_back(info_of_direct_usage);
     }
     for (auto &pair : important_members) {
-      reference_to_this->merge_with(pair.second);
+      to_merge.push_back(pair.second);
     }
-    propergate_changes();
+
+    for (auto &m : to_merge) {
+      reference_to_this->merge_with(m);
+      // descent further if this was invalidated
+      while (reference_to_this->merged_with != nullptr) {
+        reference_to_this = reference_to_this->merged_with;
+      }
+    }
+
+    reference_to_this->propergate_changes();
   }
   // else nothing to do
 }
