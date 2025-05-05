@@ -126,9 +126,10 @@ public:
     }
     assert(is_valid);
     if ((not whole_ptr_is_relevant) && wholePtrIsRelevant) {
+      whole_ptr_is_relevant = true;
       propergate_changes();
     }
-    whole_ptr_is_relevant = whole_ptr_is_relevant | wholePtrIsRelevant;
+    // else nothing to do
   }
 
   bool isWholeDerivedPtrIsRelevant() const {
@@ -138,24 +139,7 @@ public:
     assert(is_valid);
     return whole_derived_ptr_relevant;
   }
-  void setWholeDerivedPtrIsRelevant(bool derived_relevant) {
-    if (merged_with) {
-      merged_with->setWholeDerivedPtrIsRelevant(derived_relevant);
-      return;
-    }
-    assert(is_valid);
-    if ((not whole_derived_ptr_relevant) && derived_relevant) {
-      propergate_changes();
-      assert(whole_ptr_is_relevant);
-      if (info_of_direct_usage) {
-        info_of_direct_usage->setWholeDerivedPtrIsRelevant(derived_relevant);
-      }
-      for (auto &pair : important_members) {
-        pair.second->setWholeDerivedPtrIsRelevant(derived_relevant);
-      }
-    }
-    whole_derived_ptr_relevant = whole_derived_ptr_relevant | derived_relevant;
-  }
+  void setWholeDerivedPtrIsRelevant(bool derived_relevant) ;
 
   const std::shared_ptr<PtrUsageInfo> &getInfoOfDirectUsage() const {
     if (merged_with) {

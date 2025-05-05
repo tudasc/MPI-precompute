@@ -48,6 +48,7 @@ void PtrUsageInfo::setIsUsedDirectly(
     assert(info_to_use->is_valid);
 
     if (info_of_direct_usage) {
+      // info of direct usage may be this if whole_derived is relevant
       info_of_direct_usage->merge_with(info_to_use);
       // merge will propergate changes if any
     } else {
@@ -138,6 +139,7 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
       this->setIsUsedDirectly(true, other->info_of_direct_usage);
       // will merge the info_of_direct_usage
     }
+    bool need_merging_gep = this->whole_derived_ptr_relevant;
 
     // this may be invalidated (if gep is result of self)
     for (const auto &pos : other->important_members) {
@@ -161,19 +163,11 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
         // insert pad if needed
         idxs.insert(idxs.begin(), 0);
       }
-      // this will propagate changes if applicable
-      reference_to_this->add_important_member(idxs, pos.second);
-    }
-
-    // propagate whole derived ptr relevant,if applicable, as newly merged gep
-    // members need to be aware of it
-    if (reference_to_this->whole_derived_ptr_relevant) {
-      if (reference_to_this->info_of_direct_usage) {
-        reference_to_this->info_of_direct_usage->setWholeDerivedPtrIsRelevant(
-            true);
-      }
-      for (auto pair : reference_to_this->important_members) {
-        pair.second->setWholeDerivedPtrIsRelevant(true);
+      if (need_merging_gep) {
+        reference_to_this->merge_with(pos.second);
+      } else {
+        // this will propagate changes if applicable
+        reference_to_this->add_important_member(idxs, pos.second);
       }
     }
 
@@ -240,6 +234,11 @@ void PtrUsageInfo::add_important_member(
   if (result_ptr == shared_from_this()) {
     return; // nothing to do
     // e.g. an iterator where it++ is realized as a GEP instruction
+  }
+
+  if (whole_derived_ptr_relevant) {
+    shared_from_this()->merge_with(result_ptr);
+    return;
   }
 
   if (!gep_type) {
@@ -411,6 +410,28 @@ void PtrUsageInfo::propergate_changes() {
   }
 }
 
+void PtrUsageInfo::setWholeDerivedPtrIsRelevant(bool derived_relevant) {
+  if (merged_with) {
+    merged_with->setWholeDerivedPtrIsRelevant(derived_relevant);
+    return;
+  }
+  assert(is_valid);
+  if ((not whole_derived_ptr_relevant) && derived_relevant) {
+    whole_derived_ptr_relevant = true;
+    auto reference_to_this =
+        shared_from_this(); // may be invalidated when merging
+    this->setWholePtrIsRelevant(true);
+    if (info_of_direct_usage) {
+      reference_to_this->merge_with(info_of_direct_usage);
+    }
+    for (auto &pair : important_members) {
+      reference_to_this->merge_with(pair.second);
+    }
+    propergate_changes();
+  }
+  // else nothing to do
+}
+
 bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
   if (merged_with) {
     return merged_with->is_member_relevant(gep);
@@ -475,6 +496,8 @@ void PtrUsageInfo::dump() {
   errs() << "Is Called : " << is_called << "\n";
   errs() << "Is whole ptr relevant : " << whole_ptr_is_relevant
          << " (non-constant-gep)\n";
+  errs() << "Is whole derived ptr relevant : " << whole_derived_ptr_relevant
+         << "\n";
   errs() << "Important GEP members : \n";
   for (auto pair : important_members) {
     errs() << "\t";
@@ -482,9 +505,10 @@ void PtrUsageInfo::dump() {
       errs() << idx << ", ";
     }
     errs() << "\n";
-    if (pair.first == std::vector<long>{0, 2}) {
-      pair.second->dump();
-    }
+
+    // if (pair.second!=shared_from_this()) {
+    //      pair.second->dump();
+    //    }
   }
   errs() << "End PtrUsageInfo\n";
 }
