@@ -110,12 +110,16 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
     bool changed =
         (this->is_read_from != other->is_read_from ||
          this->is_written_to != other->is_written_to ||
-         this->whole_ptr_is_relevant != other->whole_ptr_is_relevant);
+         this->whole_ptr_is_relevant != other->whole_ptr_is_relevant ||
+         this->whole_derived_ptr_relevant != other->whole_derived_ptr_relevant);
 
     this->is_read_from = this->is_read_from || other->is_read_from;
     this->is_written_to = this->is_written_to || other->is_written_to;
     this->whole_ptr_is_relevant =
         this->whole_ptr_is_relevant || other->whole_ptr_is_relevant;
+
+    this->whole_derived_ptr_relevant =
+        this->whole_derived_ptr_relevant || other->whole_derived_ptr_relevant;
 
     for (auto *s : other->stores) {
       auto pair = stores.insert(s);
@@ -159,6 +163,18 @@ void PtrUsageInfo::merge_with(std::shared_ptr<PtrUsageInfo> _other) { // NOLINT
       }
       // this will propagate changes if applicable
       reference_to_this->add_important_member(idxs, pos.second);
+    }
+
+    // propagate whole derived ptr relevant,if applicable, as newly merged gep
+    // members need to be aware of it
+    if (reference_to_this->whole_derived_ptr_relevant) {
+      if (reference_to_this->info_of_direct_usage) {
+        reference_to_this->info_of_direct_usage->setWholeDerivedPtrIsRelevant(
+            true);
+      }
+      for (auto pair : reference_to_this->important_members) {
+        pair.second->setWholeDerivedPtrIsRelevant(true);
+      }
     }
 
     // we can clean up other, as other is only used to forward to this by now
