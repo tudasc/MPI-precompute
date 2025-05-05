@@ -451,7 +451,8 @@ bool PtrUsageInfo::is_member_relevant(llvm::GetElementPtrInst *gep) {
   }
   assert(is_valid);
 
-  return find_info_for_gep_idx(
+  return whole_ptr_is_relevant ||
+         find_info_for_gep_idx(
              get_gep_idxs(gep, need_pad_for_gep(gep->getSourceElementType())))
              .second != nullptr;
 }
