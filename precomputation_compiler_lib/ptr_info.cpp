@@ -346,7 +346,7 @@ void PtrUsageInfo::add_important_member(
   // auto reference_to_self = shared_from_this();
 
   // we don't keep track of if the GEP results in ptr again
-  if (result_ptr && result_ptr == shared_from_this()) {
+  if (result_ptr == shared_from_this()) {
     return; // nothing to do
     // e.g. an iterator where it++ is realized as a GEP instruction
   }
@@ -606,12 +606,16 @@ bool std::operator==(const std::shared_ptr<PtrUsageInfo> &lhs,
                      const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
 
   auto ll = lhs;
-  while (ll->merged_with) {
-    ll = ll->merged_with;
+  if (ll) {
+    while (ll->merged_with) {
+      ll = ll->merged_with;
+    }
   }
   auto rr = rhs;
-  while (rr->merged_with) {
-    rr = rr->merged_with;
+  if (rr) {
+    while (rr->merged_with) {
+      rr = rr->merged_with;
+    }
   }
   return ll.get() == rr.get();
 }
@@ -621,12 +625,16 @@ bool std::operator!=(const std::shared_ptr<PtrUsageInfo> &lhs,
                      const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
 
   auto ll = lhs;
-  while (ll->merged_with) {
-    ll = ll->merged_with;
+  if (ll) {
+    while (ll->merged_with) {
+      ll = ll->merged_with;
+    }
   }
   auto rr = rhs;
-  while (rr->merged_with) {
-    rr = rr->merged_with;
+  if (rr) {
+    while (rr->merged_with) {
+      rr = rr->merged_with;
+    }
   }
   return ll.get() != rr.get();
 }
@@ -636,12 +644,16 @@ bool std::operator<(const std::shared_ptr<PtrUsageInfo> &lhs,
                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
 
   auto ll = lhs;
-  while (ll->merged_with) {
-    ll = ll->merged_with;
+  if (ll) {
+    while (ll->merged_with) {
+      ll = ll->merged_with;
+    }
   }
   auto rr = rhs;
-  while (rr->merged_with) {
-    rr = rr->merged_with;
+  if (rr) {
+    while (rr->merged_with) {
+      rr = rr->merged_with;
+    }
   }
   return ll.get() < rr.get();
 }
@@ -651,12 +663,16 @@ bool std::operator>(const std::shared_ptr<PtrUsageInfo> &lhs,
                     const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
 
   auto ll = lhs;
-  while (ll->merged_with) {
-    ll = ll->merged_with;
+  if (ll) {
+    while (ll->merged_with) {
+      ll = ll->merged_with;
+    }
   }
   auto rr = rhs;
-  while (rr->merged_with) {
-    rr = rr->merged_with;
+  if (rr) {
+    while (rr->merged_with) {
+      rr = rr->merged_with;
+    }
   }
   return ll.get() > rr.get();
 }
@@ -666,12 +682,16 @@ bool std::operator<=(const std::shared_ptr<PtrUsageInfo> &lhs,
                      const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
 
   auto ll = lhs;
-  while (ll->merged_with) {
-    ll = ll->merged_with;
+  if (ll) {
+    while (ll->merged_with) {
+      ll = ll->merged_with;
+    }
   }
   auto rr = rhs;
-  while (rr->merged_with) {
-    rr = rr->merged_with;
+  if (rr) {
+    while (rr->merged_with) {
+      rr = rr->merged_with;
+    }
   }
   return ll.get() <= rr.get();
 }
@@ -681,12 +701,16 @@ bool std::operator>=(const std::shared_ptr<PtrUsageInfo> &lhs,
                      const std::shared_ptr<PtrUsageInfo> &rhs) noexcept {
 
   auto ll = lhs;
-  while (ll->merged_with) {
-    ll = ll->merged_with;
+  if (ll) {
+    while (ll->merged_with) {
+      ll = ll->merged_with;
+    }
   }
   auto rr = rhs;
-  while (rr->merged_with) {
-    rr = rr->merged_with;
+  if (rr) {
+    while (rr->merged_with) {
+      rr = rr->merged_with;
+    }
   }
   return ll.get() >= rr.get();
 }
