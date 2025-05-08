@@ -23,4 +23,4 @@ add_test(NAME TEALEAF
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 # mini app test take longer
-set_tests_properties(TEALEAF PROPERTIES TIMEOUT 500)
+set_tests_properties(TEALEAF PROPERTIES TIMEOUT 800)

@@ -9,6 +9,7 @@ if [ ! -d "$APP_NAME" ]; then
 fi
 GREP_STRING="WARNING: ThreadSanitizer: data race"
 
+rm -f ${APP_NAME}_normal.exe ${APP_NAME}_modified.exe # make sure to detect any build error
 build_tsan_normal $APP_NAME ${PWD}/${APP_NAME}_normal.exe
 build_tsan_modified $APP_NAME ${PWD}/${APP_NAME}_modified.exe
 
@@ -32,6 +33,8 @@ if ./${APP_NAME}_modified.exe $TEST_INVOCATION_PARAMETER 2>&1 | grep -qF "$GREP_
   exit -1
 fi
 
+
+rm -f ${APP_NAME}_normal.exe ${APP_NAME}_modified.exe # make sure to detect any build error
 patch_datarace $APP_NAME
 build_tsan_normal $APP_NAME ${PWD}/${APP_NAME}_normal.exe
 build_tsan_modified $APP_NAME ${PWD}/${APP_NAME}_modified.exe
