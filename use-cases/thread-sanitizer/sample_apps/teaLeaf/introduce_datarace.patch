@@ -1,0 +1,14 @@
+diff --git a/src/omp/cg.cpp b/src/omp/cg.cpp
+index ddd120c..bcebf3e 100644
+--- a/src/omp/cg.cpp
++++ b/src/omp/cg.cpp
+@@ -20,7 +20,8 @@ void cg_init(const int x, const int y, const int halo_depth, const int coefficie
+   for (int jj = 0; jj < y; ++jj) {
+     for (int kk = 0; kk < x; ++kk) {
+       const int index = kk + jj * x;
+-      p[index] = 0.0;
++// data race: all threads access same location
++      p[0] = 0.0;
+       r[index] = 0.0;
+       u[index] = energy[index] * density[index];
+     }
