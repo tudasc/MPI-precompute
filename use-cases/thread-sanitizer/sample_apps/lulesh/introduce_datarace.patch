@@ -1,0 +1,14 @@
+diff --git a/lulesh.cc b/lulesh.cc
+index c840817..f40d2f6 100644
+--- a/lulesh.cc
++++ b/lulesh.cc
+@@ -281,7 +281,8 @@ void InitStressTermsForElems(Domain &domain,
+ 
+ #pragma omp parallel for firstprivate(numElem)
+    for (Index_t i = 0 ; i < numElem ; ++i){
+-      sigxx[i] = sigyy[i] = sigzz[i] =  - domain.p(i) - domain.q(i) ;
++// data race: all threads access the same location
++      sigxx[0] = sigyy[i] = sigzz[i] =  - domain.p(i) - domain.q(i) ;
+    }
+ }
+ 

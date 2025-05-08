@@ -3,6 +3,7 @@ set(USECASE_SANITIZER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(sanitizer_precompute_compiler_pass)
 add_subdirectory(tests)
+add_subdirectory(sample_apps)
 
 add_custom_target(run.sh-sanitizer ALL
         COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/run.sh ${CMAKE_CURRENT_BINARY_DIR}/run.sh
@@ -26,3 +27,5 @@ add_custom_target(setup_env.sh_sanitizer ALL
         echo "export CLANG_WRAP_CC=${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cc" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh &&
         echo "export CLANG_WRAP_CXX=${CMAKE_CURRENT_BINARY_DIR}/clang_wrap_cxx" >> ${CMAKE_CURRENT_BINARY_DIR}/setup_env.sh
         DEPENDS setup_env.sh.in)
+
+
