@@ -1,0 +1,15 @@
+diff --git a/main.cpp b/main.cpp
+index 03fd731..fd991ce 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -215,7 +215,10 @@ int main(int argc, char *argv[])
+ #ifdef USING_OMP
+           int nthreads = 1;
+ #pragma omp parallel
++{
++#pragma omp master
+           nthreads = omp_get_num_threads();
++          }
+           doc.get("Parallelism")->add("Number of OpenMP threads",nthreads);
+ #else
+           doc.get("Parallelism")->add("OpenMP not enabled","");
