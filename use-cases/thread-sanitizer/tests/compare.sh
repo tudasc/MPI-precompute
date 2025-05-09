@@ -6,8 +6,8 @@ BINARY_DIR=$1
 
 # the testcase to use
 TEST_CASE=$2
+DRB_DIR=$(dirname $TEST_CASE)
 
-RUN_SCRIPT=$BINARY_DIR/run.sh
 
 source ${BINARY_DIR}/setup_env.sh
 
@@ -17,17 +17,37 @@ GREP_STRING="WARNING: ThreadSanitizer: data race"
 
 rm ./a.out ./a.out_original
 
-if grep -q 'PolyBench' "$TEST_CASE"; then
-  echo "Skip testcase for now, it needs different compile flags"
-#  additional_compile_flags+=" $POLYFLAG";
-exit 1 # SKIP_RETURN_CODE
-fi
+CFLAGS="-std=c11 -O1 -g -fopenmp -fsanitize=thread"
+PASS_FLAGS="-fuse-ld=lld -flto -fwhole-program-vtables -fno-inline"
 
-POLYFLAG="micro-benchmarks/utilities/polybench.c -I micro-benchmarks -I micro-benchmarks/utilities -DPOLYBENCH_NO_FLUSH_CACHE -DPOLYBENCH_TIME -D_POSIX_C_SOURCE=200112L"
 
 # compile
-$RUN_SCRIPT $TEST_CASE
+if grep -q 'PolyBench' "$TEST_CASE"; then
+    # needs additional compiler flags
+    POLYFLAG="-I$DRB_DIR -I$DRB_DIR/utilities -DPOLYBENCH_NO_FLUSH_CACHE -DPOLYBENCH_TIME -D_POSIX_C_SOURCE=200112L"
+    CFLAGS="$CFLAGS $POLYFLAG";
+    # normal compilation
+    export USE_COMPILER_PASS=false
+    $CLANG_WRAP_CC $CFLAGS -c -o polybench.o $DRB_DIR/utilities/polybench.c
+    $CLANG_WRAP_CC $CFLAGS -c -o main.o $2
+    $CLANG_WRAP_CC $CFLAGS -o ./a.out_original main.o polybench.o
+    # with pass
+    export USE_COMPILER_PASS=true
+    $CLANG_WRAP_CC $CFLAGS $PASS_FLAGS -c -o polybench.o $DRB_DIR/utilities/polybench.c
+    $CLANG_WRAP_CC $CFLAGS $PASS_FLAGS -c -o main.o $2
+    $CLANG_WRAP_CC $CFLAGS $PASS_FLAGS -o ./a.out main.o polybench.o
 
+else
+    # normal compilation
+    export USE_COMPILER_PASS=false
+    $CLANG_WRAP_CC $CFLAGS -o ./a.out_original $2
+    # with pass
+    export USE_COMPILER_PASS=true
+    $CLANG_WRAP_CC $CFLAGS $PASS_FLAGS -o ./a.out $2
+fi
+
+
+# execution
 if [[ -x "./a.out" ]]; then
     # a.out exists
     if ./a.out_original 2>&1 | grep -qF "$GREP_STRING"; then

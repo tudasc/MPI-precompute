@@ -26,7 +26,6 @@ function(add_compare_test SRC_FILE)
     )
     set_tests_properties(${TEST_NAME} PROPERTIES
             TIMEOUT 5
-            SKIP_RETURN_CODE 1
     )
 endfunction()
 
