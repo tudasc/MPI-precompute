@@ -22,6 +22,8 @@ has_o_files=false
 has_flto=false
 has_fwhole_program_vtables=false
 has_opt_lvl=false
+has_src_file=false
+has_multiple_src_file=false
 for arg in "$@"; do
     # Check if the current argument is "-c"
     if [ "$arg" == "-c" ]; then
@@ -35,7 +37,12 @@ for arg in "$@"; do
     elif [ "$arg" == "-fwhole-program-vtables" ]; then
         has_fwhole_program_vtables=true
     elif [ "$arg" == "-O1" ] || [ "$arg" == "-O2" ] || [ "$arg" == "-O3" ]; then
-            has_opt_lvl=true
+        has_opt_lvl=true
+    elif [[ "$arg" == *.c ]] || [[ "$arg" == *.cpp ]]  || [[ "$arg" == *.cc ]] || [[ "$arg" == *.cxx ]]; then
+        if [ "$has_src_file" == true ]; then
+            has_multiple_src_file=true
+        fi
+        has_src_file=true
     fi
 done
 
@@ -58,6 +65,11 @@ COMPILER_INVOCATION="$compiler"
 if [ "$is_to_obj" == true ]; then
     if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
         echo "MODE: to obj file"
+    fi
+    if [ $has_multiple_src_file"" == true ]; then
+      echo "ERROR linking multiple src files directly into one object file is not supported"
+      echo "Compile one by one and link afterwards"
+      exit 1
     fi
     for arg in "$@"; do
         if [ "$arg" == "-c" ]; then
@@ -125,6 +137,11 @@ fi
 
 if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
     echo "MODE: direct to Binary"
+fi
+if [ $has_multiple_src_file"" == true ]; then
+      echo "ERROR linking multiple src files directly into one binary file is not supported"
+      echo "Compile one by one and link afterwards"
+      exit 1
 fi
 COMPILER_INVOCATION="$compiler"
 if [[ "$USE_COMPILER_PASS" == true ]]; then
