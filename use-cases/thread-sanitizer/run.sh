@@ -1,10 +1,12 @@
 #!/bin/bash
 
-#CFLAGS="-std=c11 -O3 ${INCLUDE}"
-CFLAGS="-std=c11 -O1 -g -fopenmp -fsanitize=thread ${INCLUDE}"
-LIBS="-lm"
-CXXFLAGS="-std=c++17 -O1 -g -fopenmp -fsanitize=thread ${INCLUDE}"
-#
+
+DEFAULT_CFLAGS="-std=c11 -O1 -g -fopenmp -fsanitize=thread ${INCLUDE}"
+#LIBS="-lm"
+DEFAULT_CXXFLAGS="-std=c++17 -O1 -g -fopenmp -fsanitize=thread ${INCLUDE}"
+
+CFLAGS="${CFLAGS:-$DEFAULT_CFLAGS}"
+CXXFLAGS="${CFLAGS:-$DEFAULT_CXXFLAGS}"
 
 #PASS_FLAGS="-flto -fwhole-program-vtables"
 PASS_FLAGS="-fuse-ld=lld -flto -fwhole-program-vtables -fno-inline"
