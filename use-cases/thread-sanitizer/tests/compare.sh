@@ -17,7 +17,7 @@ GREP_STRING="WARNING: ThreadSanitizer: data race"
 
 rm ./a.out ./a.out_original
 
-CFLAGS="-std=c11 -O1 -g -fopenmp -fsanitize=thread"
+CFLAGS="-O2 -g -fopenmp -fsanitize=thread"
 PASS_FLAGS="-fuse-ld=lld -flto -fwhole-program-vtables -fno-inline"
 
 
