@@ -37,9 +37,14 @@ ParallelRegion::ParallelRegion(Function *ompoutlined) {
 
   for (auto u : ompoutlined->users()) {
     if (auto *call = dyn_cast<CallBase>(u)) {
-      assert(is_omp_fork_call(call));
-      assert(ompoutlined == call->getArgOperand(2));
-      _fork_calls.push_back(call);
+
+      if (is_omp_fork_call(call)) {
+        assert(ompoutlined == call->getArgOperand(2));
+        _fork_calls.push_back(call);
+      } else {
+        // direct call to ompoutlined == with one thread only
+        assert(call->getCalledFunction() == ompoutlined);
+      }
 
     } else {
       u->dump();
