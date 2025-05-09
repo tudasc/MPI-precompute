@@ -293,20 +293,21 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
 
   if (auto other_array_type = dyn_cast<ArrayType>(type_of_gep)) {
     // in this case we need to raise the type of our gep type to the array type
-    assert(other_array_type->getElementType() == this->gep_type);
-    this->gep_type = type_of_gep;
-    // pre-pend 0 to all existing gep members (need to copy whole map)
-    std::map<std::vector<long>, std::shared_ptr<PtrUsageInfo>>
-        old_important_members(important_members);
-    important_members.clear();
-    for (const auto &[key, value] : old_important_members) {
+    if (other_array_type->getElementType() == this->gep_type) {
+      this->gep_type = type_of_gep;
+      // pre-pend 0 to all existing gep members (need to copy whole map)
+      std::map<std::vector<long>, std::shared_ptr<PtrUsageInfo>>
+          old_important_members(important_members);
+      important_members.clear();
+      for (const auto &[key, value] : old_important_members) {
 
-      std::vector<long> new_key = {0};
-      std::copy(key.begin(), key.end(), std::back_inserter(new_key));
-      important_members[new_key] = value;
+        std::vector<long> new_key = {0};
+        std::copy(key.begin(), key.end(), std::back_inserter(new_key));
+        important_members[new_key] = value;
+      }
+
+      return false;
     }
-
-    return false;
   }
   gep_type->dump();
   type_of_gep->dump();
