@@ -223,15 +223,22 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 
     remove_noinline_from_module(M);
 
+    std::vector<Function *> to_delete;
     for (auto it_f = M.begin(); it_f != M.end(); ++it_f) {
       Function *f = &*it_f;
       if (precalcuation->is_func_part_of_precompute_phase(f)) {
         // the tsan calls are already part of precompute, no need to instrumente
         // them again
         f->removeFnAttr(Attribute::SanitizeThread);
+      } else if ((not f->isDeclaration())  && f!=main_func && (not f->getName().starts_with("__tsan"))) {
+        // not used: remove
+        to_delete.push_back(f);
       }
     }
-    delete analysis_results;
+    for (auto f : to_delete) {
+      f->eraseFromParent();
+    }
+    // delete analysis_results;
 
     Debug(errs() << "After Modification:\n"; M.dump();
           errs() << "END MODULE\n";);
