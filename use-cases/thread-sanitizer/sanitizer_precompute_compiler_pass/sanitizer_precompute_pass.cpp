@@ -37,6 +37,8 @@
 
 #include "llvm/Transforms/IPO/ModuleInliner.h"
 
+#include "llvm/Transforms/IPO/GlobalDCE.h"
+
 #include <precalculation.h>
 
 using namespace llvm;
@@ -59,6 +61,9 @@ void run_optimization_passes(llvm::Module &M, ModuleAnalysisManager &AM) {
 
   auto inliner = llvm::ModuleInlinerPass();
   inliner.run(M, AM);
+  errs() << "Run Global DCE Pass\n";
+  auto dce = llvm::GlobalDCEPass();
+  dce.run(M, AM);
 
   // M.dump();
 }
@@ -219,7 +224,6 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     builder.CreateCall(precomputed_main, args);
     builder.CreateRet(Constant::getNullValue(main_func->getReturnType()));
 
-
     remove_noinline_from_module(M);
 
     // remove other non-precompute functions now
@@ -234,15 +238,11 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
                  (not f->getName().starts_with("__tsan")) &&
                  (not is_func_from_std(f))) {
         // not used: remove
-        to_delete.push_back(f);
+        if (f->hasExternalLinkage())
+          f->setLinkage(GlobalValue::InternalLinkage);
+        // this will prompt GlobalDCE to remove
       }
     }
-    for (auto f : to_delete) {
-      f->replaceAllUsesWith(
-          PoisonValue::get(f->getType())); // dont care about deletion order
-      f->eraseFromParent();
-    }
-    // delete analysis_results;
 
     Debug(errs() << "After Modification:\n"; M.dump();
           errs() << "END MODULE\n";);
