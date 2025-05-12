@@ -57,14 +57,19 @@ void remove_noinline_from_module(llvm::Module &M) {
 }
 
 void run_optimization_passes(llvm::Module &M, ModuleAnalysisManager &AM) {
-  errs() << "Run inliner Pass\n";
 
+  errs() << "Run inliner Pass\n";
   auto inliner = llvm::ModuleInlinerPass();
   inliner.run(M, AM);
+
   errs() << "Run Global DCE Pass\n";
   auto dce = llvm::GlobalDCEPass();
   dce.run(M, AM);
 
+#ifndef NDEBUG
+  auto has_error = verifyModule(M, &errs(), nullptr);
+  assert(!has_error);
+#endif
   // M.dump();
 }
 
@@ -261,7 +266,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     // elems are undef)
 #endif
 
-    errs() << "Successfully executed the pass\n\n";
+    errs() << "Successfully computed the precomputation\n\n";
 
     run_optimization_passes(M, AM);
 
