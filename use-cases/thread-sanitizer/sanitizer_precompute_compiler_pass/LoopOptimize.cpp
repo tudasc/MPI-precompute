@@ -114,7 +114,7 @@ bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
 }
 
 // true if loop was optimized
-bool perform_tsan_licm(llvm::Module &M, LoopInfo *LI, Loop *loop,
+bool perform_tsan_licm(llvm::Module &M, Loop *loop,
                        const std::vector<llvm::CallBase *> &tsan_in_loop) {
   if (not check_if_tsan_licm_is_possible(loop, tsan_in_loop)) {
     return false;
@@ -231,8 +231,6 @@ bool perform_tsan_licm(llvm::Module &M, LoopInfo *LI, Loop *loop,
   */
 
   // set incoming BB
-
-  BasicBlock *succ_to_replace = nullptr;
   auto *incoming_br = dyn_cast<BranchInst>(incoming->getTerminator());
   assert(incoming_br);
   int num_successors_replaced = 0;
@@ -249,10 +247,16 @@ bool perform_tsan_licm(llvm::Module &M, LoopInfo *LI, Loop *loop,
   // remove old loop
   std::vector<BasicBlock *> to_delete;
   for (auto *bb : loop->getBlocks()) {
+    bb->replaceAllUsesWith(new_bb);
     to_delete.push_back(bb);
   }
   for (auto *bb : to_delete) {
-    bb->replaceAllUsesWith(new_bb);
+    // dont care about correct deletion order, we already checked that nothing
+    // more is used outside of loop
+    for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
+      Instruction *inst = &*it_i;
+      inst->replaceAllUsesWith(PoisonValue::get(inst->getType()));
+    }
     bb->eraseFromParent();
   }
 
@@ -308,12 +312,12 @@ void Optimize_loops(llvm::Module &M) {
           }
 
           if (loop_applicable) {
-            if (perform_tsan_licm(M, li, loop, tsan_calls)) {
+            if (perform_tsan_licm(M, loop, tsan_calls)) {
               optimized_loops++;
               optimized = true;
-              return; // TODO handle properly!! probably use a domtree updater
               // LoopInfo is invalid
               li->erase(loop);
+              return; // TODO handle properly!! probably use a domtree updater
               break;
             }
           }
