@@ -23,8 +23,8 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 
-#include "precalculation.h"
 #include "LoopOptimize.h"
+#include "precalculation.h"
 
 #include <cassert>
 #include <vector>
@@ -272,7 +272,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 #endif
 
     Debug(errs() << "After Modification:\n"; M.dump();
-      errs() << "END MODULE\n";);
+          errs() << "END MODULE\n";);
 
     delete analysis_results;
 
