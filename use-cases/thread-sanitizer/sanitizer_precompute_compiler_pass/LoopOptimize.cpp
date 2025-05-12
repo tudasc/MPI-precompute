@@ -73,6 +73,32 @@ bool check_if_tsan_licim_is_possible(
   return !isa<SCEVCouldNotCompute>(trip_count);
 }
 
+ConstantInt *get_size_of_tsan_access(CallBase *tsan_call) {
+  // TODO implement
+  auto name = tsan_call->getCalledFunction()->getName();
+  if (name == "__tsan_read1")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 1);
+  if (name == "__tsan_read4")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 4);
+  if (name == "__tsan_read8")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 8);
+  if (name == "__tsan_read16")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 16);
+
+  if (name == "__tsan_write1")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 1);
+  if (name == "__tsan_write4")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 4);
+  if (name == "__tsan_write8")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 8);
+  if (name == "__tsan_write16")
+    return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 16);
+
+  tsan_call->dump();
+  assert(false && "Size of tsan access not implemented");
+  return nullptr;
+}
+
 // true if loop was optimized
 bool perform_tsan_licim(llvm::Module &M, Loop *loop,
                         const std::vector<llvm::CallBase *> &tsan_in_loop) {
@@ -141,13 +167,19 @@ bool perform_tsan_licim(llvm::Module &M, Loop *loop,
       builder.SetInsertPoint(dummy_inst);
       auto *as_ptr = builder.CreateIntToPtr(val_min, builder.getInt8PtrTy());
       auto *size = builder.CreateSub(val_max, val_min);
+      // need to include the size of last access
+      auto *size_full = builder.CreateAdd(size, get_size_of_tsan_access(call));
+
 
       if (call->getCalledFunction()->getName().starts_with("__tsan_read")) {
-        builder.CreateCall(tsan_read_range_func, {as_ptr, size});
+        // not supported right now
+        assert(not call->getCalledFunction()->getName().starts_with(
+            "__tsan_read_write"));
+        builder.CreateCall(tsan_read_range_func, {as_ptr, size_full});
       } else {
         assert(
             call->getCalledFunction()->getName().starts_with("__tsan_write"));
-        builder.CreateCall(tsan_write_range_func, {as_ptr, size});
+        builder.CreateCall(tsan_write_range_func, {as_ptr, size_full});
       }
     }
   }
