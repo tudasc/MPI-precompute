@@ -81,7 +81,6 @@ bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
     return false;
   }
 
-  IRBuilder<> builder(insert_point);
   std::map<Value *, Value *> replacement_map;
   for (auto *bb : loop->getBlocks()) {
     for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
@@ -117,6 +116,12 @@ bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
     pair.first->replaceAllUsesWith(pair.second);
   }
   return true;
+}
+
+// removes the BB
+void clean_temp_bb(BasicBlock *bb) {
+  assert(bb->getNumUses() == 0);
+  bb->eraseFromParent();
 }
 
 // true if loop was optimized
@@ -158,6 +163,13 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   auto *dummy_inst =
       builder.CreateAlloca(builder.getInt64Ty(), nullptr, "dummy");
 
+  // check if other values, such as the loop index are used after the loop and
+  // compute them if possible
+  if (not compute_other_loop_values(M, SE, loop, dummy_inst)) {
+    clean_temp_bb(new_bb);
+    return false;
+  }
+
   for (auto *call : tsan_in_loop) {
     // call->dump();
     assert(call->getNumOperands() == 2);
@@ -171,7 +183,7 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
       auto *addRec = dyn_cast<SCEVAddRecExpr>(scev);
       if (!addRec) {
         // could not determine start and end value
-        new_bb->eraseFromParent();
+        clean_temp_bb(new_bb);
         return false;
       }
 
@@ -184,7 +196,7 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
         std::swap(start, stop); // "backward" loop
         if (!SE->isKnownPredicate(ICmpInst::ICMP_ULE, start, stop)) {
           // could not determine iteration order
-          new_bb->eraseFromParent();
+          clean_temp_bb(new_bb);
           return false;
         }
       }
@@ -220,14 +232,7 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
     }
   }
 
-  // check if other values, such as the loop index are used after teh loop and
-  // compute them if possible
-  if (not compute_other_loop_values(M, SE, loop, dummy_inst)) {
-    new_bb->removeFromParent();
-    return false;
-  }
-
-  // finish up BB
+  // finish up replacement BB
   builder.SetInsertPoint(dummy_inst);
   builder.CreateBr(outgoing);
   dummy_inst->eraseFromParent();
