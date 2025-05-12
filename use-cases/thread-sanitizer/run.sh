@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-DEFAULT_CFLAGS="-std=c11 -O1 -g -fopenmp -fsanitize=thread ${INCLUDE}"
+DEFAULT_CFLAGS="-O2 -g -fopenmp -fsanitize=thread ${INCLUDE}"
 #LIBS="-lm"
 DEFAULT_CXXFLAGS="-std=c++17 -O1 -g -fopenmp -fsanitize=thread ${INCLUDE}"
 
