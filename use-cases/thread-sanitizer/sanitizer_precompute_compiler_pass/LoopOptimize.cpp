@@ -71,6 +71,15 @@ ConstantInt *get_size_of_tsan_access(CallBase *tsan_call) {
   return nullptr;
 }
 
+bool is_block_in_loop(BasicBlock *bb, Loop *loop) {
+  for (auto *bb_in_loop : loop->getBlocks()) {
+    if (bb_in_loop == bb) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // true if loop was optimized
 bool perform_tsan_licm(llvm::Module &M, Loop *loop,
                        const std::vector<llvm::CallBase *> &tsan_in_loop) {
@@ -169,15 +178,7 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   // find successor to replace and check if it is unique
   for (unsigned int i = 0; i < incoming_br->getNumSuccessors(); i++) {
     auto *succ = incoming_br->getSuccessor(i);
-    // std::find
-    bool in_loop = false;
-    for (auto *bb : loop->getBlocks()) {
-      if (succ == bb) {
-        in_loop = true;
-        break;
-      }
-    }
-    if (in_loop) {
+    if (is_block_in_loop(succ, loop)) {
       incoming_br->setSuccessor(i, new_bb);
       num_successors_replaced++;
     }
@@ -185,10 +186,14 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   assert(num_successors_replaced == 1);
 
   // remove old loop
-  std::vector<BasicBlock *> to_delete;
   for (auto *bb : loop->getBlocks()) {
-    bb->replaceAllUsesWith(new_bb); // if used in phi at outgoing
+    for (auto *succ : successors(bb)) {
+      if (not is_block_in_loop(succ, loop)) {
+        succ->replacePhiUsesWith(bb, new_bb); // if used in phi at outgoing
+      }
+    }
   }
+  // TODO why error here??
   llvm::EliminateUnreachableBlocks(*new_bb->getParent());
 
   return true;
