@@ -186,15 +186,14 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   assert(num_successors_replaced == 1);
 
   // remove old loop
+  std::vector<BasicBlock *> to_delete;
   for (auto *bb : loop->getBlocks()) {
-    for (auto *succ : successors(bb)) {
-      if (not is_block_in_loop(succ, loop)) {
-        succ->replacePhiUsesWith(bb, new_bb); // if used in phi at outgoing
-      }
-    }
+    to_delete.push_back(bb);
   }
-  // TODO why error here??
-  llvm::EliminateUnreachableBlocks(*new_bb->getParent());
+  for (auto *bb : to_delete) {
+    bb->replaceAllUsesWith(new_bb);
+    bb->eraseFromParent();
+  }
 
   return true;
 }
