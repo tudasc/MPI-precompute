@@ -6,6 +6,7 @@
 
 #include "analysis_results.h"
 #include "openmp_runtime_functions.h"
+#include "std_funcs.h"
 
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include <cassert>
@@ -269,7 +270,7 @@ void Optimize_loops(llvm::Module &M) {
   // TODO collect loops first: then replace, iterating over the loops breaks
   for (auto it_f = M.begin(); it_f != M.end(); ++it_f) {
     Function *f = &*it_f;
-    if (not f->isDeclaration()) {
+    if (not f->isDeclaration() && not is_func_from_std((f))) {
 
       bool optimized = true;
 
@@ -293,8 +294,9 @@ void Optimize_loops(llvm::Module &M) {
                     // omp function necessary e.g. to keep synchronization
                     call->getCalledFunction()->getName().startswith("__tsan")) {
                   tsan_calls.push_back(call);
-                } else if (is_omp_function(call->getCalledFunction())) {
-                  // todo analyze if we may be able to do something here
+                } else if (call->getCalledFunction() &&
+                           is_omp_function(call->getCalledFunction())) {
+                  // todo analyze if we may be able to do something here?
                   loop_applicable = false;
                   break;
                 } else {
