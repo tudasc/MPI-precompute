@@ -278,8 +278,8 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     assert(!has_error);
 #endif
 
-    Debug(errs() << "After Modification:\n"; M.dump();
-          errs() << "END MODULE\n";);
+    /* Debug(errs() << "After Modification:\n"; M.dump();
+           errs() << "END MODULE\n";);*/
 
     delete analysis_results;
 
