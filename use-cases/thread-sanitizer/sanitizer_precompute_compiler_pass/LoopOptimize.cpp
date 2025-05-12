@@ -71,17 +71,50 @@ ConstantInt *get_size_of_tsan_access(CallBase *tsan_call) {
   return nullptr;
 }
 
-bool is_block_in_loop(BasicBlock *bb, Loop *loop) {
-  for (auto *bb_in_loop : loop->getBlocks()) {
-    if (bb_in_loop == bb) {
-      return true;
+// if e.g. loop index is used after the loop
+// todo not extensively tested!
+bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
+                               Instruction *insert_point) {
+  const SCEV *exitCount = SE->getExitCount(loop, loop->getExitingBlock());
+  if (isa<SCEVCouldNotCompute>(exitCount)) {
+    return false;
+  }
+  IRBuilder<> builder(insert_point);
+  std::vector<Instruction *> to_compute;
+  for (auto *bb : loop->getBlocks()) {
+    for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
+      llvm::Instruction *inst_in_loop = &*it_i;
+      for (auto *u : inst_in_loop->users()) {
+        if (auto *user_inst = dyn_cast<Instruction>(u)) {
+          if (not loop->contains(user_inst)) {
+            if (not SE->isSCEVable(inst_in_loop->getType())) {
+              return false;
+            }
+            auto scev = dyn_cast<SCEVAddRecExpr>(SE->getSCEV(inst_in_loop));
+            if (not scev) {
+              return false;
+            }
+            auto *end_value_scev = scev->evaluateAtIteration(exitCount, *SE);
+            SCEVExpander expander(*SE, M.getDataLayout(), "scev");
+            expander.setInsertPoint(insert_point);
+
+            Value *end_value =
+                expander.expandCodeFor(end_value_scev, inst_in_loop->getType());
+            inst_in_loop->replaceAllUsesWith(end_value);
+            break; // iterator through the users will break, but we are finished
+                   // here anyway
+          }
+        }
+      }
+      // iterator through loop instr will stay intact, as we dont chenge the
+      // loop
     }
   }
-  return false;
+  return true;
 }
 
 // true if loop was optimized
-bool perform_tsan_licm(llvm::Module &M, Loop *loop,
+bool perform_tsan_licm(llvm::Module &M, LoopInfo *LI, Loop *loop,
                        const std::vector<llvm::CallBase *> &tsan_in_loop) {
   if (not check_if_tsan_licm_is_possible(loop, tsan_in_loop)) {
     return false;
@@ -125,9 +158,12 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
       auto scev = SE->getSCEV(call->getArgOperand(0));
       assert(SE->hasComputableLoopEvolution(scev, loop));
 
-      // Assumes scev is AddRec for the loop
-      assert(isa<SCEVAddRecExpr>(scev) && "Expected AddRec SCEV");
       auto *addRec = dyn_cast<SCEVAddRecExpr>(scev);
+      if (!addRec) {
+        // could not determine start and end value
+        new_bb->eraseFromParent();
+        return false;
+      }
 
       auto tripCount = SE->getSymbolicMaxBackedgeTakenCount(loop);
 
@@ -173,11 +209,26 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
       }
     }
   }
+
+  // check if other values, such as the loop index are used after teh loop and
+  // compute them if possible
+  if (not compute_other_loop_values(M, SE, loop, dummy_inst)) {
+    new_bb->removeFromParent();
+    return false;
+  }
+
   // finish up BB
   builder.SetInsertPoint(dummy_inst);
   builder.CreateBr(outgoing);
   dummy_inst->eraseFromParent();
-  // new_bb->dump();
+  /*
+  errs() << "Loop replaced:\n";
+  for (auto bb : loop->getBlocks()) {
+    bb->dump();
+  }
+  errs() << "replaced with:\n";
+  new_bb->dump();
+  */
 
   // set incoming BB
 
@@ -188,7 +239,7 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   // find successor to replace and check if it is unique
   for (unsigned int i = 0; i < incoming_br->getNumSuccessors(); i++) {
     auto *succ = incoming_br->getSuccessor(i);
-    if (is_block_in_loop(succ, loop)) {
+    if (loop->contains(succ)) {
       incoming_br->setSuccessor(i, new_bb);
       num_successors_replaced++;
     }
@@ -248,11 +299,16 @@ void Optimize_loops(llvm::Module &M) {
                   break;
                 }
               }
+              if (isa<StoreInst>(inst)) {
+                // some computation result may be necessary
+                loop_applicable = false;
+                break;
+              }
             }
           }
 
           if (loop_applicable) {
-            if (perform_tsan_licm(M, loop, tsan_calls)) {
+            if (perform_tsan_licm(M, li, loop, tsan_calls)) {
               optimized_loops++;
               optimized = true;
               return; // TODO handle properly!! probably use a domtree updater
