@@ -80,8 +80,9 @@ bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
   if (isa<SCEVCouldNotCompute>(exitCount)) {
     return false;
   }
+
   IRBuilder<> builder(insert_point);
-  std::vector<Instruction *> to_compute;
+  std::map<Value *, Value *> replacement_map;
   for (auto *bb : loop->getBlocks()) {
     for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
       llvm::Instruction *inst_in_loop = &*it_i;
@@ -101,15 +102,19 @@ bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
 
             Value *end_value =
                 expander.expandCodeFor(end_value_scev, inst_in_loop->getType());
-            inst_in_loop->replaceAllUsesWith(end_value);
-            break; // iterator through the users will break, but we are finished
-                   // here anyway
+            replacement_map[inst_in_loop] = end_value;
+            break; // only one replacement value is needed even if multiple
+                   // users
           }
         }
       }
       // iterator through loop instr will stay intact, as we dont chenge the
       // loop
     }
+  }
+  // perform the replacement
+  for (auto pair : replacement_map) {
+    pair.first->replaceAllUsesWith(pair.second);
   }
   return true;
 }
