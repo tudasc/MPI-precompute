@@ -12,39 +12,11 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 using namespace llvm;
 
-// todo check for usage of any value outside of loop!
-
-std::vector<llvm::CallBase *> collect_tsan_calls(Loop *loop) {
-
-  std::vector<llvm::CallBase *> tsan_in_loop;
-  // collect tsan usage
-  for (auto *bb : loop->getBlocks()) {
-    for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
-      llvm::Instruction *inst = &*it_i;
-      if (auto *call = dyn_cast<CallBase>(inst)) {
-        if (call->getCalledFunction() &&
-            // eiter tsan or omp function
-            // omp function necessary e.g. to keep synchronization
-            call->getCalledFunction()->getName().startswith("__tsan")) {
-          tsan_in_loop.push_back(call);
-        } else if (
-            // TODO analyze omp loop
-            is_omp_function(call->getCalledFunction())) {
-          call->dump();
-          assert(false && "Openmp functions in loop are not implemented");
-        } else {
-          assert(false && "Other calls in loop are not implemented");
-        }
-      }
-    }
-  }
-  return tsan_in_loop;
-}
-
-bool check_if_tsan_licim_is_possible(
+bool check_if_tsan_licm_is_possible(
     Loop *loop, const std::vector<llvm::CallBase *> &tsan_in_loop) {
   auto SE = analysis_results->getSE(*loop->getHeader()->getParent());
 
@@ -100,9 +72,9 @@ ConstantInt *get_size_of_tsan_access(CallBase *tsan_call) {
 }
 
 // true if loop was optimized
-bool perform_tsan_licim(llvm::Module &M, Loop *loop,
-                        const std::vector<llvm::CallBase *> &tsan_in_loop) {
-  if (not check_if_tsan_licim_is_possible(loop, tsan_in_loop)) {
+bool perform_tsan_licm(llvm::Module &M, Loop *loop,
+                       const std::vector<llvm::CallBase *> &tsan_in_loop) {
+  if (not check_if_tsan_licm_is_possible(loop, tsan_in_loop)) {
     return false;
   }
 
@@ -118,7 +90,7 @@ bool perform_tsan_licim(llvm::Module &M, Loop *loop,
   BasicBlock *outgoing;
   if (not loop->getIncomingAndBackEdge(incoming, outgoing)) {
 
-    errs() << "Could not replace loop wiht one BB: incoming and backendge are "
+    errs() << "Could not replace loop with one BB: incoming and backedge are "
               "not unique\n";
     return false;
   }
@@ -170,7 +142,6 @@ bool perform_tsan_licim(llvm::Module &M, Loop *loop,
       // need to include the size of last access
       auto *size_full = builder.CreateAdd(size, get_size_of_tsan_access(call));
 
-
       if (call->getCalledFunction()->getName().starts_with("__tsan_read")) {
         // not supported right now
         assert(not call->getCalledFunction()->getName().starts_with(
@@ -183,26 +154,42 @@ bool perform_tsan_licim(llvm::Module &M, Loop *loop,
       }
     }
   }
+  // finish up BB
   builder.SetInsertPoint(dummy_inst);
-  outgoing->dump();
   builder.CreateBr(outgoing);
-
-  auto *incoming_br = dyn_cast<BranchInst>(incoming->getTerminator());
-  assert(incoming_br);
-  assert(incoming_br->getNumSuccessors() == 1);
-  incoming_br->setSuccessor(0, new_bb);
-
   dummy_inst->eraseFromParent();
   // new_bb->dump();
+
+  // set incoming BB
+
+  BasicBlock *succ_to_replace = nullptr;
+  auto *incoming_br = dyn_cast<BranchInst>(incoming->getTerminator());
+  assert(incoming_br);
+  int num_successors_replaced = 0;
+  // find successor to replace and check if it is unique
+  for (unsigned int i = 0; i < incoming_br->getNumSuccessors(); i++) {
+    auto *succ = incoming_br->getSuccessor(i);
+    // std::find
+    bool in_loop = false;
+    for (auto *bb : loop->getBlocks()) {
+      if (succ == bb) {
+        in_loop = true;
+        break;
+      }
+    }
+    if (in_loop) {
+      incoming_br->setSuccessor(i, new_bb);
+      num_successors_replaced++;
+    }
+  }
+  assert(num_successors_replaced == 1);
 
   // remove old loop
   std::vector<BasicBlock *> to_delete;
   for (auto *bb : loop->getBlocks()) {
-    to_delete.push_back(bb);
+    bb->replaceAllUsesWith(new_bb); // if used in phi at outgoing
   }
-  for (auto *bb : to_delete) {
-    bb->eraseFromParent();
-  }
+  llvm::EliminateUnreachableBlocks(*new_bb->getParent());
 
   return true;
 }
@@ -214,17 +201,56 @@ void Optimize_loops(llvm::Module &M) {
   for (auto it_f = M.begin(); it_f != M.end(); ++it_f) {
     Function *f = &*it_f;
     if (not f->isDeclaration()) {
+
+      bool optimized = true;
+
       auto li = analysis_results->getLoopInfo(*f);
+      while (optimized) { // ontil no more optimization
+        optimized = false;
+        // get new loop info
 
-      for (auto loop : li->getLoopsInPreorder()) {
-        num_loops++;
-        auto tsan_calls = collect_tsan_calls(loop);
+        for (auto loop : li->getLoopsInPreorder()) {
+          num_loops++;
 
-        if (perform_tsan_licim(M, loop, tsan_calls)) {
-          optimized_loops++;
+          bool loop_applicable = true;
+          std::vector<llvm::CallBase *> tsan_calls;
+          // collect tsan usage
+          for (auto *bb : loop->getBlocks()) {
+            for (auto it_i = bb->begin(); it_i != bb->end(); ++it_i) {
+              llvm::Instruction *inst = &*it_i;
+              if (auto *call = dyn_cast<CallBase>(inst)) {
+                if (call->getCalledFunction() &&
+                    // eiter tsan or omp function
+                    // omp function necessary e.g. to keep synchronization
+                    call->getCalledFunction()->getName().startswith("__tsan")) {
+                  tsan_calls.push_back(call);
+                } else if (is_omp_function(call->getCalledFunction())) {
+                  // todo analyze if we may be able to do something here
+                  loop_applicable = false;
+                  break;
+                } else {
+                  // nothing we can do
+                  loop_applicable = false;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (loop_applicable) {
+            if (perform_tsan_licm(M, loop, tsan_calls)) {
+              optimized_loops++;
+              optimized = true;
+              return; // TODO handle properly!! probably use a domtree updater
+              // LoopInfo is invalid
+              li->erase(loop);
+              break;
+            }
+          }
         }
       }
     }
   }
+  // print statistics
   errs() << "Optimized loops: " << optimized_loops << "/" << num_loops << "\n";
 }
