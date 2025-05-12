@@ -133,6 +133,16 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
 
       auto *start = addRec->getStart();
       auto *stop = addRec->evaluateAtIteration(tripCount, *SE);
+
+      if (!SE->isKnownPredicate(ICmpInst::ICMP_ULE, start, stop)) {
+        std::swap(start, stop); // "backward" loop
+        if (!SE->isKnownPredicate(ICmpInst::ICMP_ULE, start, stop)) {
+          // could not determine iteration order
+          new_bb->eraseFromParent();
+          return false;
+        }
+      }
+
       // start->dump();
       // stop->dump();
 
