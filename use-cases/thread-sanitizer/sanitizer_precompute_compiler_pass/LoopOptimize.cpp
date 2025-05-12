@@ -139,7 +139,10 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   }
   outgoing = loop->getExitBlock();
   assert(incoming);
-  assert(outgoing);
+  if (!outgoing) {
+    // TODO implement
+    return false;
+  }
   // errs() << "create new BB instead of loop\n";
   BasicBlock *new_bb =
       BasicBlock::Create(loop->getHeader()->getContext(), "loop_replacement",
