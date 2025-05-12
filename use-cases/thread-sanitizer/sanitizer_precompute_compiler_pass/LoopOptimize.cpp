@@ -268,7 +268,6 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
 }
 
 void Optimize_loops(llvm::Module &M) {
-  unsigned int num_loops = 0;
   unsigned int optimized_loops = 0;
   // TODO collect loops first: then replace, iterating over the loops breaks
   for (auto it_f = M.begin(); it_f != M.end(); ++it_f) {
@@ -276,14 +275,12 @@ void Optimize_loops(llvm::Module &M) {
     if (not f->isDeclaration() && not is_func_from_std((f))) {
 
       bool optimized = true;
-
-      auto li = analysis_results->getLoopInfo(*f);
-      while (optimized) { // ontil no more optimization
+      while (optimized) { // until no more optimization
         optimized = false;
-        // get new loop info
+        // get new loop info if it was invalidated
+        auto li = analysis_results->getLoopInfo(*f);
 
         for (auto loop : li->getLoopsInPreorder()) {
-          num_loops++;
 
           bool loop_applicable = true;
           std::vector<llvm::CallBase *> tsan_calls;
@@ -293,8 +290,6 @@ void Optimize_loops(llvm::Module &M) {
               llvm::Instruction *inst = &*it_i;
               if (auto *call = dyn_cast<CallBase>(inst)) {
                 if (call->getCalledFunction() &&
-                    // eiter tsan or omp function
-                    // omp function necessary e.g. to keep synchronization
                     call->getCalledFunction()->getName().startswith("__tsan")) {
                   tsan_calls.push_back(call);
                 } else if (call->getCalledFunction() &&
@@ -303,7 +298,7 @@ void Optimize_loops(llvm::Module &M) {
                   loop_applicable = false;
                   break;
                 } else {
-                  // nothing we can do
+                  // call to something else: we cant analyze that
                   loop_applicable = false;
                   break;
                 }
@@ -320,10 +315,9 @@ void Optimize_loops(llvm::Module &M) {
             if (perform_tsan_licm(M, loop, tsan_calls)) {
               optimized_loops++;
               optimized = true;
-              // LoopInfo is invalid
-              li->erase(loop);
-              return; // TODO handle properly!! probably use a domtree updater
-              break;
+              // LoopInfo is invalid!
+              analysis_results->invalidate(*f);
+              break; // end looping over loops, as iterator is invalid
             }
           }
         }
@@ -331,5 +325,5 @@ void Optimize_loops(llvm::Module &M) {
     }
   }
   // print statistics
-  errs() << "Optimized loops: " << optimized_loops << "/" << num_loops << "\n";
+  errs() << "Optimized loops: " << optimized_loops << "\n";
 }
