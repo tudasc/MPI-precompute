@@ -17,37 +17,7 @@
 
 using namespace llvm;
 
-bool check_if_tsan_licm_is_possible(
-    Loop *loop, const std::vector<llvm::CallBase *> &tsan_in_loop) {
-  auto SE = analysis_results->getSE(*loop->getHeader()->getParent());
-
-  for (auto *call : tsan_in_loop) {
-    // called func + ONE argument
-    assert(call->getNumOperands() == 2);
-    // call->dump();
-    if (loop->isLoopInvariant(call->getArgOperand(0))) {
-      // nothing to do, invariant anyway
-      // llvm::errs() << "Loop invariant\n";
-    } else {
-      // check if bounds are know
-      auto scev = SE->getSCEV(call->getArgOperand(0));
-      if (not SE->hasComputableLoopEvolution(scev, loop)) {
-        // need to execute
-        return false;
-      }
-      // else: we could compute the memory accesses before the loop
-      // without running it and tell tsan that whole region is accessed
-      // at once effectively
-    }
-  }
-
-  auto trip_count = SE->getSymbolicMaxBackedgeTakenCount(loop);
-  // loop bounds need to be computable as well
-  return !isa<SCEVCouldNotCompute>(trip_count);
-}
-
 ConstantInt *get_size_of_tsan_access(CallBase *tsan_call) {
-  // TODO implement
   auto name = tsan_call->getCalledFunction()->getName();
   if (name == "__tsan_read1")
     return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 1);
@@ -67,9 +37,42 @@ ConstantInt *get_size_of_tsan_access(CallBase *tsan_call) {
   if (name == "__tsan_write16")
     return ConstantInt::get(Type::getInt64Ty(tsan_call->getContext()), 16);
 
-  tsan_call->dump();
-  assert(false && "Size of tsan access not implemented");
+  // tsan_call->dump();
+  // assert(false && "Size of tsan access not implemented");
   return nullptr;
+}
+
+bool check_if_tsan_licm_is_possible(
+    Loop *loop, const std::vector<llvm::CallBase *> &tsan_in_loop) {
+  auto SE = analysis_results->getSE(*loop->getHeader()->getParent());
+
+  for (auto *call : tsan_in_loop) {
+    // called func + ONE argument
+    if (not get_size_of_tsan_access(call)) {
+      // TODO
+      //  this tsan call is not supported yet
+      return false;
+    }
+
+    if (loop->isLoopInvariant(call->getArgOperand(0))) {
+      // nothing to do, invariant anyway
+      // llvm::errs() << "Loop invariant\n";
+    } else {
+      // check if bounds are know
+      auto scev = SE->getSCEV(call->getArgOperand(0));
+      if (not SE->hasComputableLoopEvolution(scev, loop)) {
+        // need to execute
+        return false;
+      }
+      // else: we could compute the memory accesses before the loop
+      // without running it and tell tsan that whole region is accessed
+      // at once effectively
+    }
+  }
+
+  auto trip_count = SE->getSymbolicMaxBackedgeTakenCount(loop);
+  // loop bounds need to be computable as well
+  return !isa<SCEVCouldNotCompute>(trip_count);
 }
 
 // if e.g. loop index is used after the loop
