@@ -153,6 +153,7 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
     // call->dump();
     assert(call->getNumOperands() == 2);
     if (loop->isLoopInvariant(call->getArgOperand(0))) {
+      builder.SetInsertPoint(dummy_inst);
       builder.CreateCall(call->getCalledFunction(), call->getArgOperand(0));
     } else {
       auto scev = SE->getSCEV(call->getArgOperand(0));
@@ -222,14 +223,13 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   builder.CreateBr(outgoing);
   dummy_inst->eraseFromParent();
   /*
-  errs() << "Loop replaced:\n";
-  for (auto bb : loop->getBlocks()) {
-    bb->dump();
-  }
-  errs() << "replaced with:\n";
-  new_bb->dump();
+    errs() << "Loop replaced:\n";
+    for (auto bb : loop->getBlocks()) {
+      bb->dump();
+    }
+    errs() << "replaced with:\n";
+    new_bb->dump();
   */
-
   // set incoming BB
   auto *incoming_br = dyn_cast<BranchInst>(incoming->getTerminator());
   assert(incoming_br);
