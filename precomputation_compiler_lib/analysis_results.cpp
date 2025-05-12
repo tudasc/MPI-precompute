@@ -59,3 +59,7 @@ llvm::TargetLibraryInfo *RequiredAnalysisResults::getTLI() { return TLI; }
 llvm::PostDominatorTree *RequiredAnalysisResults::getPostDomTree(Function &f) {
   return &FAM->getResult<PostDominatorTreeAnalysis>(f);
 }
+
+void RequiredAnalysisResults::invalidate(llvm::Function &f) {
+  FAM->invalidate(f, PreservedAnalyses::none());
+}

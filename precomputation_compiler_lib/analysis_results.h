@@ -38,6 +38,9 @@ public:
 
   llvm::TargetLibraryInfo *getTLI();
 
+  // invalidate All analysis for a specific function if something changes
+  void invalidate(llvm::Function &f);
+
 private:
   llvm::FunctionAnalysisManager *FAM;
 
