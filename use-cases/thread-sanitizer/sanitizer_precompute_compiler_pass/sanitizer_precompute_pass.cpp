@@ -24,6 +24,7 @@
 #include "llvm/Passes/PassPlugin.h"
 
 #include "precalculation.h"
+#include "LoopOptimize.h"
 
 #include <cassert>
 #include <vector>
@@ -230,7 +231,8 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
         // the tsan calls are already part of precompute, no need to instrumente
         // them again
         f->removeFnAttr(Attribute::SanitizeThread);
-      } else if ((not f->isDeclaration())  && f!=main_func && (not f->getName().starts_with("__tsan"))) {
+      } else if ((not f->isDeclaration()) && f != main_func &&
+                 (not f->getName().starts_with("__tsan"))) {
         // not used: remove
         to_delete.push_back(f);
       }
@@ -260,6 +262,19 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
     errs() << "Successfully executed the pass\n\n";
 
     run_optimization_passes(M, AM);
+
+    errs() << "Optimize Loops\n\n";
+    Optimize_loops(M);
+
+#ifndef NDEBUG
+    has_error = verifyModule(M, &errs(), nullptr);
+    assert(!has_error);
+#endif
+
+    Debug(errs() << "After Modification:\n"; M.dump();
+      errs() << "END MODULE\n";);
+
+    delete analysis_results;
 
     return PreservedAnalyses::none();
   }

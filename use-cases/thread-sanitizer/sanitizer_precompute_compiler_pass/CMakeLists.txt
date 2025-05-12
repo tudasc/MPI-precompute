@@ -1,5 +1,6 @@
 add_library(sanitizer_precompute_pass MODULE
         # List your source files here.
+        LoopOptimize.cpp
         sanitizer_precompute_pass.cpp
 )
 
