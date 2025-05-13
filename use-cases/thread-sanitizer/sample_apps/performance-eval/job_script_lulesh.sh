@@ -8,7 +8,7 @@
 #SBATCH --time 00:30:00
 #SBATCH --exclusive
 
-#SBATCH --array 0-15
+#SBATCH --array 1-15
 
 #same as -c
 #SBATCH --cpus-per-task 8
@@ -20,7 +20,7 @@
 #specify these variables
 PRECOMPUTE_DIR="/home/tj75qeje/precompute/build/use-cases/thread-sanitizer"
 EXECUTABLE_DIR="/home/tj75qeje/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/LULESH"
-PARAMETER_FILE="/home/tj75qeje/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/parameters.txt"
+PARAMETER_FILE="/home/tj75qeje/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/parameters_lulesh.txt"
 OUTPUT_DIR="/work/scratch/tj75qeje/precompute/lulesh"
 
 
