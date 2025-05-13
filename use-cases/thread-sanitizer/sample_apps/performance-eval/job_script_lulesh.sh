@@ -8,7 +8,7 @@
 #SBATCH --time 00:30:00
 #SBATCH --exclusive
 
-#SBATCH --array 1-15
+#SBATCH --array 1-20
 
 #same as -c
 #SBATCH --cpus-per-task 8
@@ -28,6 +28,8 @@ OUTPUT_FILE_PREFIX="$OUTPUT_DIR/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}_out
 
 ml gcc/8.5.0 clang/16.0.6
 source ${PRECOMPUTE_DIR}/setup_env.sh
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OMP_PLACES=cores
 
 # read from parameter file
 RUN_PARAMETER=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $PARAMETER_FILE)
