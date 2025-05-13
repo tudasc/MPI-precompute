@@ -1080,6 +1080,27 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   return false;
 }
 
+bool PrecalculationAnalysis::is_ptr_usage_in_std_indirect(
+    llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
+  assert(ptr_arg_info->v->getType()->isPointerTy());
+  assert(ptr_arg_info->ptr_info);
+  assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
+  if (not call->getCalledFunction()) {
+    // virtual call, dont know
+    return true;
+  }
+
+  if (is_omp_function(call->getCalledFunction())) {
+    return false; // openmp does not do that for relevant ptrs
+    // the ptrs where it does are managed by omp runtime anyway
+  }
+  if (call->getCalledFunction()->isIntrinsic()) {
+    return false;
+  }
+
+  return true;
+}
+
 void PrecalculationAnalysis::include_call_to_std(
     const std::shared_ptr<TaintedValue> &call_info) {
   assert(isa<CallBase>(call_info->v));
@@ -1164,7 +1185,7 @@ void PrecalculationAnalysis::visit_call(
   }
 
   // analyze if call to str read/writes ptr
-  if (is_call_to_std(call)) {
+  if (is_call_to_std(call) && !is_omp_fork_call(call)) {
     for (auto &arg : call->args()) {
       if (auto *v = dyn_cast<Value>(&arg)) {
         if (is_tainted(v) && v->getType()->isPointerTy()) {
@@ -1172,13 +1193,17 @@ void PrecalculationAnalysis::visit_call(
             get_function_analysis(call->getFunction())
                 ->add_ptr_write(get_taint_info(v)->ptr_info);
             // std may write to derived ptrs
-            get_taint_info(v)->ptr_info->setDerivedPtrIsRelevant(true);
+            if (is_ptr_usage_in_std_indirect(call, get_taint_info(v))) {
+              get_taint_info(v)->ptr_info->setDerivedPtrIsRelevant(true);
+            }
           }
           if (is_ptr_usage_in_std_read(call, get_taint_info(v))) {
             get_function_analysis(call->getFunction())
                 ->add_ptr_read(get_taint_info(v)->ptr_info);
             // std may read derived ptrs
-            get_taint_info(v)->ptr_info->setDerivedPtrIsRelevant(true);
+            if (is_ptr_usage_in_std_indirect(call, get_taint_info(v))) {
+              get_taint_info(v)->ptr_info->setDerivedPtrIsRelevant(true);
+            }
           }
         }
       }

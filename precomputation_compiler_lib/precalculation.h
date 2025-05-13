@@ -179,6 +179,8 @@ private:
   bool
   is_ptr_usage_in_std_write(llvm::CallBase *call,
                             const std::shared_ptr<TaintedValue> &ptr_arg_info);
+  bool is_ptr_usage_in_std_indirect(
+      llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info);
 
   void insert_necessary_control_flow(llvm::Value *v);
 
@@ -223,7 +225,8 @@ private:
   void visit_ptr_ret(const std::shared_ptr<TaintedValue> &ptr,
                      llvm::ReturnInst *ret);
 
-  void handle_vararg_ptr_alias(const std::shared_ptr<TaintedValue> &ptr, llvm::Function* func);
+  void handle_vararg_ptr_alias(const std::shared_ptr<TaintedValue> &ptr,
+                               llvm::Function *func);
 
   bool
   visit_ptr_insertvalue_recursive_impl(const std::shared_ptr<TaintedValue> &ptr,
