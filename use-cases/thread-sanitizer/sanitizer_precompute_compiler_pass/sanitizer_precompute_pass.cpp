@@ -270,6 +270,10 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 
     run_optimization_passes(M, AM);
 
+    delete analysis_results;
+
+    return PreservedAnalyses::none();
+
     errs() << "Optimize Loops\n\n";
     Optimize_loops(M);
 
