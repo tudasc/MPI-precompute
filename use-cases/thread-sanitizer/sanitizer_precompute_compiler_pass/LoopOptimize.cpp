@@ -51,7 +51,7 @@ bool check_if_tsan_licm_is_possible(
     if (not get_size_of_tsan_access(call)) {
       // TODO
       //  this tsan call is not supported yet
-      errs()  << "Loop Optimization fail: TSAN call not supported yet\n";
+      errs() << "Loop Optimization fail: TSAN call not supported yet\n";
       call->dump();
       return false;
     }
@@ -64,7 +64,8 @@ bool check_if_tsan_licm_is_possible(
       auto scev = SE->getSCEV(call->getArgOperand(0));
       if (not SE->hasComputableLoopEvolution(scev, loop)) {
         // need to execute
-        errs()  << "Loop Optimization fail: Ptr has non computable loop Evolution\n";
+        errs() << "Loop Optimization fail: Ptr has non computable loop "
+                  "Evolution\n";
         return false;
       }
       // else: we could compute the memory accesses before the loop
@@ -84,7 +85,7 @@ bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
                                Instruction *insert_point) {
   const SCEV *exitCount = SE->getExitCount(loop, loop->getExitingBlock());
   if (isa<SCEVCouldNotCompute>(exitCount)) {
-    errs()  << "Loop Optimization fail: Could not compute loop exit count\n";
+    errs() << "Loop Optimization fail: Could not compute loop exit count\n";
     return false;
   }
 
@@ -100,7 +101,8 @@ bool compute_other_loop_values(llvm::Module &M, ScalarEvolution *SE, Loop *loop,
             }
             auto scev = dyn_cast<SCEVAddRecExpr>(SE->getSCEV(inst_in_loop));
             if (not scev) {
-              errs()  << "Could not compute Evolution of value used after loop\n";
+              errs()
+                  << "Could not compute Evolution of value used after loop\n";
               inst_in_loop->dump();
               return false;
             }
@@ -152,14 +154,14 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
   BasicBlock *outgoing;
   if (not loop->getIncomingAndBackEdge(incoming, outgoing)) {
 
-    errs()  << "Loop Optimization Incoming and Back edge are not unique\n";
+    errs() << "Loop Optimization Incoming and Back edge are not unique\n";
     return false;
   }
   outgoing = loop->getExitBlock();
   assert(incoming);
   if (!outgoing) {
     // TODO implement
-    errs()  << "Loop Optimization fail: Outgoing edge not unique\n";
+    errs() << "Loop Optimization fail: Outgoing edge not unique\n";
     return false;
   }
   // errs() << "create new BB instead of loop\n";
@@ -193,7 +195,8 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
       if (!addRec) {
         // could not determine start and end value
         clean_temp_bb(new_bb);
-        errs()  << "Loop Optimization fail: Could not compute start and end values of ptr\n";
+        errs() << "Loop Optimization fail: Could not compute start and end "
+                  "values of ptr\n";
         return false;
       }
 
@@ -207,7 +210,8 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
         if (!SE->isKnownPredicate(ICmpInst::ICMP_ULE, start, stop)) {
           // could not determine iteration order
           clean_temp_bb(new_bb);
-          errs()  << "Loop Optimization fail: Could not determine iteration order\n";
+          errs() << "Loop Optimization fail: Could not determine iteration "
+                    "order\n";
           return false;
         }
       }
@@ -315,23 +319,32 @@ void Optimize_loops(llvm::Module &M) {
                 } else if (call->getCalledFunction() &&
                            is_omp_function(call->getCalledFunction())) {
                   // todo analyze if we may be able to do something here?
-                  errs()  << "Loop Optimization fail: Call to Openmp\n";
+                  errs() << "Loop Optimization fail: Call to Openmp\n";
                   call->dump();
                   loop_applicable = false;
                   break;
                 } else {
                   // call to something else: we cant analyze that
+
                   loop_applicable = false;
-                  errs()  << "Loop Optimization fail: Call in loop\n";
+                  errs() << "Loop Optimization fail: Call in loop\n";
                   call->dump();
                   break;
                 }
               }
-              if (isa<StoreInst>(inst)) {
+              if (auto *store = dyn_cast<StoreInst>(inst)) {
                 // some computation result may be necessary
                 loop_applicable = false;
-                errs()  << "Loop Optimization fail: store in loop\n";
+                errs() << "Loop Optimization fail: store in loop\n";
                 inst->dump();
+                // debug info
+                auto SE =
+                    analysis_results->getSE(*loop->getHeader()->getParent());
+                auto scev = SE->getSCEV(store->getPointerOperand()); // ptr
+                errs() << "Ptr: Invariant? " << SE->isLoopInvariant(scev, loop)
+                       << " Konwn Evolution? "
+                       << SE->hasComputableLoopEvolution(scev, loop) << "\n";
+
                 break;
               }
             }
