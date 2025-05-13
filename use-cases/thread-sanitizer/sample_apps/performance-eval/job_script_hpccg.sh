@@ -8,7 +8,7 @@
 #SBATCH --time 00:30:00
 #SBATCH --exclusive
 
-#SBATCH --array 1-10
+#SBATCH --array 1-9
 
 #same as -c
 #SBATCH --cpus-per-task 8
