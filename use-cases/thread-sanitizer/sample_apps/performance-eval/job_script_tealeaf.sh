@@ -8,7 +8,7 @@
 #SBATCH --time 00:30:00
 #SBATCH --exclusive
 
-#SBATCH --array 1-15
+#SBATCH --array 1-6
 
 
 #same as -c
@@ -42,6 +42,7 @@ IFS=',' read -r RESOLUTION STEPS <<< "$RUN_PARAMETER"
 
 # setup tea.in
 cp $EXECUTABLE_DIR/tea.in tea.in
+cp $EXECUTABLE_DIR/tea.problems tea.problems
 # update input file with correct parameters
 sed -i \
     -e "s/^x_cells=.*/x_cells=$RESOLUTION/" \
