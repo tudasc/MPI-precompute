@@ -30,10 +30,11 @@ inline bool is_omp_fork_call(llvm::CallBase *call) {
 }
 
 // get the call that actually schedules the task
-inline llvm::CallBase *get_task_scheduling_call(llvm::CallBase *alloc_call) {
+inline std::vector<llvm::CallBase *>
+get_task_scheduling_calls(llvm::CallBase *alloc_call) {
   assert(alloc_call->getCalledFunction() ==
          get_omp_functions(*alloc_call->getModule())->kmpc_omp_task_alloc);
-  llvm::CallBase *sched_call = nullptr;
+  std::vector<llvm::CallBase *> sched_calls;
   for (auto *u : alloc_call->users()) {
     if (auto *call = llvm::dyn_cast<llvm::CallBase>(u)) {
       if (call->getCalledFunction() &&
@@ -43,18 +44,17 @@ inline llvm::CallBase *get_task_scheduling_call(llvm::CallBase *alloc_call) {
            call->getCalledFunction()->getName() == "__kmpc_taskloop" ||
            call->getCalledFunction()->getName() ==
                "__kmpc_omp_task_begin_if0")) {
-        assert(sched_call == nullptr);
 
-        sched_call = call;
+        sched_calls.push_back(call);
+        assert(call->getFunction() == alloc_call->getFunction());
       }
     }
   }
-  if (!sched_call) {
+  if (sched_calls.empty()) {
     alloc_call->dump();
   }
-  assert(sched_call);
-  assert(sched_call->getFunction() == alloc_call->getFunction());
-  return sched_call;
+  assert(!sched_calls.empty());
+  return sched_calls;
 }
 
 #endif /* MACH_OMP_FUNCS_H_ */

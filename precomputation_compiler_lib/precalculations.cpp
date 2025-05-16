@@ -73,7 +73,7 @@ void print_needed_for(const std::shared_ptr<TaintedValue> &child,
 // TODO move code?
 void PrecalculationAnalysis::analyze_functions() {
   // create
-  for (auto &f : M) {
+  for (auto &f : M.functions()) {
     function_analysis[&f] =
         std::make_shared<PrecalculationFunctionAnalysis>(&f, this);
   }
@@ -88,7 +88,10 @@ void PrecalculationAnalysis::analyze_functions() {
       // dont analyze std's internals
       for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
         if (auto *call = dyn_cast<CallBase>(&*I)) {
+          errs() << "Call targets for\n";
+          call->dump();
           auto targets = get_possible_call_targets(call);
+          errs() << "got targets\n";
           for (auto *target : targets) {
             assert(target != nullptr);
             if (target == get_omp_functions(M)->kmpc_fork_call) {
@@ -103,11 +106,12 @@ void PrecalculationAnalysis::analyze_functions() {
             if (target == get_omp_functions(M)->kmpc_omp_task_alloc) {
               auto *ompoutlined_func = cast<Function>(call->getArgOperand(5));
               assert(function_analysis[ompoutlined_func]->is_openmp_task);
-              auto *omp_task_call = get_task_scheduling_call(call);
-              function_analysis[ompoutlined_func]->callsites.insert(
-                  omp_task_call);
-              function_analysis[call->getFunction()]->callees.insert(
-                  function_analysis[ompoutlined_func]);
+              for (auto *omp_task_call : get_task_scheduling_calls(call)) {
+                function_analysis[ompoutlined_func]->callsites.insert(
+                    omp_task_call);
+                function_analysis[call->getFunction()]->callees.insert(
+                    function_analysis[ompoutlined_func]);
+              }
             }
 
             function_analysis[target]->callsites.insert(call);

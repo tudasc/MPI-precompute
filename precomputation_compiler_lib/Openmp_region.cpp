@@ -81,24 +81,29 @@ ParallelRegion::ParallelRegion(Function *ompoutlined) {
   // Look for a parallel for inside the microtask;
   // TODO add the other kmpc functions for parallel for pragamas
   auto call_instructions = get_instruction_in_function<CallInst>(_function);
-  for (auto &call : call_instructions) {
-    if (call->getCalledFunction()->getName().equals(
-            "__kmpc_for_static_init_4")) {
-      _parallel_for.init = call;
-    } else if (call->getCalledFunction()->getName().equals(
-                   "__kmpc_for_static_fini")) {
-      _parallel_for.fini = call;
-    }
-  }
+  for (auto &call :
+       call_instructions) { // if thre are indirect calls in parallel region
+    if (call->getCalledFunction()) {
+      if (call->getCalledFunction() &&
+          call->getCalledFunction()->getName().equals(
+              "__kmpc_for_static_init_4")) {
+        _parallel_for.init = call;
+      } else if (call->getCalledFunction() &&
+                 call->getCalledFunction()->getName().equals(
+                     "__kmpc_for_static_fini")) {
+        _parallel_for.fini = call;
+      }
 
-  // Look for a reduction inside the microtask;
-  // TODO add the other kmpc functions for reduction pragmas
-  for (auto &call : call_instructions) {
-    if (call->getCalledFunction()->getName().equals("__kmpc_reduce_nowait")) {
-      _reduction.reduce = call;
-    } else if (call->getCalledFunction()->getName().equals(
-                   "__kmpc_end_reduce_nowait")) {
-      _reduction.end_reduce = call;
+      // Look for a reduction inside the microtask;
+      // TODO add the other kmpc functions for reduction pragmas
+
+      else if (call->getCalledFunction()->getName().equals(
+                   "__kmpc_reduce_nowait")) {
+        _reduction.reduce = call;
+      } else if (call->getCalledFunction()->getName().equals(
+                     "__kmpc_end_reduce_nowait")) {
+        _reduction.end_reduce = call;
+      }
     }
   }
 }
