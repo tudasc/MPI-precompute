@@ -8,7 +8,7 @@
 #SBATCH --time 00:30:00
 #SBATCH --exclusive
 
-#SBATCH --array 1-20
+#SBATCH --array 1-9
 
 #same as -c
 #SBATCH --cpus-per-task 8
@@ -19,9 +19,9 @@
 
 #specify these variables
 PRECOMPUTE_DIR="/home/tj75qeje/precompute/build/use-cases/thread-sanitizer"
-EXECUTABLE_DIR="/home/tj75qeje/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/LULESH"
-PARAMETER_FILE="/home/tj75qeje/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/parameters_lulesh.txt"
-OUTPUT_DIR="/work/scratch/tj75qeje/precompute/lulesh"
+EXECUTABLE_DIR="/home/tj75qeje/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/HPCCG"
+PARAMETER_FILE="/home/tj75qeje/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/parameters_hpccg.txt"
+OUTPUT_DIR="/work/scratch/tj75qeje/precompute/hpccg"
 
 
 OUTPUT_FILE_PREFIX="$OUTPUT_DIR/${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}_output"
