@@ -688,7 +688,7 @@ void PrecalculationAnalysis::visit_ptr_usages(
     const std::shared_ptr<TaintedValue> &ptr) {
   assert(ptr->is_pointer());
 
-  if (isa<ConstantPointerNull>(ptr->v)) {
+  if (isa<ConstantPointerNull>(ptr->v) || isa<UndefValue>(ptr->v)) {
     return;
     // we don't need to trace usages of null to find out if is written or read
   }

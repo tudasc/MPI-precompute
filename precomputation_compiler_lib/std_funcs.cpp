@@ -187,6 +187,10 @@ bool is_func_from_std(llvm::Function *func) {
 
     return true;
   }
+  if (func->getName().starts_with("__ctype_")) {
+    // from ctype.h
+    return true;
+  }
 
   // if std=c99 is supplied to the compiler
   if (func->getName().starts_with("__isoc99_")) {
