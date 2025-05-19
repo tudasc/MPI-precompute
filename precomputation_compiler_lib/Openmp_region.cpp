@@ -141,8 +141,7 @@ void sort_parallel_gep_indices(
     GetElementPtrInst *gep_a = lhs.first;
     GetElementPtrInst *gep_b = rhs.first;
     auto *idx_b = gep_b->idx_begin();
-    for (auto *idx_a = gep_a->idx_begin();
-         ++idx_a, idx_a != gep_a->idx_end();) {
+    for (auto *idx_a = gep_a->idx_begin(); idx_a != gep_a->idx_end(); ++idx_a) {
       assert(idx_b != gep_b->idx_end());
       assert(isa<ConstantInt>(idx_a) && isa<ConstantInt>(idx_b) &&
              "Non constant access to task struct");
@@ -154,9 +153,11 @@ void sort_parallel_gep_indices(
         return false;
       }
       // else equals
+
       ++idx_b;
     }
     // same
+
     assert(0 && "fail to determine order of parameters in openmp task");
   });
 }
@@ -209,6 +210,8 @@ void ParallelRegion::get_shared_vars_in_task() {
     }
   }
   for (auto p : parallel_geps) {
+    _to_serial_map[p.first] = {};
+    _shared_variables.push_back(p.first);
     _to_serial_map[p.second] = {};
     if (p.second->getType()->isPointerTy()) {
       // else it is private
@@ -225,21 +228,25 @@ void ParallelRegion::get_shared_vars_in_task() {
 
         Value *shared_var_0_serial = nullptr;
         std::vector<std::pair<GetElementPtrInst *, Value *>> serial_geps;
-
-        for (auto *u : load_serial->users()) {
-          if (auto *gep_serial = dyn_cast<GetElementPtrInst>(u)) {
-            for (auto uu : gep_serial->users()) {
-              if (auto *store_shared_var = dyn_cast<StoreInst>(uu)) {
+        for (auto *uu : load_serial->users()) {
+          uu->dump();
+          if (auto *gep_serial = dyn_cast<GetElementPtrInst>(uu)) {
+            for (auto uuu : gep_serial->users()) {
+              if (auto *store_shared_var = dyn_cast<StoreInst>(uuu)) {
                 serial_geps.push_back(std::make_pair(
                     gep_serial, store_shared_var->getValueOperand()));
               }
             }
-          } else if (auto *store_parallel = dyn_cast<StoreInst>(u)) {
+          } else if (auto *store_serial = dyn_cast<StoreInst>(uu)) {
             // direct usage = gep 0
             assert(shared_var_0_serial == nullptr &&
                    "not supported usage of omp task struct");
-            shared_var_0_serial = store_parallel->getValueOperand();
-          } else if (auto *cc = dyn_cast<CallBase>(u)) {
+            shared_var_0_serial = store_serial->getValueOperand();
+          } else if (auto *ll = dyn_cast<LoadInst>(uu)) {
+            // nothing to do, serial may read again
+            // this happens with openmp if and conditional task creation
+
+          } else if (auto *cc = dyn_cast<CallBase>(uu)) {
             if (!cc->getCalledFunction() &&
                 cc->getName().starts_with("__tsan")) {
               u->dump();
@@ -255,16 +262,34 @@ void ParallelRegion::get_shared_vars_in_task() {
         sort_parallel_gep_indices(serial_geps);
 
         // map the values from serial and paralllel
-        assert(serial_geps.size() == parallel_geps.size());
-        if (shared_var_0) {
-          assert(shared_var_0_serial);
-          _to_serial_map[shared_var_0].push_back(shared_var_0_serial);
-          _to_parallel_map[shared_var_0_serial] = shared_var_0;
-        }
-        for (unsigned long i = 0; i < serial_geps.size(); i++) {
-          _to_serial_map[parallel_geps[i].second].push_back(
-              serial_geps[i].second);
-          _to_parallel_map[serial_geps[i].second] = parallel_geps[i].second;
+
+        if (shared_var_0_serial || !serial_geps.empty()) {
+          // else it is an inline execution of the task (task not created with
+          // omp if)
+          if (shared_var_0) {
+            assert(shared_var_0_serial);
+            _to_serial_map[shared_var_0].push_back(shared_var_0_serial);
+            _to_parallel_map[shared_var_0_serial] = shared_var_0;
+          }
+
+          errs() << "serial:\n";
+          for (auto p : serial_geps)
+            p.first->dump();
+          errs() << "parallel:\n";
+          for (auto p : parallel_geps)
+            p.first->dump();
+
+          assert(serial_geps.size() == parallel_geps.size());
+
+          for (unsigned long i = 0; i < serial_geps.size(); i++) {
+            _to_serial_map[parallel_geps[i].first].push_back(
+                serial_geps[i].first);
+            _to_parallel_map[serial_geps[i].first] = parallel_geps[i].first;
+
+            _to_serial_map[parallel_geps[i].second].push_back(
+                serial_geps[i].second);
+            _to_parallel_map[serial_geps[i].second] = parallel_geps[i].second;
+          }
         }
       }
     }
