@@ -2,6 +2,8 @@
 
 #include "openmp_runtime_functions.h"
 
+#include <llvm/IR/Constants.h>
+
 using namespace llvm;
 
 /**
@@ -111,7 +113,10 @@ void ParallelRegion::get_shared_vars_in_parallel() {
   for (auto &argument : _function->args()) {
     // The first shared variable has index 2
     if (argument.getArgNo() > 1) {
-      //_shared_variables.push_back(new SharedVariable(&argument, _function));
+      if (argument.getType()->isPointerTy()) {
+        // otherwise it is private
+        _shared_variables.push_back(&argument);
+      }
       Value *in_parallel = &argument;
       // first shared arg
       int start_args_at_fork = 3;
@@ -129,6 +134,32 @@ void ParallelRegion::get_shared_vars_in_parallel() {
   }
 }
 
+void sort_parallel_gep_indices(
+    std::vector<std::pair<GetElementPtrInst *, Value *>> &geps) {
+  // sort based on gep idx
+  std::sort(geps.begin(), geps.end(), [](auto lhs, auto rhs) {
+    GetElementPtrInst *gep_a = lhs.first;
+    GetElementPtrInst *gep_b = rhs.first;
+    auto *idx_b = gep_b->idx_begin();
+    for (auto *idx_a = gep_a->idx_begin();
+         ++idx_a, idx_a != gep_a->idx_end();) {
+      assert(idx_b != gep_b->idx_end());
+      assert(isa<ConstantInt>(idx_a) && isa<ConstantInt>(idx_b) &&
+             "Non constant access to task struct");
+      if (cast<ConstantInt>(idx_a)->getZExtValue() <
+          cast<ConstantInt>(idx_b)->getZExtValue()) {
+        return true;
+      } else if (cast<ConstantInt>(idx_a)->getZExtValue() >
+                 cast<ConstantInt>(idx_b)->getZExtValue()) {
+        return false;
+      }
+      // else equals
+      ++idx_b;
+    }
+    // same
+    assert(0 && "fail to determine order of parameters in openmp task");
+  });
+}
 void ParallelRegion::get_shared_vars_in_task() {
   assert(_is_task);
   auto arg = _function->getArg(1);   // struct address
@@ -139,8 +170,51 @@ void ParallelRegion::get_shared_vars_in_task() {
       load_parallel = load_inst;
     }
   }
+  // collect shared variables
+  std::vector<std::pair<GetElementPtrInst *, Value *>> parallel_geps;
+  LoadInst *shared_var_0 = nullptr;
+  for (auto *u : load_parallel->users()) {
+    if (auto *gep_parallel = dyn_cast<GetElementPtrInst>(u)) {
+      for (auto uu : gep_parallel->users()) {
+        if (auto *ll_parallel = dyn_cast<LoadInst>(uu)) {
+          parallel_geps.push_back(std::make_pair(gep_parallel, ll_parallel));
+        }
+      }
+    } else if (auto *ll_parallel = dyn_cast<LoadInst>(u)) {
+      // direct usage = gep 0
+      assert(shared_var_0 == nullptr &&
+             "not supported usage of omp task struct");
+      shared_var_0 = ll_parallel;
+
+    } else if (auto *cc = dyn_cast<CallBase>(u)) {
+      if (!cc->getCalledFunction() && cc->getName().starts_with("__tsan")) {
+        u->dump();
+        assert(0 && "not supported usage of omp task struct");
+      }
+      // nothing to do
+    } else {
+      u->dump();
+      assert(0 && "not supported usage of omp task struct");
+    }
+  }
+  sort_parallel_gep_indices(parallel_geps);
+
   _to_serial_map[load_parallel] = {};
-  _to_serial_map[arg];
+  _to_serial_map[arg] = {};
+  if (shared_var_0) {
+    _to_serial_map[shared_var_0] = {};
+    if (shared_var_0->getType()->isPointerTy()) {
+      // else it is private
+      _shared_variables.push_back(shared_var_0);
+    }
+  }
+  for (auto p : parallel_geps) {
+    _to_serial_map[p.second] = {};
+    if (p.second->getType()->isPointerTy()) {
+      // else it is private
+      _shared_variables.push_back(p.second);
+    }
+  }
   for (auto *task_alloc : _task_alloc_calls) {
     _to_serial_map[arg].push_back(task_alloc);
     _to_parallel_map[task_alloc] = arg;
@@ -149,9 +223,49 @@ void ParallelRegion::get_shared_vars_in_task() {
         _to_serial_map[load_parallel].push_back(load_serial);
         _to_parallel_map[load_serial] = load_parallel;
 
-        // TODO one could match the loaded variables as well these are stroed as
-        // GEP elements of the load serial/parallel
-        // but this is currently sufficient
+        Value *shared_var_0_serial = nullptr;
+        std::vector<std::pair<GetElementPtrInst *, Value *>> serial_geps;
+
+        for (auto *u : load_serial->users()) {
+          if (auto *gep_serial = dyn_cast<GetElementPtrInst>(u)) {
+            for (auto uu : gep_serial->users()) {
+              if (auto *store_shared_var = dyn_cast<StoreInst>(uu)) {
+                serial_geps.push_back(std::make_pair(
+                    gep_serial, store_shared_var->getValueOperand()));
+              }
+            }
+          } else if (auto *store_parallel = dyn_cast<StoreInst>(u)) {
+            // direct usage = gep 0
+            assert(shared_var_0_serial == nullptr &&
+                   "not supported usage of omp task struct");
+            shared_var_0_serial = store_parallel->getValueOperand();
+          } else if (auto *cc = dyn_cast<CallBase>(u)) {
+            if (!cc->getCalledFunction() &&
+                cc->getName().starts_with("__tsan")) {
+              u->dump();
+              assert(0 && "not supported usage of omp task struct");
+            }
+            // nothing to do
+          } else {
+            u->dump();
+            assert(0 && "not supported usage of omp task struct");
+          }
+        }
+        // sort based on gep idxs
+        sort_parallel_gep_indices(serial_geps);
+
+        // map the values from serial and paralllel
+        assert(serial_geps.size() == parallel_geps.size());
+        if (shared_var_0) {
+          assert(shared_var_0_serial);
+          _to_serial_map[shared_var_0].push_back(shared_var_0_serial);
+          _to_parallel_map[shared_var_0_serial] = shared_var_0;
+        }
+        for (unsigned long i = 0; i < serial_geps.size(); i++) {
+          _to_serial_map[parallel_geps[i].second].push_back(
+              serial_geps[i].second);
+          _to_parallel_map[serial_geps[i].second] = parallel_geps[i].second;
+        }
       }
     }
   }
@@ -176,7 +290,7 @@ ReductionData *ParallelRegion::get_reduction() {
 }
 
 // gets the value that corresponds to the given value from main
-llvm::Argument *ParallelRegion::get_value_in_parallel(llvm::Value *val) {
+llvm::Value *ParallelRegion::get_value_in_parallel(llvm::Value *val) {
 
   return _to_parallel_map.count(val) > 0
              ? cast<Argument>(_to_parallel_map.at(val))

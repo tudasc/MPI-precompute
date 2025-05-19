@@ -959,10 +959,21 @@ void PrecalculationAnalysis::visit_arg(
         // will be set by omp runtime: nothing to do
       } else if (arg->getArgNo() == 1) {
         assert(arg->getType()->isPointerTy());
-        for (auto *task_alloc_call : fun_to_precalc->task_alloc_calls) {
-          auto alloc_info = insert_tainted_value(task_alloc_call, arg_info);
-          assert(alloc_info->ptr_info);
-          alloc_info->ptr_info->merge_with(arg_info->ptr_info);
+        // alias all relevant shared values
+        for (auto *parallel_v : fun_to_precalc->parallel_region
+                                    ->get_shared_variables_in_parallel()) {
+          assert(parallel_v->getType()->isPointerTy());
+          if (is_tainted(parallel_v)) {
+            auto parallel_info = get_taint_info(parallel_v);
+            for (auto *serial_v :
+                 fun_to_precalc->parallel_region->get_value_in_serial(
+                     parallel_v)) {
+              auto serial_info = insert_tainted_value(serial_v, parallel_info);
+              assert(parallel_info->ptr_info);
+              // create another ptr alias
+              serial_info->ptr_info->merge_with(parallel_info->ptr_info);
+            }
+          }
         }
       } else {
         assert(0 && "This form of openmp task is not implemented");
@@ -1968,13 +1979,26 @@ bool PrecalculationAnalysis::is_store_important(
   assert(isa<StoreInst>(inst) || isa<AtomicRMWInst>(inst) ||
          isa<CallBase>(inst));
 
+  bool interesting = false;
+  if (auto *store = dyn_cast<StoreInst>(inst)) {
+    interesting = store->getValueOperand()->getName() == "tn.addr";
+    if (interesting) {
+      errs() << "INTERESTING ACCESS:\n";
+      store->dump();
+      errs() << "IN: " << store->getFunction()->getName() << "\n";
+      ptr_info->dump();
+    }
+  }
+
   if (not ptr_info->isReadFrom()) {
+    errs() << "NOT READ\n";
     return false;
   }
   if (store_happens_after_all_loads(inst, ptr_info)) {
+    errs() << "AFTER LOAD\n";
     return false;
   }
-
+  errs() << "IMPORTANT\n";
   return true;
 }
 

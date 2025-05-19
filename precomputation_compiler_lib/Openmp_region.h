@@ -42,6 +42,7 @@ private:
   std::vector<llvm::CallBase *> _task_alloc_calls;
   std::vector<llvm::CallBase *> _task_sched_calls;
 
+  std::vector<llvm::Value *> _shared_variables;
   // map to match values in serial and parallel region
   std::map<llvm::Value *, std::vector<llvm::Value *>> _to_serial_map;
   std::map<llvm::Value *, llvm::Value *> _to_parallel_map;
@@ -54,7 +55,6 @@ private:
 
   void get_shared_vars_in_parallel();
   void get_shared_vars_in_task();
-
 
 public:
   /**
@@ -72,10 +72,12 @@ public:
 
   bool is_task() const { return _is_task; }
 
-  std::vector<std::pair<llvm::Value *, llvm::Value *>> &get_shared_variables();
+  std::vector<llvm::Value *> get_shared_variables_in_parallel() const {
+    return _shared_variables;
+  }
 
   // gets the value that corresponds to the given value from serial region
-  llvm::Argument *get_value_in_parallel(llvm::Value *val);
+  llvm::Value *get_value_in_parallel(llvm::Value *val);
   // get the value that corresponds to the given value in parallel region
   std::vector<llvm::Value *> get_value_in_serial(llvm::Value *val);
 
