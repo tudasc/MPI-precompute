@@ -88,10 +88,10 @@ void PrecalculationAnalysis::analyze_functions() {
       // dont analyze std's internals
       for (auto I = inst_begin(f), E = inst_end(f); I != E; ++I) {
         if (auto *call = dyn_cast<CallBase>(&*I)) {
-          errs() << "Call targets for\n";
-          call->dump();
+          // errs() << "Call targets for\n";
+          // call->dump();
           auto targets = get_possible_call_targets(call);
-          errs() << "got targets\n";
+          // errs() << "got targets\n";
           for (auto *target : targets) {
             assert(target != nullptr);
             if (target == get_omp_functions(M)->kmpc_fork_call) {

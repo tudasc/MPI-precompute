@@ -41,6 +41,16 @@ ParallelRegion::ParallelRegion(Function *ompoutlined) {
       if (is_omp_fork_call(call)) {
         assert(ompoutlined == call->getArgOperand(2));
         _fork_calls.push_back(call);
+      } else if (call->getCalledFunction() &&
+                 call->getCalledFunction() ==
+                     get_omp_functions(*ompoutlined->getParent())
+                         ->kmpc_omp_task_alloc) {
+        _task_alloc_calls.push_back(call);
+        _is_task = true;
+        for (auto *sched_call : get_task_scheduling_calls(call)) {
+          _task_sched_calls.push_back(sched_call);
+        }
+
       } else {
         // direct call to ompoutlined == with one thread only
         assert(call->getCalledFunction() == ompoutlined);
@@ -58,24 +68,10 @@ ParallelRegion::ParallelRegion(Function *ompoutlined) {
   _reduction.end_reduce = nullptr;
 
   // Collect the shared variables
-  for (auto &argument : _function->args()) {
-    // The first shared variable has index 2
-    if (argument.getArgNo() > 1) {
-      //_shared_variables.push_back(new SharedVariable(&argument, _function));
-      Value *in_parallel = &argument;
-      // first shared arg
-      int start_args_at_fork = 3;
-      // first two args of ompoutlined are not interesting
-      start_args_at_fork = start_args_at_fork - 2;
-
-      _to_serial_map[in_parallel] = {};
-      for (auto *c : _fork_calls) {
-        Value *in_serial =
-            c->getArgOperand(start_args_at_fork + argument.getArgNo());
-        _to_serial_map[in_parallel].push_back(in_serial);
-        _to_parallel_map[in_serial] = in_parallel;
-      }
-    }
+  if (_is_task) {
+    get_shared_vars_in_task();
+  } else {
+    get_shared_vars_in_parallel();
   }
 
   // Look for a parallel for inside the microtask;
@@ -110,7 +106,56 @@ ParallelRegion::ParallelRegion(Function *ompoutlined) {
 
 ParallelRegion::~ParallelRegion() {}
 
-std::vector<CallBase *> ParallelRegion::get_fork_calls() { return _fork_calls; }
+void ParallelRegion::get_shared_vars_in_parallel() {
+  assert(not _is_task);
+  for (auto &argument : _function->args()) {
+    // The first shared variable has index 2
+    if (argument.getArgNo() > 1) {
+      //_shared_variables.push_back(new SharedVariable(&argument, _function));
+      Value *in_parallel = &argument;
+      // first shared arg
+      int start_args_at_fork = 3;
+      // first two args of ompoutlined are not interesting
+      start_args_at_fork = start_args_at_fork - 2;
+
+      _to_serial_map[in_parallel] = {};
+      for (auto *c : _fork_calls) {
+        Value *in_serial =
+            c->getArgOperand(start_args_at_fork + argument.getArgNo());
+        _to_serial_map[in_parallel].push_back(in_serial);
+        _to_parallel_map[in_serial] = in_parallel;
+      }
+    }
+  }
+}
+
+void ParallelRegion::get_shared_vars_in_task() {
+  assert(_is_task);
+  auto arg = _function->getArg(1);   // struct address
+  LoadInst *load_parallel = nullptr; // load struct to shared vars
+  for (auto u : arg->users()) {
+    if (auto *load_inst = dyn_cast<LoadInst>(u)) {
+      assert(load_parallel == nullptr && "Only one load of omp task struct");
+      load_parallel = load_inst;
+    }
+  }
+  _to_serial_map[load_parallel] = {};
+  _to_serial_map[arg];
+  for (auto *task_alloc : _task_alloc_calls) {
+    _to_serial_map[arg].push_back(task_alloc);
+    _to_parallel_map[task_alloc] = arg;
+    for (auto u : task_alloc->users()) {
+      if (auto *load_serial = dyn_cast<LoadInst>(u)) {
+        _to_serial_map[load_parallel].push_back(load_serial);
+        _to_parallel_map[load_serial] = load_parallel;
+
+        // TODO one could match the loaded variables as well these are stroed as
+        // GEP elements of the load serial/parallel
+        // but this is currently sufficient
+      }
+    }
+  }
+}
 
 Function *ParallelRegion::get_function() { return _function; }
 

@@ -37,6 +37,11 @@ private:
   // OpenMP parallel sections).
   llvm::Function *_function;
 
+  bool _is_task =
+      false; // if this is a openmp task instead of a parallel construct
+  std::vector<llvm::CallBase *> _task_alloc_calls;
+  std::vector<llvm::CallBase *> _task_sched_calls;
+
   // map to match values in serial and parallel region
   std::map<llvm::Value *, std::vector<llvm::Value *>> _to_serial_map;
   std::map<llvm::Value *, llvm::Value *> _to_parallel_map;
@@ -47,6 +52,10 @@ private:
   // Reduction inside the microtask
   ReductionData _reduction;
 
+  void get_shared_vars_in_parallel();
+  void get_shared_vars_in_task();
+
+
 public:
   /**
    * Constructor expects the ompoutlined function
@@ -55,13 +64,13 @@ public:
 
   ~ParallelRegion();
 
-  std::vector<llvm::CallBase *> get_fork_calls();
-
   llvm::Function *get_function();
 
   ParallelForData *get_parallel_for();
 
   ReductionData *get_reduction();
+
+  bool is_task() const { return _is_task; }
 
   std::vector<std::pair<llvm::Value *, llvm::Value *>> &get_shared_variables();
 

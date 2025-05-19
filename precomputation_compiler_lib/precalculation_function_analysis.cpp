@@ -127,14 +127,22 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
       if (call->getCalledFunction() != func) {
         if (is_omp_fork_call(call)) {
           //  call to openmp
-          if (!is_openmp_parallel) {
-            is_openmp_parallel = true;
+
+          is_openmp_parallel = true;
+          if (!parallel_region) {
             parallel_region = std::make_shared<ParallelRegion>(func);
           }
+
         } else if (call->getCalledFunction() ==
                    get_omp_functions(*call->getModule())->kmpc_omp_task_alloc) {
+
           is_openmp_task = true;
+          if (!parallel_region) {
+            parallel_region = std::make_shared<ParallelRegion>(func);
+          }
+
           task_alloc_calls.push_back(call);
+
         } else {
           is_func_ptr_captured = true;
         }
