@@ -97,6 +97,8 @@ void PrecalculationAnalysis::analyze_functions() {
             if (target == get_omp_functions(M)->kmpc_fork_call) {
               // for openmp call: the openmp runtime will call the parallel
               // function
+              assert(isa<Function>(call->getArgOperand(2)) &&
+                     "Indirect call to ompoutlined is not supported");
               auto *ompoutlined_func = cast<Function>(call->getArgOperand(2));
               assert(function_analysis[ompoutlined_func]->is_openmp_parallel);
               function_analysis[ompoutlined_func]->callsites.insert(call);
@@ -105,6 +107,8 @@ void PrecalculationAnalysis::analyze_functions() {
             }
             if (target == get_omp_functions(M)->kmpc_omp_task_alloc) {
               auto *ompoutlined_func = cast<Function>(call->getArgOperand(5));
+              assert(isa<Function>(call->getArgOperand(5)) &&
+                     "Indirect call to ompoutlined is not supported");
               assert(function_analysis[ompoutlined_func]->is_openmp_task);
               for (auto *omp_task_call : get_task_scheduling_calls(call)) {
                 function_analysis[ompoutlined_func]->callsites.insert(
