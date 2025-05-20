@@ -1020,7 +1020,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
     llvm::CallBase *call, const std::shared_ptr<TaintedValue> &ptr_arg_info) {
   assert(ptr_arg_info->v->getType()->isPointerTy());
   assert(ptr_arg_info->ptr_info);
-  assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
+  assert(is_call_to_std(call) || call->getCalledFunction()->isIntrinsic());
 
   if (is_omp_fork_call(call)) {
     // TODO determine if parallel region actually reads from shared var
@@ -1045,6 +1045,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
   assert(arg_no != -1);
 
   for (auto *tgt : get_possible_call_targets(call)) {
+    assert(tgt);
     if (tgt->isVarArg() || tgt == get_std_dummy_func(call->getModule())) {
       return true; // assume it is
     }
@@ -1355,18 +1356,20 @@ void PrecalculationAnalysis::visit_call_for_retval(
   auto *call = cast<CallBase>(call_info->v);
   assert(is_retval_of_call_needed(call));
 
+  auto *func = call->getCalledFunction();
+  if (!func and !call->isIndirectCall()) {
+    func = cast<Function>(call->getCalledOperand());
+  }
+
   call_info->addReason(CONTROL_FLOW_RETURN_VALUE_NEEDED);
   if (is_allocation(call)) {
     // nothing to do, just keep this call around, it will later be replaced
     for (auto &arg : call->args()) {
       auto arg_info = insert_tainted_value(arg, call_info);
     }
-  } else if (not call->isIndirectCall() &&
-             call->getCalledFunction()->isIntrinsic() &&
-             should_call_intrinsic(
-                 call->getCalledFunction()->getIntrinsicID())) {
-    if (not should_ignore_intrinsic(
-            call->getCalledFunction()->getIntrinsicID())) {
+  } else if (not call->isIndirectCall() && func->isIntrinsic() &&
+             should_call_intrinsic(func->getIntrinsicID())) {
+    if (not should_ignore_intrinsic(func->getIntrinsicID())) {
       // consider it same as call to std
       include_call_to_std(call_info);
     }
@@ -1420,6 +1423,9 @@ void PrecalculationAnalysis::visit_call_from_ptr(
   //  }
 
   auto *func = call->getCalledFunction();
+  if (func == nullptr && not call->isIndirectCall()) {
+    func = cast<Function>(call->getCalledOperand());
+  }
   assert(not ptr_given_as_arg.empty());
   assert(ptr->ptr_info);
 
@@ -1783,6 +1789,9 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
   if (auto *cc = dyn_cast<CallBase>(v)) {
     if (is_retval_of_call_needed(cc) && not cc->isIndirectCall()) {
       auto *func = cc->getCalledFunction();
+      if (!func and !cc->isIndirectCall()) {
+        func = cast<Function>(cc->getCalledOperand());
+      }
       // TODO proper management why this is not working as is
       // TODO this is only a hotfix
       if (not(get_function_analysis(func)->include_in_precompute ||

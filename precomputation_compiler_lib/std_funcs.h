@@ -28,8 +28,12 @@ inline bool is_free(const llvm::CallBase *call) {
   if (call->isIndirectCall()) {
     return false;
   }
+  auto *func = call->getCalledFunction();
+  if (!call->isIndirectCall() && !func) {
+    func = llvm::cast<llvm::Function>(call->getCalledOperand());
+  }
 
-  return is_free(call->getCalledFunction());
+  return is_free(func);
 }
 
 bool is_interaction_with_cout(llvm::CallBase *call);
@@ -110,8 +114,13 @@ inline bool is_call_to_std(llvm::CallBase *call) {
     return std::all_of(tgts.begin(), tgts.end(),
                        [](auto t) { return is_func_from_std(t); });
   }
+  auto *func = call->getCalledFunction();
+  if (!call->isIndirectCall() && !func) {
+    // need that for -std=cnu89
+    func = llvm::cast<llvm::Function>(call->getCalledOperand());
+  }
 
-  return is_func_from_std(call->getCalledFunction());
+  return is_func_from_std(func);
 }
 
 #endif // STD_FUNCS_H
