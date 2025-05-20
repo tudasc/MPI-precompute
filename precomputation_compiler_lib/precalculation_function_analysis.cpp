@@ -121,7 +121,7 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
       }
     }
   }
-  // new calls in func.users if aliases arte replaced
+  // new calls in func.users if aliases are replaced
   for (auto *u : func->users()) {
     if (auto call = llvm::dyn_cast<llvm::CallBase>(u)) {
       if (call->getCalledFunction() != func) {
@@ -133,8 +133,10 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
             parallel_region = std::make_shared<ParallelRegion>(func);
           }
 
-        } else if (call->getCalledFunction() ==
-                   get_omp_functions(*call->getModule())->kmpc_omp_task_alloc) {
+        } else if (call->getCalledFunction() &&
+                   call->getCalledFunction() ==
+                       get_omp_functions(*call->getModule())
+                           ->kmpc_omp_task_alloc) {
 
           is_openmp_task = true;
           if (!parallel_region) {
