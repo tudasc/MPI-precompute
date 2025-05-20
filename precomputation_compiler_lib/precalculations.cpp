@@ -1887,7 +1887,17 @@ PrecalculationAnalysis::get_possible_call_targets(llvm::CallBase *call) const {
     possible_targets = DevirtAnalysis::get_possible_call_targets(call);
   } else {
 
-    possible_targets.push_back(call->getCalledFunction());
+    if (call->getCalledFunction() == nullptr) {
+      // happens when function is casted
+      if (auto *func = dyn_cast<Function>(call->getCalledOperand())) {
+        possible_targets.push_back(func);
+      } else {
+        call->dump();
+        assert(0 && "Could not determine targets of call");
+      }
+    } else {
+      possible_targets.push_back(call->getCalledFunction());
+    }
     return possible_targets;
   }
 
