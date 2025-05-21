@@ -1127,7 +1127,6 @@ void PrecalculationAnalysis::include_call_to_std(
   auto *call = cast<CallBase>(call_info->v);
 
   for (auto *func : get_possible_call_targets(call)) {
-    errs() << func->getName() << "\n";
     assert((func->isIntrinsic() &&
             should_call_intrinsic(func->getIntrinsicID())) ||
            is_func_from_std(func));
@@ -2000,24 +1999,24 @@ bool PrecalculationAnalysis::is_store_important(
 
   bool interesting = false;
   if (auto *store = dyn_cast<StoreInst>(inst)) {
-    interesting = store->getValueOperand()->getName() == "tn.addr";
+    /*interesting = store->getValueOperand()->getName() == "tn.addr";
     if (interesting) {
       errs() << "INTERESTING ACCESS:\n";
       store->dump();
       errs() << "IN: " << store->getFunction()->getName() << "\n";
       ptr_info->dump();
-    }
+    }*/
   }
 
   if (not ptr_info->isReadFrom()) {
-    errs() << "NOT READ\n";
+    // errs() << "NOT READ\n";
     return false;
   }
   if (store_happens_after_all_loads(inst, ptr_info)) {
-    errs() << "AFTER LOAD\n";
+    // errs() << "AFTER LOAD\n";
     return false;
   }
-  errs() << "IMPORTANT\n";
+  // errs() << "IMPORTANT\n";
   return true;
 }
 
