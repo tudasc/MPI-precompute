@@ -131,7 +131,7 @@ bool is_func_from_std(llvm::Function *func) {
   // errs() << "Test if in std:\n" << func->getName() <<demangled_fname <<
   // "\n";
 
-  for (auto prefix : allowed_function_prefixes) {
+  for (const auto &prefix : allowed_function_prefixes) {
     if (demangled_fname.rfind(prefix, 0) == 0) {
       return true;
     }

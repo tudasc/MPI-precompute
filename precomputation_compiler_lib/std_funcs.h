@@ -111,6 +111,9 @@ inline bool is_global_from_std(llvm::GlobalValue *global) {
 inline bool is_call_to_std(llvm::CallBase *call) {
   if (call->isIndirectCall()) {
     auto tgts = DevirtAnalysis::get_possible_call_targets(call);
+    if (tgts.empty()) {
+      return false;
+    }
     return std::all_of(tgts.begin(), tgts.end(),
                        [](auto t) { return is_func_from_std(t); });
   }
