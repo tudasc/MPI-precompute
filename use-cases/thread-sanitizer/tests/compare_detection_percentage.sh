@@ -55,18 +55,19 @@ MODIFIED_RACES=0
 if [[ -x "./a.out" ]]; then
     # a.out exists
     for i in {1..100} ; do
+    echo "Run $i"
 
     if ./a.out_original 2>&1 | grep -qF "$GREP_STRING"; then
         # original sanitizer found data race
         ((ORIGINAL_RACES++))
     fi
 
-
       if ./a.out 2>&1 | grep -qF "$GREP_STRING"; then
-           # modified found the race
-                   ((MODIFIED_RACES++))
+        # modified found the race
+        ((MODIFIED_RACES++))
+      fi
 
-            fi
+done
 else
     echo "Compilation fail"
     exit -2
@@ -74,12 +75,11 @@ fi
 
 echo "Detection Statistics"
 echo "ORIGINAL: $ORIGINAL_RACES"
-echo "Modified: $ORIGINAL_RACES"
+echo "Modified: $MODIFIED_RACES"
 echo "of 100 executions"
 
 
 
-done
 
 
 
