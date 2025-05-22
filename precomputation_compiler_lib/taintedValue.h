@@ -109,17 +109,21 @@ public:
     _visited = true;
 #ifndef NDEBUG
     visit_count++;
-    if (visit_count > 100) {
+#endif
+  }
+  // visited = false
+  void set_need_visit() {
+    _visited = false;
+#ifndef NDEBUG
+    if (visit_count > 50) {
       llvm::errs() << "Possible endless loop visiting\n";
       v->dump();
-      llvm::errs() << "In:\n";
+      llvm::errs() << "Re visit triggered by:\n";
       llvm::errs() << to_string(boost::stacktrace::stacktrace());
       assert(false);
     }
 #endif
   }
-  // visited = false
-  void set_need_visit() { _visited = false; }
   bool is_visited() const { return _visited; }
 
   // one can have multiple children and parents e.g. one call with several args
