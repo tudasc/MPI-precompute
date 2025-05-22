@@ -416,7 +416,7 @@ void PtrUsageInfo::propergate_changes() {
   // re-visit all users of ptr as something has changed
   for (const auto &tv : ptrs_with_this_info) {
     assert(not tv.expired());
-    tv.lock()->visited = false;
+    tv.lock()->set_need_visit();
   }
 }
 

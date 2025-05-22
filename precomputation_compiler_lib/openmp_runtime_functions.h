@@ -25,8 +25,9 @@ inline bool is_omp_function(const llvm::Function *func) {
 
 inline bool is_omp_fork_call(llvm::CallBase *call) {
   return (not call->isIndirectCall()) &&
-         (call->getCalledFunction() && call->getCalledFunction() ==
-          get_omp_functions(*call->getModule())->kmpc_fork_call);
+         (call->getCalledFunction() &&
+          call->getCalledFunction() ==
+              get_omp_functions(*call->getModule())->kmpc_fork_call);
 }
 
 // get the call that actually schedules the task

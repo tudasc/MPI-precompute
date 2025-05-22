@@ -198,8 +198,8 @@ void PrecalculationAnalysis::analyze() {
   for (const auto &val : this->to_precompute_cfg) {
     auto val_info = insert_tainted_value(val, TaintReason::CONTROL_FLOW);
     include_value_in_precompute(val_info);
-    val_info->visited =
-        true; // don't need to visit value, it only is used for control flow
+    val_info->set_visited(); // don't need to visit value, it only is used for
+                             // control flow
     auto func_info = get_function_analysis(val->getFunction());
     func_info->include_all_callsites = true;
     func_info->re_visit_callsites(); // if one of the values tainted for cfg is
@@ -232,7 +232,7 @@ void PrecalculationAnalysis::find_all_tainted_vals() {
     to_visit.clear();
     std::copy_if(tainted_values.begin(), tainted_values.end(),
                  std::back_inserter(to_visit),
-                 [](const auto &v) { return !v->visited; });
+                 [](const auto &v) { return !v->is_visited(); });
 
 #ifdef SHUFFLE_VALUES_FOR_TESTING
     // for more scrutiny under testing:
@@ -271,7 +271,7 @@ void PrecalculationAnalysis::find_all_tainted_vals() {
 void PrecalculationAnalysis::visit_load(
     const std::shared_ptr<TaintedValue> &load_info,
     const std::shared_ptr<TaintedValue> &ptr_operand) {
-  load_info->visited = true;
+  load_info->set_visited();
 
   ptr_operand->ptr_info->setIsReadFrom(cast<Instruction>(load_info->v), this);
 
@@ -285,7 +285,7 @@ void PrecalculationAnalysis::visit_load(
 void PrecalculationAnalysis::visit_store(
     const std::shared_ptr<TaintedValue> &store_info, llvm::Value *ptr,
     llvm::Value *store_val) {
-  store_info->visited = true;
+  store_info->set_visited();
 
   auto ptr_info = insert_tainted_value(ptr, store_info, true);
   std::shared_ptr<PtrUsageInfo> stored_val_ptr_info =
@@ -313,8 +313,8 @@ void PrecalculationAnalysis::visit_store(
 
 void PrecalculationAnalysis::visit_gep(
     const std::shared_ptr<TaintedValue> &gep_info) {
-  assert(not gep_info->visited);
-  gep_info->visited = true;
+  assert(not gep_info->is_visited());
+  gep_info->set_visited();
   auto *gep = dyn_cast<GetElementPtrInst>(gep_info->v);
   assert(gep);
 
@@ -359,7 +359,7 @@ void PrecalculationAnalysis::visit_phi(
     }
   }
 
-  phi_info->visited = true;
+  phi_info->set_visited();
 }
 
 void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
@@ -370,7 +370,7 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
 
   if (isa<Constant>(v->v)) {
     // nothing to do for constant
-    v->visited = true;
+    v->set_visited();
   } else if (auto load = dyn_cast<LoadInst>(v->v)) {
     auto loaded_from = insert_tainted_value(load->getPointerOperand(), v);
     visit_load(v, loaded_from);
@@ -378,7 +378,7 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // visit_ptr_usages is called on all ptrs anyway
     // need to calculate allocation size
     insert_tainted_value(alloc->getArraySize(), v);
-    v->visited = true;
+    v->set_visited();
   } else if (auto store = dyn_cast<StoreInst>(v->v)) {
     visit_store(v, store->getPointerOperand(), store->getValueOperand());
   } else if (auto *op = dyn_cast<BinaryOperator>(v->v)) {
@@ -388,20 +388,20 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     assert(not op->getType()->isPointerTy());
     insert_tainted_value(op->getOperand(0), v);
     insert_tainted_value(op->getOperand(1), v);
-    v->visited = true;
+    v->set_visited();
   } else if (auto *uop = dyn_cast<UnaryOperator>(v->v)) {
     // arithmetic
     // TODO do we need to exclude some opcodes?
     assert(uop->getNumOperands() == 1);
     assert(not uop->getType()->isPointerTy());
     insert_tainted_value(uop->getOperand(0), v);
-    v->visited = true;
+    v->set_visited();
   } else if (auto *cmp = dyn_cast<CmpInst>(v->v)) {
     // cmp
     assert(cmp->getNumOperands() == 2);
     insert_tainted_value(cmp->getOperand(0), v);
     insert_tainted_value(cmp->getOperand(1), v);
-    v->visited = true;
+    v->set_visited();
   } else if (auto *select = dyn_cast<SelectInst>(v->v)) {
     insert_tainted_value(select->getCondition(), v);
     auto true_val = insert_tainted_value(select->getTrueValue(), v);
@@ -413,7 +413,7 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
       v->ptr_info->add_ptr_info_user(true_val);
       v->ptr_info->add_ptr_info_user(false_val);
     }
-    v->visited = true;
+    v->set_visited();
   } else if (isa<Argument>(v->v)) {
     visit_arg(v);
   } else if (isa<CallBase>(v->v)) {
@@ -428,14 +428,14 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     // modulo operation) as long as it is not casted back into a ptr
 
     insert_tainted_value(cast->getOperand(0), v);
-    v->visited = true;
+    v->set_visited();
   } else if (auto *gep = dyn_cast<GetElementPtrInst>(v->v)) {
     visit_gep(v);
     assert(is_tainted(gep->getPointerOperand()));
-    v->visited = true;
+    v->set_visited();
   } else if (auto *br = dyn_cast<BranchInst>(v->v)) {
     assert(v->getReason() & TaintReason::CONTROL_FLOW);
-    v->visited = true;
+    v->set_visited();
     if (br->isConditional()) {
       insert_tainted_value(br->getCondition(), v);
     } else {
@@ -443,34 +443,34 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     }
   } else if (auto *sw = dyn_cast<SwitchInst>(v->v)) {
     assert(v->getReason() & TaintReason::CONTROL_FLOW);
-    v->visited = true;
+    v->set_visited();
     insert_tainted_value(sw->getCondition(), v);
   } else if (auto *resume = dyn_cast<ResumeInst>(v->v)) {
     assert(v->getReason() & TaintReason::CONTROL_FLOW);
     // resume exception: nothing to do just keep it
     insert_tainted_value(resume->getOperand(0), v);
-    v->visited = true;
+    v->set_visited();
   } else if (auto *ret = dyn_cast<ReturnInst>(v->v)) {
     insert_tainted_value(ret->getOperand(0), v);
-    v->visited = true;
+    v->set_visited();
   } else if (isa<LandingPadInst>(v->v)) {
     // nothing to do, just keep around
     assert(v->getReason() & TaintReason::CONTROL_FLOW);
-    v->visited = true;
+    v->set_visited();
   } else if (auto *ext = dyn_cast<ExtractValueInst>(v->v)) {
     insert_tainted_value(ext->getAggregateOperand(), v);
-    v->visited = true;
+    v->set_visited();
   } else if (auto *ptoi = dyn_cast<PtrToIntInst>(v->v)) {
     // conversion of ptr TO int e.g. for comparison or alignment check is
     // allowed
     insert_tainted_value(ptoi->getPointerOperand(), v);
-    v->visited = true;
+    v->set_visited();
   } else if (isa<ShuffleVectorInst>(v->v) || isa<ExtractElementInst>(v->v) ||
              isa<InsertElementInst>(v->v)) {
     for (auto *operand : llvm::cast<Instruction>(v->v)->operand_values()) {
       insert_tainted_value(operand, v);
     }
-    v->visited = true;
+    v->set_visited();
   } else if (auto *atomic = dyn_cast<AtomicRMWInst>(v->v)) {
     // a load and store to ptr
     visit_store(v, atomic->getPointerOperand(), atomic->getValOperand());
@@ -481,17 +481,17 @@ void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
     insert_tainted_value(insertvalue->getInsertedValueOperand(), v);
     // indices are constants
     // I mean an integral part of the instruction, not even llvm::ConstantInt
-    v->visited = true;
+    v->set_visited();
   } else if (auto *insertelem = dyn_cast<InsertElementInst>(v->v)) {
     // a load and store to ptr
     insert_tainted_value(insertelem->getOperand(0), v); // vector
     insert_tainted_value(insertelem->getOperand(1), v); // insterted elem
     insert_tainted_value(insertelem->getOperand(2), v); // index
-    v->visited = true;
+    v->set_visited();
   } else if (auto *freeze = dyn_cast<FreezeInst>(v->v)) {
     // essentially a no-op on valid values
     insert_tainted_value(freeze->getOperand(0), v);
-    v->visited = true;
+    v->set_visited();
   } else {
 
     errs() << "Support for analyzing this Value is not implemented yet\n";
@@ -896,7 +896,7 @@ void PrecalculationAnalysis::insert_function_to_include(llvm::Function *func) {
     for (auto *call : fun_to_precalc->callsites) {
       auto call_info =
           insert_tainted_value(call, TaintReason::CONTROL_FLOW_CALLEE_NEEDED);
-      call_info->visited = false; // may need to re visit if it was later
+      call_info->set_need_visit(); // may need to re visit if it was later
       // discovered that it is important
 
       if (fun_to_precalc->include_all_callsites) {
@@ -915,7 +915,7 @@ void PrecalculationAnalysis::insert_function_to_include(llvm::Function *func) {
 void PrecalculationAnalysis::visit_arg(
     const std::shared_ptr<TaintedValue> &arg_info) {
   auto *arg = cast<Argument>(arg_info->v);
-  arg_info->visited = true;
+  arg_info->set_visited();
 
   if (is_func_from_std(arg->getParent())) {
     return;
@@ -981,12 +981,11 @@ void PrecalculationAnalysis::visit_arg(
     } else {
 
       for (auto *call : fun_to_precalc->callsites) {
-        call->dump();
+
         assert(not is_func_from_std(call->getFunction()));
         auto *operand = call->getArgOperand(arg->getArgNo());
         auto new_val = insert_tainted_value(operand, arg_info);
-        new_val->visited =
-            false; // may need to re visit if we discover it is important
+
         if (arg_info->is_pointer()) {
           arg_info->ptr_info->merge_with(new_val->ptr_info);
         }
@@ -1171,8 +1170,8 @@ void PrecalculationAnalysis::include_call_to_std(
 void PrecalculationAnalysis::visit_call(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallBase>(call_info->v);
-  assert(!call_info->visited);
-  call_info->visited = true;
+  assert(!call_info->is_visited());
+  call_info->set_visited();
 
   std::vector<Function *> possible_targets = get_possible_call_targets(call);
 
@@ -1758,7 +1757,7 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       if (pair.second) // was inserted
       {
         // may need to re-visit if we discover that we need it later
-        inserted_elem->visited = false;
+        inserted_elem->set_need_visit();
       }
       // we don't care why the Control flow was tagged for te parent
       inserted_elem->addReason(from->getReason() &
@@ -1777,11 +1776,12 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
       if (pair.second) // was inserted
       {
         // may need to re-visit if we discover that we need it later
-        inserted_elem->visited = false;
+        inserted_elem->set_need_visit();
       }
     }
   }
 
+  /*
   // this code is asserting that we will visit the call if the retval is
   // needed
 #ifndef NDEBUG
@@ -1828,7 +1828,7 @@ std::shared_ptr<TaintedValue> PrecalculationAnalysis::insert_tainted_value(
     }
   }
 #endif
-
+*/
   assert(inserted_elem != nullptr);
   return inserted_elem;
 }
@@ -1850,7 +1850,9 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
             new_val->addReason(TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
             // it may need to be re-visited if we find out that we do need
             // the exception path
-            new_val->visited = false;
+            // TOOD possiblity of endless loop as visited=false is not guarded??
+            new_val->set_need_visit();
+            assert(0 && "Possibility of endles loop: TODO: fixme");
             include_value_in_precompute(new_val);
           } else {
             if (invoke->getUnwindDest() == bb) {

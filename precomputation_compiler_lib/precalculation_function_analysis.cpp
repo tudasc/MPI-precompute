@@ -235,7 +235,7 @@ void PrecalculationFunctionAnalysis::re_visit_callsites() {
   for (auto *c : callsites) {
     if (precalculatioanalysis->is_tainted(c)) {
       auto ti = precalculatioanalysis->get_taint_info(c);
-      ti->visited = false;
+      ti->set_need_visit();
     }
   }
 }

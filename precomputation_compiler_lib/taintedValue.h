@@ -51,12 +51,16 @@ enum TaintReason : int {
 };
 
 struct TaintedValue {
-  TaintedValue(llvm::Value *v) : v(v){};
+  TaintedValue(llvm::Value *v) : v(v) {};
   llvm::Value *v = nullptr;
 
 private:
   int _reason = OTHER;
   bool _include_in_precompute = false;
+  bool _visited = false;
+#ifdef NDEBUG
+  int visit_count = 0;
+#endif
 
 public:
   int getReason() const { return _reason; }
@@ -92,12 +96,21 @@ public:
       _reason = _reason | INCLUDED;
       _include_in_precompute = true;
       // TODO do I rly need to re-visit it?
-      visited = false;
+      _visited = false;
     }
   }
 
 public:
-  bool visited = false;
+  // visited=true
+  void set_visited() {
+    _visited = true;
+#ifdef NDEBUG
+    visit_count++;
+#endif
+  }
+  // visited = false
+  void set_need_visit() { _visited = false; }
+  bool is_visited() const { return _visited; }
 
   // one can have multiple children and parents e.g. one call with several args
   // whose return value is used multiple times
