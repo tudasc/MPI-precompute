@@ -17,6 +17,9 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Casting.h"
+#ifndef NDEBUG
+#include <boost/stacktrace/stacktrace.hpp>
+#endif
 #include <memory>
 
 #ifndef MACH_TAINTED_VALUE_H
@@ -58,7 +61,7 @@ private:
   int _reason = OTHER;
   bool _include_in_precompute = false;
   bool _visited = false;
-#ifdef NDEBUG
+#ifndef NDEBUG
   int visit_count = 0;
 #endif
 
@@ -104,8 +107,15 @@ public:
   // visited=true
   void set_visited() {
     _visited = true;
-#ifdef NDEBUG
+#ifndef NDEBUG
     visit_count++;
+    if (visit_count > 100) {
+      llvm::errs() << "Possible endless loop visiting\n";
+      v->dump();
+      llvm::errs() << "In:\n";
+      llvm::errs() << to_string(boost::stacktrace::stacktrace());
+      assert(false);
+    }
 #endif
   }
   // visited = false
