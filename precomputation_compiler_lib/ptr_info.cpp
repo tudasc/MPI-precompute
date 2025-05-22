@@ -363,7 +363,7 @@ void PtrUsageInfo::add_important_member(
     if (not existing_info.first && member_idx[member_idx.size() - 1]) {
       // new usage has wildcard but old usages may not
       // we need to combine all usages that match this wildcard
-      has_changed = true;
+      // has_changed = true;
 
       std::set<std::shared_ptr<PtrUsageInfo>> to_merge;
       // the set removes duplicates
@@ -390,12 +390,12 @@ void PtrUsageInfo::add_important_member(
       for (auto &m : to_merge) {
         result_ptr->merge_with(m);
       }
+
     } else {
       // exact match regarding wildcards
-      if (existing_info.second != result_ptr) {
-        has_changed = true;
-      }
       existing_info.second->merge_with(result_ptr);
+      // will propergate changes if necessary, no need to set has_changed=true
+      // here
     }
   }
 
