@@ -63,7 +63,7 @@ if [[ -x "./a.out" ]]; then
         fi
     else
         #echo "Original sanitizer found no race"
-        if ./a.out 2>&1 | grep -qF $GREP_STRING; then
+        if ./a.out 2>&1 | grep -qF "$GREP_STRING"; then
                   echo "Original sanitizer found no race but precomputed did"
                     exit -1
                 else
