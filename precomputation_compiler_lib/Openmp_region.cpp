@@ -163,6 +163,7 @@ void sort_parallel_gep_indices(
 }
 void ParallelRegion::get_shared_vars_in_task() {
   assert(_is_task);
+  _function->dump();
   auto arg = _function->getArg(1);   // struct address
   LoadInst *load_parallel = nullptr; // load struct to shared vars
   for (auto u : arg->users()) {
@@ -170,6 +171,9 @@ void ParallelRegion::get_shared_vars_in_task() {
       assert(load_parallel == nullptr && "Only one load of omp task struct");
       load_parallel = load_inst;
     }
+  }
+  if (not load_parallel) {
+    return; // nothing to do: no shared vars used
   }
   // collect shared variables
   std::vector<std::pair<GetElementPtrInst *, Value *>> parallel_geps;
