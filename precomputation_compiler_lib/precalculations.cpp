@@ -1850,10 +1850,10 @@ void PrecalculationAnalysis::insert_necessary_control_flow(Value *v) {
             new_val->addReason(TaintReason::CONTROL_FLOW_EXCEPTION_NEEDED);
             // it may need to be re-visited if we find out that we do need
             // the exception path
-            // TOOD possiblity of endless loop as visited=false is not guarded??
-            new_val->set_need_visit();
-            assert(0 && "Possibility of endles loop: TODO: fixme");
-            include_value_in_precompute(new_val);
+            if (!new_val->isIncludeInPrecompute()) {
+              new_val->set_need_visit();
+              include_value_in_precompute(new_val);
+            }
           } else {
             if (invoke->getUnwindDest() == bb) {
               // this exception block cannot be visited in precompute anyway
