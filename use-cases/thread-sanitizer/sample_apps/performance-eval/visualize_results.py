@@ -6,12 +6,15 @@ from io import StringIO
 DATAPATH = "/home/tim/precompute/use-cases/thread-sanitizer/sample_apps/performance-eval/results"
 NUM_T_TO_SHOW = 96
 
+colors = [
+    "#DDAA33",
+    "#BB5566",
+    "#004488"
+]
+mode_order = ["modified", "normal", "without"]
+mode_to_color = dict(zip(mode_order, colors))
 
 def get_plot_specomp(df_specomp):
-    # Get the Seaborn color palette
-    palette = sns.color_palette(n_colors=df_specomp["mode"].nunique())
-    mode_order = ["modified", "normal", "without"]
-    mode_to_color = dict(zip(mode_order, palette))
 
     fig, axs = plt.subplots(1, 3, sharey=False, figsize=(12, 5))
 
@@ -60,11 +63,6 @@ def get_plot_specomp(df_specomp):
 
 
 def get_plot(df, name):
-    # Get the Seaborn color palette
-    palette = sns.color_palette(n_colors=df["mode"].nunique())
-    mode_order = ["modified", "normal", "without"]
-    mode_to_color = dict(zip(mode_order, palette))
-
     fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(12, 5))
 
     sns.lineplot(data=df[df["num_threads"] == NUM_T_TO_SHOW], x="size", y="time", hue="mode",
