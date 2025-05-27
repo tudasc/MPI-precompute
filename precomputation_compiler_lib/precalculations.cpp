@@ -363,12 +363,11 @@ void PrecalculationAnalysis::visit_phi(
 }
 
 void PrecalculationAnalysis::visit_val(const std::shared_ptr<TaintedValue> &v) {
-  errs() << "Visit\n";
-  v->v->dump();
+  Debug(errs() << "Visit\n"; v->v->dump();)
 
-  // TODO clang tidy repeated branch body (the v->visited = true part)
+      // TODO clang tidy repeated branch body (the v->visited = true part)
 
-  if (isa<Constant>(v->v)) {
+      if (isa<Constant>(v->v)) {
     // nothing to do for constant
     v->set_visited();
   } else if (auto load = dyn_cast<LoadInst>(v->v)) {

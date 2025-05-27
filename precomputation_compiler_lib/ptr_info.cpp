@@ -309,8 +309,8 @@ bool PtrUsageInfo::need_pad_for_gep(llvm::Type *type_of_gep) {
       return false;
     }
   }
-  gep_type->dump();
-  type_of_gep->dump();
+  // gep_type->dump();
+  // type_of_gep->dump();
 
   if (gep_type->isStructTy() && type_of_gep->isStructTy()) {
     // "different" classes e.g. one is base and the other is derived
