@@ -1514,6 +1514,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
         is_func_from_std(func)) {
       if (is_ptr_usage_in_std_write(call, ptr)) {
         ptr->ptr_info->setIsWrittenTo(call, this);
+        ptr->ptr_info->setDerivedPtrIsRelevant(true); // we dont know what part of the ptr is written to by std func
         if (is_store_important(call, ptr->ptr_info)) {
           auto call_info = insert_tainted_value(call, ptr, false);
           include_call_to_std(call_info);
