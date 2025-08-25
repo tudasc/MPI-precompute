@@ -35,4 +35,7 @@ endforeach ()
 #cmakes cpp try compile
 add_compare_test(${CMAKE_CURRENT_SOURCE_DIR}/try-compile.cpp)
 
+# pthreads
+add_compare_test(${CMAKE_CURRENT_SOURCE_DIR}/test_pthread.c)
+
 
