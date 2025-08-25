@@ -317,7 +317,7 @@ void Optimize_loops(llvm::Module &M) {
                     call->getCalledFunction()->getName().startswith("__tsan")) {
                   tsan_calls.push_back(call);
                 } else if (call->getCalledFunction() &&
-                           is_omp_function(call->getCalledFunction())) {
+                           is_thread_function(call->getCalledFunction())) {
                   // todo analyze if we may be able to do something here?
                   errs() << "Loop Optimization fail: Call to Openmp\n";
                   call->dump();

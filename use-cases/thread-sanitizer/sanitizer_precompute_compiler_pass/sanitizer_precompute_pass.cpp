@@ -155,7 +155,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
                   // eiter tsan or omp function
                   // omp function necessary e.g. to keep synchronization
                   (call->getCalledFunction()->getName().startswith("__tsan") ||
-                   is_omp_function(call->getCalledFunction()))) {
+                   is_thread_function(call->getCalledFunction()))) {
                 if (call->getCalledFunction()->getName() ==
                     "__tsan_func_exit") {
                   if (dyn_cast<ResumeInst>(
@@ -189,6 +189,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
       }
     }
 
+errs()<< "Statistics: locations: "<<precompute_locations.size()<<" values: "<< to_precompute.size()<<"\n";
     // no tsan found
     if (precompute_locations.empty()) {
       // no modification

@@ -1045,7 +1045,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_read(
   assert(ptr_arg_info->ptr_info);
   assert(is_call_to_std(call) || call->getCalledFunction()->isIntrinsic());
 
-  if (is_omp_fork_call(call)) {
+  if (is_thread_fork_call(call)) {
     // TODO determine if parallel region actually reads from shared var
     return true;
   }
@@ -1088,7 +1088,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_write(
   assert(ptr_arg_info->ptr_info);
   assert(call->getCalledFunction()->isIntrinsic() || is_call_to_std(call));
 
-  if (is_omp_fork_call(call)) {
+  if (is_thread_fork_call(call)) {
     // TODO determine if parallel region actually writes to shared var
     return true;
   }
@@ -1133,7 +1133,7 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_indirect(
     return true;
   }
 
-  if (is_omp_function(call->getCalledFunction())) {
+  if (is_thread_function(call->getCalledFunction())) {
     return false; // openmp does not do that for relevant ptrs
     // the ptrs where it does are managed by omp runtime anyway
   }
@@ -1227,7 +1227,7 @@ void PrecalculationAnalysis::visit_call(
   }
 
   // analyze if call to str read/writes ptr
-  if (is_call_to_std(call) && !is_omp_fork_call(call)) {
+  if (is_call_to_std(call) && !is_thread_fork_call(call)) {
     for (auto &arg : call->args()) {
       if (auto *v = dyn_cast<Value>(&arg)) {
         if (is_tainted(v) && v->getType()->isPointerTy()) {
@@ -1252,7 +1252,7 @@ void PrecalculationAnalysis::visit_call(
     }
   }
 
-  if (is_omp_fork_call(call)) {
+  if (is_thread_fork_call(call)) {
     visit_call_to_parallel(call_info);
   }
 
@@ -1267,7 +1267,7 @@ void PrecalculationAnalysis::visit_call(
 void PrecalculationAnalysis::visit_call_to_parallel(
     const std::shared_ptr<TaintedValue> &call_info) {
   auto *call = cast<CallInst>(call_info->v);
-  assert(is_omp_fork_call(call));
+  assert(is_thread_fork_call(call));
 
   // need to include all calls to omp runtime that set the settings for this
   // parallel region these calls can only be inside of the same BB before this
@@ -1554,7 +1554,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
     }
   }
 
-  if (is_omp_fork_call(call)) {
+  if (is_thread_fork_call(call)) {
     // find parallel region
     auto parallel_func = cast<Function>(call->getArgOperand(2));
     auto parallel_region_info =

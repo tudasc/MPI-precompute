@@ -111,7 +111,7 @@ bool is_func_from_std(llvm::Function *func) {
   }
 
   // openmp
-  if (is_omp_function(func)) {
+  if (is_thread_function(func)) {
     return true;
   }
   if (func == get_std_dummy_func(func->getParent())) {

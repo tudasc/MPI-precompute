@@ -40,7 +40,7 @@ ParallelRegion::ParallelRegion(Function *ompoutlined) {
   for (auto u : ompoutlined->users()) {
     if (auto *call = dyn_cast<CallBase>(u)) {
 
-      if (is_omp_fork_call(call)) {
+      if (is_thread_fork_call(call)) {
         assert(ompoutlined == call->getArgOperand(2));
         _fork_calls.push_back(call);
       } else if (call->getCalledFunction() &&

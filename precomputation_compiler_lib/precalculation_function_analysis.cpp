@@ -125,7 +125,7 @@ PrecalculationFunctionAnalysis::PrecalculationFunctionAnalysis(
   for (auto *u : func->users()) {
     if (auto call = llvm::dyn_cast<llvm::CallBase>(u)) {
       if (call->getCalledFunction() != func) {
-        if (is_omp_fork_call(call)) {
+        if (is_thread_fork_call(call)) {
           //  call to openmp
 
           is_openmp_parallel = true;
