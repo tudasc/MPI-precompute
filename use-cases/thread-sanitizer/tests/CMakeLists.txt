@@ -36,6 +36,9 @@ endforeach ()
 add_compare_test(${CMAKE_CURRENT_SOURCE_DIR}/try-compile.cpp)
 
 # pthreads
-add_compare_test(${CMAKE_CURRENT_SOURCE_DIR}/test_pthread.c)
+file(GLOB PTHREAD_TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/pthreads/pthread_*.c")
+foreach (PTHREAD_TEST ${PTHREAD_TEST_SOURCES})
+    add_compare_test(${PTHREAD_TEST})
+endforeach ()
 
 
