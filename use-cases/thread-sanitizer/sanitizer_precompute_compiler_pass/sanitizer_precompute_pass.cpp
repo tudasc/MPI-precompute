@@ -189,7 +189,8 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
       }
     }
 
-errs()<< "Statistics: locations: "<<precompute_locations.size()<<" values: "<< to_precompute.size()<<"\n";
+    errs() << "Statistics: locations: " << precompute_locations.size()
+           << " values: " << to_precompute.size() << "\n";
     // no tsan found
     if (precompute_locations.empty()) {
       // no modification
