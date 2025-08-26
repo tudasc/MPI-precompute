@@ -41,4 +41,14 @@ foreach (PTHREAD_TEST ${PTHREAD_TEST_SOURCES})
     add_compare_test(${PTHREAD_TEST})
 endforeach ()
 
+# fortran
+file(GLOB FORTRAN_TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/fortran/fortran*.f90")
+foreach (FORTRAN_TEST_SRC ${FORTRAN_TEST_SOURCES})
+    get_filename_component(FORTRAN_TEST_NAME ${FORTRAN_TEST_SRC} NAME_WE) # Extract filename without extension
+
+    add_test(NAME ${FORTRAN_TEST_NAME}
+            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/fortran/test_fortran.sh ${USECASE_SANITIZER_BINARY_DIR} ${FORTRAN_TEST_SRC}
+    )
+endforeach ()
+
 
