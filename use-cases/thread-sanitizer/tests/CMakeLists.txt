@@ -52,7 +52,5 @@ foreach (FORTRAN_TEST_SRC ${FORTRAN_TEST_SOURCES})
 
 endforeach ()
 
-# __tsan_memset is not supported in fortran right now, at least I get linking errors with the tsan runtime in this case
-set_tests_properties(fortran_test_02 PROPERTIES DISABLED TRUE)
 
 

@@ -14,7 +14,8 @@ GREP_STRING="WARNING: ThreadSanitizer: data race"
 
 rm ./a.out
 
-COMPILER_FLAGS="-O2 -g -fopenmp -flto -fuse-ld=lld -ltsan"
+# manually link the required tsan libraries as flang currently dies not support -fsanitize=thread
+COMPILER_FLAGS="-O2 -g -fopenmp -flto -fuse-ld=lld -Wl,--whole-archive /home/tim/llvm_20/lib/clang/21/lib/x86_64-pc-linux-gnu/libclang_rt.tsan.a -Wl,--no-whole-archive -Wl,--dynamic-list=/home/tim/llvm_20/lib/clang/21/lib/x86_64-pc-linux-gnu/libclang_rt.tsan.a.syms -ldl"
 
 # compile
 # with pass
