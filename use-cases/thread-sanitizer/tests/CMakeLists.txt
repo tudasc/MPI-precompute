@@ -49,6 +49,10 @@ foreach (FORTRAN_TEST_SRC ${FORTRAN_TEST_SOURCES})
     add_test(NAME ${FORTRAN_TEST_NAME}
             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/fortran/test_fortran.sh ${USECASE_SANITIZER_BINARY_DIR} ${FORTRAN_TEST_SRC}
     )
+
 endforeach ()
+
+# __tsan_memset is not supported in fortran right now, at least I get linking errors with the tsan runtime in this case
+set_tests_properties(fortran_test_02 PROPERTIES DISABLED TRUE)
 
 
