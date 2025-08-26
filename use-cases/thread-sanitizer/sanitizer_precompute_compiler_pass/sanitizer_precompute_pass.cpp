@@ -94,6 +94,19 @@ bool is_tsan_cleanup_block(llvm::BasicBlock *block) {
   return it == block->end();
 }
 
+// find compiler used in metadata
+bool is_compiled_with_flang(const Module &M) {
+  if (auto *NMD = M.getNamedMetadata("llvm.ident")) {
+    for (auto *Op : NMD->operands()) {
+      if (auto *MDStr = llvm::dyn_cast<llvm::MDString>(Op->getOperand(0))) {
+        return MDStr->getString().starts_with("flang");
+      }
+    }
+  }
+  errs() << "WARNING: Module contains no Metadata about compiler used!\n";
+  return false;
+}
+
 namespace {
 struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 
@@ -116,12 +129,18 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
         (M.getFunction("__tsan_func_entry")->users().empty())) {
 
       Debug(errs() << "Run tsan pass\n");
+      bool is_fortran_code = is_compiled_with_flang(M);
       //  make sure TSAN pass runs
       auto *FAM =
           &AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
       auto tsan_pass = ThreadSanitizerPass();
       for (auto it = M.begin(); it != M.end(); ++it) {
         Function *f = &*it;
+        if (is_fortran_code) {
+          f->addFnAttr(Attribute::SanitizeThread);
+          // work around for fortran, as fortran does currently not support
+          // -fsanitize=thread flag
+        }
         tsan_pass.run(*f, *FAM);
       }
     }
