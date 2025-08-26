@@ -24,7 +24,7 @@ export USE_COMPILER_PASS=false
 export OMPI_CC=clang
 export OMPI_CXX=clang++
 
-cmake -DCMAKE_C_COMPILER=clang -DCMAKE_C_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" $TEST_DIR
+cmake -DCMAKE_C_COMPILER=clang -DCMAKE_C_FLAGS="-O1 -flto -fuse-ld=lld -fwhole-program-vtables" -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-O1 -flto -fuse-ld=lld -fwhole-program-vtables" $TEST_DIR
 make
 
 mpirun -n 2 ./test | grep "Usage of MPIOPT optimized communication sceme"
@@ -47,7 +47,7 @@ fi
 # also remove all cmake file to start build process from scratch
 rm -rf *
 
-export USE_MPI_COMPILER_ASSISTANCE_PASS=true
+export USE_COMPILER_PASS=true
 export OMPI_CC="${BINARY_DIR}/clang_wrap_cc"
 export OMPI_CXX="${BINARY_DIR}/clang_wrap_cxx"
 
@@ -55,7 +55,7 @@ export OMPI_CXX="${BINARY_DIR}/clang_wrap_cxx"
 echo $ASAN_OPTIONS
 echo $DEBUG_CLANG_WRAPPER
 
-cmake -DCMAKE_C_COMPILER="${MPICC}" -DCMAKE_C_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" -DCMAKE_CXX_COMPILER="${MPICXX}" -DCMAKE_CXX_FLAGS="-flto -fuse-ld=lld -fwhole-program-vtables" $TEST_DIR
+cmake -DCMAKE_C_COMPILER="${MPICC}" -DCMAKE_C_FLAGS="-O1 -flto -fuse-ld=lld -fwhole-program-vtables" -DCMAKE_CXX_COMPILER="${MPICXX}" -DCMAKE_CXX_FLAGS="-O1 -flto -fuse-ld=lld -fwhole-program-vtables" $TEST_DIR
 
 make
 
