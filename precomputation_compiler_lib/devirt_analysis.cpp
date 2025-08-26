@@ -22,7 +22,6 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/BasicAliasAnalysis.h"
@@ -404,7 +403,7 @@ struct DevirtModule {
         ExportSummary(ExportSummary),
         // ImportSummary(ImportSummary),
         Int8Ty(Type::getInt8Ty(M.getContext())),
-        Int8PtrTy(Type::getInt8PtrTy(M.getContext())),
+        Int8PtrTy(PointerType::get(M.getContext(), 0)),
         Int32Ty(Type::getInt32Ty(M.getContext())),
         Int64Ty(Type::getInt64Ty(M.getContext())),
         IntPtrTy(M.getDataLayout().getIntPtrType(M.getContext(), 0)),
@@ -488,7 +487,7 @@ void DevirtModule::buildTypeIdentifierMap(
     std::vector<VTableBits> &Bits,
     DenseMap<Metadata *, std::set<TypeMemberInfo>> &TypeIdMap) {
   DenseMap<GlobalVariable *, VTableBits *> GVToBits;
-  Bits.reserve(M.getGlobalList().size());
+  Bits.reserve(M.global_size());
   SmallVector<MDNode *, 2> Types;
   for (GlobalVariable &GV : M.globals()) {
     Types.clear();
@@ -601,8 +600,9 @@ std::map<llvm::CallBase *, std::vector<llvm::Function *>> DevirtModule::run() {
     DenseMap<GlobalValue::GUID, TinyPtrVector<Metadata *>> MetadataByGUID;
     for (auto &P : TypeIdMap) {
       if (auto *TypeId = dyn_cast<MDString>(P.first))
-        MetadataByGUID[GlobalValue::getGUID(TypeId->getString())].push_back(
-            TypeId);
+        MetadataByGUID[GlobalValue::getGUIDAssumingExternalLinkage(
+                           TypeId->getString())]
+            .push_back(TypeId);
     }
 
     for (auto &P : *ExportSummary) {

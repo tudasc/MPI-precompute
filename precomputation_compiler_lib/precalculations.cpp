@@ -1589,7 +1589,7 @@ void PrecalculationAnalysis::visit_call_from_ptr(
       for (auto arg_num : ptr_given_as_arg) {
         if (arg_num < func->getFunctionType()->getNumParams()) {
           auto *arg = func->getArg(arg_num);
-          if (arg->hasAttribute(Attribute::NoCapture) &&
+          if (!arg->hasAttribute(Attribute::Captures) &&
               arg->hasAttribute(Attribute::ReadOnly)) {
             continue; // nothing to do: reading the val is allowed
             // TODO has foo( int ** array){ array[0][0]=0;} also readonly? as

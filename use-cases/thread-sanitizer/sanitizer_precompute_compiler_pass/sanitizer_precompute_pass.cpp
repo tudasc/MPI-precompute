@@ -39,6 +39,7 @@
 
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include <llvm/IR/IRBuilder.h>
 #include <precalculation.h>
 
 using namespace llvm;
@@ -154,7 +155,7 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
               if (call->getCalledFunction() &&
                   // eiter tsan or omp function
                   // omp function necessary e.g. to keep synchronization
-                  (call->getCalledFunction()->getName().startswith("__tsan") ||
+                  (call->getCalledFunction()->getName().starts_with("__tsan") ||
                    is_thread_function(call->getCalledFunction()))) {
                 if (call->getCalledFunction()->getName() ==
                     "__tsan_func_exit") {
@@ -295,17 +296,13 @@ struct SanitizerPrecomputePass : public PassInfoMixin<SanitizerPrecomputePass> {
 
 } // namespace
 
-PassPluginLibraryInfo getPassPluginInfo() {
-  const auto callback = [](PassBuilder &PB) {
-    PB.registerOptimizerEarlyEPCallback([&](ModulePassManager &MPM, auto) {
-      MPM.addPass(SanitizerPrecomputePass());
-      return true;
-    });
-  };
-
-  return {LLVM_PLUGIN_API_VERSION, "sanitizer-precompute", "1.0.0", callback};
-};
-
 extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
-  return getPassPluginInfo();
+  return {LLVM_PLUGIN_API_VERSION, "sanitizer_precompute", "1.0.0",
+          [](PassBuilder &PB) {
+            PB.registerOptimizerEarlyEPCallback([&](ModulePassManager &MPM,
+                                                    OptimizationLevel Level,
+                                                    ThinOrFullLTOPhase Phase) {
+              MPM.addPass(SanitizerPrecomputePass());
+            });
+          }};
 }

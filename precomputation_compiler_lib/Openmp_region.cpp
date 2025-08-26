@@ -83,23 +83,21 @@ ParallelRegion::ParallelRegion(Function *ompoutlined) {
        call_instructions) { // if thre are indirect calls in parallel region
     if (call->getCalledFunction()) {
       if (call->getCalledFunction() &&
-          call->getCalledFunction()->getName().equals(
-              "__kmpc_for_static_init_4")) {
+          call->getCalledFunction()->getName() == "__kmpc_for_static_init_4") {
         _parallel_for.init = call;
       } else if (call->getCalledFunction() &&
-                 call->getCalledFunction()->getName().equals(
-                     "__kmpc_for_static_fini")) {
+                 call->getCalledFunction()->getName() ==
+                     "__kmpc_for_static_fini") {
         _parallel_for.fini = call;
       }
 
       // Look for a reduction inside the microtask;
       // TODO add the other kmpc functions for reduction pragmas
 
-      else if (call->getCalledFunction()->getName().equals(
-                   "__kmpc_reduce_nowait")) {
+      else if (call->getCalledFunction()->getName() == "__kmpc_reduce_nowait") {
         _reduction.reduce = call;
-      } else if (call->getCalledFunction()->getName().equals(
-                     "__kmpc_end_reduce_nowait")) {
+      } else if (call->getCalledFunction()->getName() ==
+                 "__kmpc_end_reduce_nowait") {
         _reduction.end_reduce = call;
       }
     }
@@ -340,7 +338,7 @@ BasicBlock *ParallelRegion::find_loop_end_block() {
 
   auto it = find_if_exactly_one(
       _function->begin(), _function->end(), [](BasicBlock &bb) {
-        return bb.getName().startswith("omp.dispatch.cond.omp.dispatch.end");
+        return bb.getName().starts_with("omp.dispatch.cond.omp.dispatch.end");
       });
 
   if (it == _function->end()) {

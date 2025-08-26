@@ -48,7 +48,7 @@ PrecomputeFunctions::PrecomputeFunctions(Module &M) {
                          .getCallee()
                          ->stripPointerCasts());
 
-  ftype = FunctionType::get(Type::getInt8PtrTy(M.getContext()),
+  ftype = FunctionType::get(PointerType::get(M.getContext(), 0),
                             {Type::getInt64Ty(M.getContext())}, false);
 
   allocate_memory = cast<Function>(

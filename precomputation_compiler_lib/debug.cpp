@@ -26,7 +26,7 @@ void add_debug_printfs_to_precalculation(llvm::Function *func) {
 
   auto *M = func->getParent();
   auto *ftype = FunctionType::get(Type::getVoidTy(M->getContext()),
-                                  Type::getInt8PtrTy(M->getContext()), true);
+                                  PointerType::get(M->getContext(), 0), true);
   auto printf_func = M->getOrInsertFunction("printf", ftype);
 
   for (auto &bb : *func) {

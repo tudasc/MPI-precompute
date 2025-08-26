@@ -51,107 +51,107 @@ struct mpi_functions *get_used_mpi_functions(llvm::Module &M) {
 
   for (auto it = M.begin(); it != M.end(); ++it) {
     Function *f = &*it;
-    if (f->getName().equals("MPI_Init")) {
+    if (f->getName() == "MPI_Init") {
       result->mpi_init = f;
 
-    } else if (f->getName().equals("MPI_Init_thread")) {
+    } else if (f->getName() == "MPI_Init_thread") {
       result->mpi_init_thread = f;
-    } else if (f->getName().equals("MPI_Comm_rank")) {
+    } else if (f->getName() == "MPI_Comm_rank") {
       result->mpi_comm_rank = f;
-    } else if (f->getName().equals("MPI_Comm_size")) {
+    } else if (f->getName() == "MPI_Comm_size") {
       result->mpi_comm_size = f;
 
       // sync functions:
-    } else if (f->getName().equals("MPI_Finalize")) {
+    } else if (f->getName() == "MPI_Finalize") {
       result->mpi_finalize = f;
 
-    } else if (f->getName().equals("MPI_Barrier")) {
+    } else if (f->getName() == "MPI_Barrier") {
       result->mpi_barrier = f;
 
-    } else if (f->getName().equals("MPI_Ibarrier")) {
+    } else if (f->getName() == "MPI_Ibarrier") {
       result->mpi_Ibarrier = f;
 
-    } else if (f->getName().equals("MPI_Allreduce")) {
+    } else if (f->getName() == "MPI_Allreduce") {
       result->mpi_allreduce = f;
 
-    } else if (f->getName().equals("MPI_Iallreduce")) {
+    } else if (f->getName() == "MPI_Iallreduce") {
       result->mpi_Iallreduce = f;
 
-    } else if (f->getName().equals("MPI_Wtime")) {
+    } else if (f->getName() == "MPI_Wtime") {
       result->mpi_wtime = f;
     }
 
     // different sending modes:
-    else if (f->getName().equals("MPI_Send")) {
+    else if (f->getName() == "MPI_Send") {
       result->mpi_send = f;
 
-    } else if (f->getName().equals("MPI_Bsend")) {
+    } else if (f->getName() == "MPI_Bsend") {
       result->mpi_Bsend = f;
 
-    } else if (f->getName().equals("MPI_Ssend")) {
+    } else if (f->getName() == "MPI_Ssend") {
       result->mpi_Ssend = f;
 
-    } else if (f->getName().equals("MPI_Rsend")) {
+    } else if (f->getName() == "MPI_Rsend") {
       result->mpi_Rsend = f;
 
-    } else if (f->getName().equals("MPI_Isend")) {
+    } else if (f->getName() == "MPI_Isend") {
       result->mpi_Isend = f;
 
-    } else if (f->getName().equals("MPI_Ibsend")) {
+    } else if (f->getName() == "MPI_Ibsend") {
       result->mpi_Ibsend = f;
 
-    } else if (f->getName().equals("MPI_Issend")) {
+    } else if (f->getName() == "MPI_Issend") {
       result->mpi_Issend = f;
 
-    } else if (f->getName().equals("MPI_Irsend")) {
+    } else if (f->getName() == "MPI_Irsend") {
       result->mpi_Irsend = f;
 
-    } else if (f->getName().equals("MPI_Sendrecv")) {
+    } else if (f->getName() == "MPI_Sendrecv") {
       result->mpi_Sendrecv = f;
 
-    } else if (f->getName().equals("MPI_Recv")) {
+    } else if (f->getName() == "MPI_Recv") {
       result->mpi_recv = f;
 
-    } else if (f->getName().equals("MPI_Irecv")) {
+    } else if (f->getName() == "MPI_Irecv") {
       result->mpi_Irecv = f;
 
       // Other MPI functions, that themselves may not yield another conflict
-    } else if (f->getName().equals("MPI_Buffer_detach")) {
+    } else if (f->getName() == "MPI_Buffer_detach") {
       result->mpi_buffer_detach = f;
 
-    } else if (f->getName().equals("MPI_Test")) {
+    } else if (f->getName() == "MPI_Test") {
       result->mpi_test = f;
-    } else if (f->getName().equals("MPI_Testall")) {
+    } else if (f->getName() == "MPI_Testall") {
       result->mpi_testall = f;
-    } else if (f->getName().equals("MPI_Testany")) {
+    } else if (f->getName() == "MPI_Testany") {
       result->mpi_testany = f;
-    } else if (f->getName().equals("MPI_Testsome")) {
+    } else if (f->getName() == "MPI_Testsome") {
       result->mpi_testsome = f;
-    } else if (f->getName().equals("MPI_Wait")) {
+    } else if (f->getName() == "MPI_Wait") {
       result->mpi_wait = f;
-    } else if (f->getName().equals("MPI_Waitall")) {
+    } else if (f->getName() == "MPI_Waitall") {
       result->mpi_waitall = f;
-    } else if (f->getName().equals("MPI_Waitany")) {
+    } else if (f->getName() == "MPI_Waitany") {
       result->mpi_waitany = f;
-    } else if (f->getName().equals("MPI_Waitsome")) {
+    } else if (f->getName() == "MPI_Waitsome") {
       result->mpi_waitsome = f;
-    } else if (f->getName().equals("MPI_Start")) {
+    } else if (f->getName() == "MPI_Start") {
       result->mpi_start = f;
-    } else if (f->getName().equals("MPI_Startall")) {
+    } else if (f->getName() == "MPI_Startall") {
       result->mpi_startall = f;
-    } else if (f->getName().equals("MPI_Recv_init")) {
+    } else if (f->getName() == "MPI_Recv_init") {
       result->mpi_recv_init = f;
 
-    } else if (f->getName().equals("MPI_Send_init")) {
+    } else if (f->getName() == "MPI_Send_init") {
       result->mpi_send_init = f;
 
-    } else if (f->getName().equals("MPI_Request_free")) {
+    } else if (f->getName() == "MPI_Request_free") {
       result->mpi_request_free = f;
-    } else if (f->getName().equals("MPI_Info_create")) {
+    } else if (f->getName() == "MPI_Info_create") {
       result->mpi_info_create = f;
-    } else if (f->getName().equals("MPI_Info_set")) {
+    } else if (f->getName() == "MPI_Info_set") {
       result->mpi_info_set = f;
-    } else if (f->getName().equals("MPI_Info_free")) {
+    } else if (f->getName() == "MPI_Info_free") {
       result->mpi_info_free = f;
     }
   }

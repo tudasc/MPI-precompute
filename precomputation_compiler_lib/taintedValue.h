@@ -21,6 +21,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 #include <boost/stacktrace/stacktrace.hpp>
 #endif
 #include <memory>
+#include <set>
 
 #ifndef MACH_TAINTED_VALUE_H
 #define MACH_TAINTED_VALUE_H

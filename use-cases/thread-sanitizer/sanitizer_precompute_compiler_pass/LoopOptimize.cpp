@@ -144,10 +144,10 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
 
   auto tsan_read_range_func = M.getOrInsertFunction(
       "__tsan_read_range", Type::getVoidTy(M.getContext()),
-      Type::getInt8PtrTy(M.getContext()), Type::getInt64Ty(M.getContext()));
+      PointerType::get(M.getContext(), 0), Type::getInt64Ty(M.getContext()));
   auto tsan_write_range_func = M.getOrInsertFunction(
       "__tsan_write_range", Type::getVoidTy(M.getContext()),
-      Type::getInt8PtrTy(M.getContext()), Type::getInt64Ty(M.getContext()));
+      PointerType::get(M.getContext(), 0), Type::getInt64Ty(M.getContext()));
 
   auto SE = analysis_results->getSE(*loop->getHeader()->getParent());
   BasicBlock *incoming;
@@ -229,7 +229,7 @@ bool perform_tsan_licm(llvm::Module &M, Loop *loop,
 
       // create tsan call
       builder.SetInsertPoint(dummy_inst);
-      auto *as_ptr = builder.CreateIntToPtr(val_min, builder.getInt8PtrTy());
+      auto *as_ptr = builder.CreateIntToPtr(val_min, builder.getPtrTy());
       auto *size = builder.CreateSub(val_max, val_min);
       // need to include the size of last access
       auto *size_full = builder.CreateAdd(size, get_size_of_tsan_access(call));
@@ -314,7 +314,8 @@ void Optimize_loops(llvm::Module &M) {
               llvm::Instruction *inst = &*it_i;
               if (auto *call = dyn_cast<CallBase>(inst)) {
                 if (call->getCalledFunction() &&
-                    call->getCalledFunction()->getName().startswith("__tsan")) {
+                    call->getCalledFunction()->getName().starts_with(
+                        "__tsan")) {
                   tsan_calls.push_back(call);
                 } else if (call->getCalledFunction() &&
                            is_thread_function(call->getCalledFunction())) {
