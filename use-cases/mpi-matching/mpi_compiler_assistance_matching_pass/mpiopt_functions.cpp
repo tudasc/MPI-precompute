@@ -50,8 +50,8 @@ void add_mpi_info_functions(llvm::Module &M) {
   if (mpi_func->mpi_info_set == nullptr) {
     auto fntype = FunctionType::get(Type::getInt32Ty(M.getContext()),
                                     {mpi_implementation_specifics->mpi_info,
-                                     Type::getInt8PtrTy(M.getContext()),
-                                     Type::getInt8PtrTy(M.getContext())},
+                                     PointerType::get(M.getContext(), 0),
+                                     PointerType::get(M.getContext(), 0)},
                                     false);
 
     mpi_func->mpi_info_set =
