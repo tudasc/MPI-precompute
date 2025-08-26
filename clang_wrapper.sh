@@ -49,7 +49,7 @@ done
 # check if necessary flags are given
 if [ "$USE_COMPILER_PASS" == true ] &&
     ( [ "$has_flto" == false ] ||
-   [ "$has_fwhole_program_vtables" == false ] || [ "$has_opt_lvl" == false ] ); then
+  ( [ "$has_fwhole_program_vtables" == false ] && [ "$compiler" != flang ])|| [ "$has_opt_lvl" == false ] ); then
     echo "Error, need -flto and -fwhole-program-vtables and at least -O1 for pass to work correctly"
     export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit 1
