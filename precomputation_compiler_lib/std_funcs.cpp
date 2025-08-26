@@ -198,5 +198,10 @@ bool is_func_from_std(llvm::Function *func) {
     return true;
   }
 
+  // flang
+  if (func->getName().starts_with("_FortranAio")) {
+    return true;
+  }
+
   return false;
 }
