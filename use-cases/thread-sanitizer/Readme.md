@@ -5,7 +5,7 @@ instrumentation, leading to a program skeleton that has only the data race detec
 
 ## Prerequisites
 
-For this Project, we used clang/`llvm 16.0.1`
+For this Project, we used clang/`llvm 21.1.0`
 The cmake configure step will download DataRaceBench REFERENZ? for testing
 
 ## Building
