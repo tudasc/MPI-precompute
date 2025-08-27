@@ -1564,6 +1564,11 @@ void PrecalculationAnalysis::visit_call_from_ptr(
           assert(ptr->ptr_info->isWrittenTo());
         }
       }
+      if (is_ptr_usage_in_std_read(call,ptr)) {
+        ptr->ptr_info->setIsReadFrom(call, this);
+        ptr->ptr_info->setDerivedPtrIsRelevant(
+            true); // we dont know what part of the ptr is read by std
+      }
       return;
     }
   }
@@ -2045,7 +2050,7 @@ bool PrecalculationAnalysis::is_store_important(
   /*
   bool interesting = true;
   if (auto *store = dyn_cast<StoreInst>(inst)) {
-    interesting = store->getValueOperand()->getName() == "tn.addr";
+    //interesting = store->getValueOperand()->getName() == "tn.addr";
     if (interesting) {
       errs() << "INTERESTING ACCESS:\n";
       store->dump();
