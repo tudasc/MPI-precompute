@@ -1143,8 +1143,10 @@ bool PrecalculationAnalysis::is_ptr_usage_in_std_indirect(
   }
 
   if (is_thread_function(call->getCalledFunction())) {
-    return false; // openmp does not do that for relevant ptrs
-    // the ptrs where it does are managed by omp runtime anyway
+    return true;
+    // return
+    // call->getCalledFunction()!=get_omp_functions(*call->getModule())->kmpc_omp_task_with_deps;
+    //  other ptrs are managed by omp runtime anyway
   }
   if (call->getCalledFunction()->isIntrinsic()) {
     return false;
@@ -1235,12 +1237,14 @@ void PrecalculationAnalysis::visit_call(
     include_value_in_precompute(func_ptr_info);
   }
 
+
   // analyze if call to str read/writes ptr
   if (is_call_to_std(call) && !is_thread_fork_call(call)) {
     for (auto &arg : call->args()) {
       if (auto *v = dyn_cast<Value>(&arg)) {
         if (is_tainted(v) && v->getType()->isPointerTy()) {
           if (is_ptr_usage_in_std_write(call, get_taint_info(v))) {
+            get_taint_info(v)->ptr_info->setIsWrittenTo(call, this);
             get_function_analysis(call->getFunction())
                 ->add_ptr_write(get_taint_info(v)->ptr_info);
             // std may write to derived ptrs
@@ -1249,6 +1253,7 @@ void PrecalculationAnalysis::visit_call(
             }
           }
           if (is_ptr_usage_in_std_read(call, get_taint_info(v))) {
+            get_taint_info(v)->ptr_info->setIsReadFrom(call, this);
             get_function_analysis(call->getFunction())
                 ->add_ptr_read(get_taint_info(v)->ptr_info);
             // std may read derived ptrs
