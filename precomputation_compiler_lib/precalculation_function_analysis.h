@@ -171,6 +171,10 @@ inline bool should_call_intrinsic(llvm::Intrinsic::ID id) {
       id == llvm::Intrinsic::sponentry || id == llvm::Intrinsic::frameaddress ||
       id == llvm::Intrinsic::threadlocal_address ||
 
+      // handling of varargs
+      id == llvm::Intrinsic::vastart || id == llvm::Intrinsic::vacopy ||
+      id == llvm::Intrinsic::vaend ||
+
       // vector instructions
       id == llvm::Intrinsic::vector_reduce_add ||
       llvm::Intrinsic::getName(id).starts_with("llvm.x86.sse"); // NOLINT
