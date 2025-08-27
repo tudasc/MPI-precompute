@@ -100,12 +100,15 @@ if [ "$has_o_files" == true ]; then
     if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
         echo "MODE: Link .o files"
     fi
+
+    TMP_FILE=$(mktemp --suffix=.bc)
     #-x ir - : read ir from stdin
-    COMPILER_INVOCATION="$compiler -x ir -"
+    COMPILER_INVOCATION="$compiler $TMP_FILE"
     if [[ "$USE_COMPILER_PASS" == true ]]; then
         COMPILER_INVOCATION="$COMPILER_INVOCATION -fpass-plugin=$COMPILER_PASS -lprecompute"
     fi
-    LLVM_LINK_INVOCATION="llvm-link"
+
+    LLVM_LINK_INVOCATION="llvm-link -o $TMP_FILE"
     for arg in "$@"; do
         if [[ "$arg" == *.o ]]; then
             # Remove the ".o" suffix and append ".bc"
@@ -128,9 +131,9 @@ if [ "$has_o_files" == true ]; then
         fi
     done
     if [ "$DEBUG_CLANG_WRAPPER" == true ]; then
-        echo "$LLVM_LINK_INVOCATION | $COMPILER_INVOCATION"
+        echo "$LLVM_LINK_INVOCATION && $COMPILER_INVOCATION"
     fi
-    $LLVM_LINK_INVOCATION | $COMPILER_INVOCATION
+    $LLVM_LINK_INVOCATION && $COMPILER_INVOCATION
     export LD_PRELOAD="$LD_PRELOAD_PREV"
     exit
 fi
