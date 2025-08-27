@@ -171,7 +171,13 @@ void ParallelRegion::get_shared_vars_in_task() {
     }
   }
   if (not load_parallel) {
+    _to_serial_map[arg] = {};
+    for (auto *task_alloc : _task_alloc_calls) {
+      _to_serial_map[arg].push_back(task_alloc);
+      _to_parallel_map[task_alloc] = arg;
+    }
     return; // nothing to do: no shared vars used
+    // ensure that the struct aliases though
   }
   // collect shared variables
   std::vector<std::pair<GetElementPtrInst *, Value *>> parallel_geps;

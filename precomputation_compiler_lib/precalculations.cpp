@@ -983,7 +983,16 @@ void PrecalculationAnalysis::visit_arg(
         // will be set by omp runtime: nothing to do
       } else if (arg->getArgNo() == 1) {
         assert(arg->getType()->isPointerTy());
-        // alias all relevant shared values
+        auto in_serial_vec =
+            fun_to_precalc->parallel_region->get_value_in_serial(arg);
+        for (auto *in_serial : in_serial_vec) {
+          auto serial_info = insert_tainted_value(in_serial, arg_info);
+          // create another ptr alias
+          if (arg->getType()->isPointerTy()) {
+            serial_info->ptr_info->merge_with(arg_info->ptr_info);
+          }
+        }
+        // and directly alias all relevant shared values
         for (auto *parallel_v : fun_to_precalc->parallel_region
                                     ->get_shared_variables_in_parallel()) {
           assert(parallel_v->getType()->isPointerTy());
@@ -2028,16 +2037,17 @@ bool PrecalculationAnalysis::is_store_important(
   assert(isa<StoreInst>(inst) || isa<AtomicRMWInst>(inst) ||
          isa<CallBase>(inst));
 
-  bool interesting = false;
+  /*
+  bool interesting = true;
   if (auto *store = dyn_cast<StoreInst>(inst)) {
-    /*interesting = store->getValueOperand()->getName() == "tn.addr";
+    interesting = store->getValueOperand()->getName() == "tn.addr";
     if (interesting) {
       errs() << "INTERESTING ACCESS:\n";
       store->dump();
       errs() << "IN: " << store->getFunction()->getName() << "\n";
       ptr_info->dump();
-    }*/
-  }
+    }
+  }*/
 
   if (not ptr_info->isReadFrom()) {
     // errs() << "NOT READ\n";
